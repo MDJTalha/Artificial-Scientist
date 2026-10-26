@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-import { getStatusPresentation, type ServiceStatus } from './lib/status'
+import { getStatusPresentation, isHealthyResponse, type ServiceStatus } from './lib/status'
 
 interface HealthResponse {
   status: string
@@ -50,17 +50,8 @@ export default function App() {
         }
 
         const payload: unknown = await response.json()
-        if (
-          typeof payload !== 'object' ||
-          payload === null ||
-          !('status' in payload) ||
-          !('service' in payload) ||
-          !('version' in payload) ||
-          typeof payload.status !== 'string' ||
-          typeof payload.service !== 'string' ||
-          typeof payload.version !== 'string'
-        ) {
-          throw new Error('The API returned an unexpected health response.')
+        if (!isHealthyResponse(payload)) {
+          throw new Error('The API did not report a healthy status.')
         }
 
         setHealth({
@@ -108,21 +99,21 @@ export default function App() {
             Overview
             <span className="nav-indicator" />
           </a>
-          <a className="nav-item nav-item-disabled" href="#research-cycle" aria-disabled="true">
+          <button className="nav-item nav-item-disabled" type="button" disabled>
             <span className="nav-symbol">⌕</span>
             Research agenda
             <span className="nav-soon">PLANNED</span>
-          </a>
-          <a className="nav-item nav-item-disabled" href="#planned-capabilities" aria-disabled="true">
+          </button>
+          <button className="nav-item nav-item-disabled" type="button" disabled>
             <span className="nav-symbol">⌘</span>
             Evidence explorer
             <span className="nav-soon">PLANNED</span>
-          </a>
-          <a className="nav-item nav-item-disabled" href="#planned-capabilities" aria-disabled="true">
+          </button>
+          <button className="nav-item nav-item-disabled" type="button" disabled>
             <span className="nav-symbol">∑</span>
             Computing lab
             <span className="nav-soon">PLANNED</span>
-          </a>
+          </button>
         </nav>
 
         <div className="sidebar-bottom">
