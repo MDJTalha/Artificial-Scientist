@@ -1,6 +1,6 @@
 # Backend
 
-The backend is a Python/FastAPI research foundation with health/readiness endpoints, a local record/provenance API, and a bounded scholarly metadata search API for OpenAlex and Crossref. The record API validates typed research records and relationships, persists them in SQLite, hashes stored payloads, and records creation events. Literature search normalizes provider metadata, records retrieval provenance, and can persist source records. It does not download full-text papers, assess scientific truth, call an LLM, or run experiments.
+The backend is a Python/FastAPI research foundation with health/readiness endpoints, a local record/provenance API, a bounded OpenAlex/Crossref metadata search API, and a scientific knowledge graph API. Research records, concepts, and relationships are stored immutably in SQLite with checksums and creation events. Concept search covers preferred labels, aliases, and definitions; graph links retain direction, evidence-source IDs, and assertion status. It does not download full-text papers, assess scientific truth, call an LLM, or run experiments.
 
 ## Requirements
 
@@ -32,6 +32,13 @@ If Python 3.12 is not installed, use an installed supported Python version (3.12
 - GET /api/v1/records/{record_id} — fetch and verify a record's SHA-256 payload checksum and schema
 - GET /api/v1/records/audit-events — list server-generated creation audit events
 - POST /api/v1/literature/search — search OpenAlex and/or Crossref, normalize metadata, deduplicate results, and optionally persist source records
+- GET /api/v1/knowledge/vocabulary — list controlled concept/domain/predicate/status values
+- POST /api/v1/knowledge/concepts — create an immutable scientific concept
+- GET /api/v1/knowledge/concepts — search labels, aliases and definitions with optional domain/type/status filters
+- GET /api/v1/knowledge/concepts/{concept_id} — retrieve and verify one concept
+- POST /api/v1/knowledge/relationships — add an evidence-linkable relation between existing concepts
+- GET /api/v1/knowledge/concepts/{concept_id}/relationships — list incoming/outgoing relations
+- GET /api/v1/knowledge/graph/neighborhood?concept_id={uuid}&depth=1 — traverse a bounded concept neighborhood
 
 Readiness currently checks only application configuration; it does not assert that remote scholarly APIs, models, or computational services are available. Literature search requires outbound internet access and may return partial or unavailable provider statuses. Records default to `data/artificial_scientist.sqlite3` relative to the backend working directory. Override with `ARTIFICIAL_SCIENTIST_DB_PATH` to select another path. The API is a local development foundation and has no authentication yet; do not expose it to untrusted networks.
 
