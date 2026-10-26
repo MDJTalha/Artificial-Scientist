@@ -24,9 +24,11 @@ The current lab router uses a single shared `X-Lab-API-Key` outside development.
 
 - [x] Add provider-neutral OIDC bearer-token validation using maintained PyJWT/JWKS support; configure issuer, audience, and HTTPS JWKS URL explicitly. This validates identity claims but does not implement a provider-specific login flow.
 - [ ] Select and document the production identity provider and verify its access-token format, key rotation, and deployment configuration.
-- [ ] Add principal, tenant, membership, and role-permission data models with schema migration tests.
+- [x] Add SQLite persistence primitives for immutable principal IDs, tenants, explicit memberships, supported roles, and security audit events.
+- [ ] Add schema migration and legacy-record ownership tests; wire these records into protected run/artifact storage before claiming tenant isolation.
 - [x] Enforce configured OIDC bearer validation on the lab router; when any OIDC setting is configured, partial configuration fails closed and the legacy shared API key cannot bypass OIDC.
-- [ ] Propagate the validated immutable principal into request context and add deny-by-default permission checks.
+- [x] Propagate the validated identity into request context; add an explicit role/action matrix that denies unknown roles and actions.
+- [ ] Resolve request identity to a persisted principal and require tenant membership at every protected route.
 - [ ] Add tenant ownership to run and execution-attempt records; define a reviewed legacy-data migration.
 - [ ] Enforce tenant scoping inside all run, artifact, export, verification, and status store operations.
 - [ ] Add transactional per-tenant quotas and tests for concurrent uploads and run creation.
@@ -58,4 +60,10 @@ Set all three environment variables to enable OIDC validation for the lab API:
 
 The validator accepts signed RS256 tokens only, validates issuer, audience, expiry and issued-at claims, and requires `sub`, `iss`, `aud`, `iat`, and `exp`. A missing or partial OIDC configuration fails closed outside development. Once any OIDC setting is supplied, the shared API key cannot be used as a fallback. The JWKS endpoint must use HTTPS.
 
-This is an authentication foundation, not a complete SaaS authorization system. The validated subject is not yet propagated as a principal to storage operations, and no tenant ownership or RBAC is claimed. Until tenant scoping and cross-tenant tests are implemented, the service must still be treated as a trusted single-deployment service. Development mode continues to bypass the lab authentication dependency for local development only.
+This is an authentication and authorization-foundation layer, not a complete SaaS authorization system. Validated identity is stored in request context, and tenant-directory primitives and a deny-by-default role matrix exist, but these are not yet enforced by run/artifact storage operations. No tenant isolation is claimed. Until tenant scoping and cross-tenant tests are implemented, the service must still be treated as a trusted single-deployment service. Development mode continues to bypass the lab authentication dependency for local development only.
+
+## Tenant-directory foundation added
+
+The current branch adds `artificial_scientist.authorization.TenantDirectory`, which persists opaque principal IDs derived from the trusted issuer/subject pair, tenant records, explicit active memberships, and append-only-style security audit events. The supported roles are `tenant_admin`, `researcher`, `viewer`, and `auditor`; unknown roles/actions deny by default. Membership checks record allowed and denied outcomes without recording credentials or scientific payloads.
+
+This is an initial persistence primitive, not a completed migration or enforcement layer. Existing lab tables still do not carry tenant ownership, and protected store methods are not yet scoped by tenant. Do not expose this branch to multiple customers until that integration and the cross-tenant negative tests are complete.
