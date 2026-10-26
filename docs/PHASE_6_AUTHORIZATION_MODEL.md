@@ -29,11 +29,11 @@ The current lab router uses a single shared `X-Lab-API-Key` outside development.
 - [x] Enforce configured OIDC bearer validation on the lab router; when any OIDC setting is configured, partial configuration fails closed and the legacy shared API key cannot bypass OIDC.
 - [x] Propagate the validated identity into request context; add an explicit role/action matrix that denies unknown roles and actions.
 - [x] Resolve validated request identity to a stable principal ID and require active tenant membership and action permission on run, execution-status, JSON artifact, binary artifact, verification, and export routes.
-- [ ] Add tenant ownership to run and execution-attempt records; define a reviewed legacy-data migration.
+- [x] Add nullable tenant ownership columns to run and execution-attempt records; legacy rows remain unowned rather than being assigned arbitrarily.\n- [ ] Define, test, and review the operational migration/claim process for legacy records before production rollout.
 - [x] Add tenant filters to run lists/reads, execution-status reads, JSON artifact lists/reads, binary artifact lists/reads, and export/verification route storage calls.
 - [ ] Add transactional per-tenant quotas and tests for concurrent uploads and run creation.
 - [ ] Add security audit events without recording secrets or raw request payloads.
-- [ ] Expand negative cross-tenant tests across every object endpoint, including UUID substitution for export, verification, execution status, uploads, and downloads.
+- [ ] Complete negative cross-tenant tests across every object endpoint, including UUID substitution for export, verification, execution status, uploads, and downloads. Current coverage includes store-level run/artifact/binary isolation, execution status, and API-level denial for read/export/verification/download paths; a regression test now checks that cross-tenant binary uploads are rejected before scanning.
 - [ ] Verify behavior in CI and conduct an independent security review before exposing untrusted or multi-tenant traffic.
 
 ## Minimum acceptance tests
@@ -66,4 +66,4 @@ This is an incremental authorization implementation, not a claim of production S
 
 The current branch adds `artificial_scientist.authorization.TenantDirectory`, which persists opaque principal IDs derived from the trusted issuer/subject pair, tenant records, explicit active memberships, and append-only-style security audit events. The supported roles are `tenant_admin`, `researcher`, `viewer`, and `auditor`; unknown roles/actions deny by default. Membership checks record allowed and denied outcomes without recording credentials or scientific payloads.
 
-This is an initial persistence primitive, not a completed migration or enforcement layer. Existing lab tables still do not carry tenant ownership, and protected store methods are not yet scoped by tenant. Do not expose this branch to multiple customers until that integration and the cross-tenant negative tests are complete.
+This is an incremental authorization and persistence layer, not a completed migration or enforcement layer. The current branch adds nullable tenant ownership to run and execution-attempt records and scopes protected run/artifact operations by tenant; legacy rows remain unowned and must stay inaccessible to tenant-scoped requests. Migration/claim handling, transactional tenant quotas, complete cross-tenant endpoint coverage, production identity-provider verification, and independent security review remain open. Do not expose this branch to multiple customers until those controls and reviews are complete.
