@@ -88,16 +88,16 @@ class LabRunResponse(BaseModel):
         "Declarative allowlisted operations only; arbitrary generated code is never executed."
     )
     limitations: list[str] = [
-        "Canonical JSON run-result artifacts are stored; "
-        "general binary artifacts and automated retention scheduling are not implemented. "
-        "An internal bounded purge preserves retention tombstones.",
+        "Only canonical JSON run-result artifacts are currently supported; general binary "
+        "scientific artifacts and complete cross-system provenance are not implemented. An "
+        "opt-in retention job entry point is available, but must be invoked by an external "
+        "operator-managed scheduler.",
         "POSIX workers receive CPU, address-space, file-size, descriptor, and core-dump limits. "
         "These limits do not isolate filesystem, network, syscalls, or kernel attack surface.",
         "Environment manifests and replay comparison are available, but identical outputs do not "
         "prove scientific validity. This service is not a complete OS sandbox and must remain on "
         "trusted infrastructure.",
     ]
-
 
 
 class LabArtifactMetadata(LabModel):
@@ -118,6 +118,7 @@ class LabArtifactResponse(LabArtifactMetadata):
 
     content: dict[str, Any]
 
+
 class LabRunVerificationResponse(BaseModel):
     """Outcome of replaying a stored run against the current runtime."""
 
@@ -129,4 +130,3 @@ class LabRunVerificationResponse(BaseModel):
     differences: list[str]
     recorded_environment: dict[str, str]
     current_environment: dict[str, str]
-
