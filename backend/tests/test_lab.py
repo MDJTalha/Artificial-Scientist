@@ -12,7 +12,7 @@ from artificial_scientist.lab.engine import run_lab
 from artificial_scientist.lab.execution import LabExecutionTimeout, run_isolated
 from artificial_scientist.lab.integrity import result_digest
 from artificial_scientist.lab.models import LabRunRequest
-from artificial_scientist.lab.store import LabRunStore
+from artificial_scientist.lab.store import LabArtifactNotFound, LabRunStore
 from artificial_scientist.main import app
 
 
@@ -410,7 +410,7 @@ def test_retention_purge_deletes_artifacts_and_preserves_audit_tombstone(tmp_pat
         "test_retention",
         1,
     )
-    with pytest.raises(Exception):
+    with pytest.raises(LabArtifactNotFound):
         store.get_artifact(artifact_id)
 
 
