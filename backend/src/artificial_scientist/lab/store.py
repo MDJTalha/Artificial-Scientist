@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import sqlite3
 from pathlib import Path
@@ -73,6 +74,25 @@ class LabRunStore:
             )
         return run
 
+    @staticmethod
+    def _verify_result_hash(run: LabRunResponse) -> None:
+        """Verify the stored step payload against the digest recorded at execution."""
+        canonical = json.dumps(
+            {
+                "run_id": str(run.run_id),
+                "configuration_sha256": run.configuration_sha256,
+                "status": run.status,
+                "steps": [step.model_dump(mode="json") for step in run.steps],
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        )
+        actual = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+        if actual != run.result_sha256:
+            raise RuntimeError("Stored lab run result hash does not match its payload.")
+
     def get(self, run_id: UUID) -> LabRunResponse:
         with self._connect() as connection:
             row = connection.execute(
@@ -84,6 +104,7 @@ class LabRunStore:
         try:
             payload: dict[str, Any] = json.loads(row["payload_json"])
             run = LabRunResponse.model_validate(payload)
+            self._verify_result_hash(run)
         except (json.JSONDecodeError, TypeError, ValueError) as error:
             raise RuntimeError("Stored lab run failed schema validation.") from error
         return run
@@ -98,7 +119,9 @@ class LabRunStore:
         runs: list[LabRunResponse] = []
         for row in rows:
             try:
-                runs.append(LabRunResponse.model_validate(json.loads(row["payload_json"])))
+                run = LabRunResponse.model_validate(json.loads(row["payload_json"]))
+                self._verify_result_hash(run)
+                runs.append(run)
             except (json.JSONDecodeError, TypeError, ValueError) as error:
                 raise RuntimeError("Stored lab run failed schema validation.") from error
         return runs, total
