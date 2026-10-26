@@ -5,7 +5,7 @@ verify source truth, the identity of a reviewer, or whether an experiment occurr
 """
 
 from datetime import UTC, date, datetime
-from typing import Annotated, Literal
+from typing import Annotated, Literal, get_args
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
@@ -35,6 +35,76 @@ class Provenance(BaseModel):
     model_name: str | None = Field(default=None, max_length=200)
     tool_name: str | None = Field(default=None, max_length=200)
     notes: str | None = Field(default=None, max_length=4000)
+
+
+ConceptType = Literal[
+    "entity",
+    "process",
+    "method",
+    "property",
+    "quantity",
+    "theory",
+    "equation",
+    "discipline",
+    "unit",
+    "dataset",
+    "instrument",
+    "phenomenon",
+    "material",
+    "organism",
+    "algorithm",
+    "model",
+    "other",
+]
+ScientificDomain = Literal[
+    "mathematics",
+    "computer_science",
+    "physics",
+    "chemistry",
+    "biology",
+    "medicine",
+    "engineering",
+    "earth_science",
+    "astronomy",
+    "social_sciences",
+    "psychology",
+    "economics",
+    "materials_science",
+    "interdisciplinary",
+    "other",
+]
+ConceptStatus = Literal["proposed", "active", "deprecated", "disputed"]
+KnowledgePredicate = Literal[
+    "broader_than",
+    "narrower_than",
+    "subclass_of",
+    "instance_of",
+    "part_of",
+    "has_part",
+    "causes",
+    "caused_by",
+    "prerequisite_of",
+    "requires",
+    "measured_by",
+    "measures",
+    "uses_method",
+    "method_for",
+    "derived_from",
+    "applied_to",
+    "has_unit",
+    "unit_of",
+    "same_as",
+    "contrasts_with",
+    "related_to",
+]
+RelationshipStatus = Literal[
+    "proposed", "source_reported", "reviewed", "disputed", "rejected"
+]
+CONCEPT_TYPES = get_args(ConceptType)
+SCIENTIFIC_DOMAINS = get_args(ScientificDomain)
+CONCEPT_STATUSES = get_args(ConceptStatus)
+KNOWLEDGE_PREDICATES = get_args(KnowledgePredicate)
+RELATIONSHIP_STATUSES = get_args(RelationshipStatus)
 
 
 RecordType = Literal[
@@ -232,44 +302,10 @@ class KnowledgeConceptRecord(RecordBase):
     preferred_label: str = Field(min_length=2, max_length=250)
     definition: str = Field(min_length=10, max_length=4000)
     aliases: list[str] = Field(default_factory=list, max_length=100)
-    concept_type: Literal[
-        "entity",
-        "process",
-        "method",
-        "property",
-        "quantity",
-        "theory",
-        "equation",
-        "discipline",
-        "unit",
-        "dataset",
-        "instrument",
-        "phenomenon",
-        "material",
-        "organism",
-        "algorithm",
-        "model",
-        "other",
-    ] = "other"
-    scientific_domain: Literal[
-        "mathematics",
-        "computer_science",
-        "physics",
-        "chemistry",
-        "biology",
-        "medicine",
-        "engineering",
-        "earth_science",
-        "astronomy",
-        "social_sciences",
-        "psychology",
-        "economics",
-        "materials_science",
-        "interdisciplinary",
-        "other",
-    ] = "interdisciplinary"
+    concept_type: ConceptType = "other"
+    scientific_domain: ScientificDomain = "interdisciplinary"
     language: str = Field(default="en", pattern=r"^[a-z]{2,3}(?:-[A-Z]{2})?$")
-    status: Literal["proposed", "active", "deprecated", "disputed"] = "proposed"
+    status: ConceptStatus = "proposed"
     external_identifiers: dict[str, str] = Field(default_factory=dict, max_length=20)
     source_record_ids: list[UUID] = Field(default_factory=list, max_length=200)
     assessment_notes: str | None = Field(default=None, max_length=4000)
@@ -305,33 +341,9 @@ class KnowledgeRelationshipRecord(RecordBase):
     record_type: Literal["knowledge_relationship"] = "knowledge_relationship"
     source_concept_id: UUID
     target_concept_id: UUID
-    predicate: Literal[
-        "broader_than",
-        "narrower_than",
-        "subclass_of",
-        "instance_of",
-        "part_of",
-        "has_part",
-        "causes",
-        "caused_by",
-        "prerequisite_of",
-        "requires",
-        "measured_by",
-        "measures",
-        "uses_method",
-        "method_for",
-        "derived_from",
-        "applied_to",
-        "has_unit",
-        "unit_of",
-        "same_as",
-        "contrasts_with",
-        "related_to",
-    ]
+    predicate: KnowledgePredicate
     evidence_source_record_ids: list[UUID] = Field(default_factory=list, max_length=200)
-    assertion_status: Literal[
-        "proposed", "source_reported", "reviewed", "disputed", "rejected"
-    ] = "proposed"
+    assertion_status: RelationshipStatus = "proposed"
     confidence_score: float | None = Field(default=None, ge=0, le=1)
     notes: str | None = Field(default=None, max_length=4000)
 
