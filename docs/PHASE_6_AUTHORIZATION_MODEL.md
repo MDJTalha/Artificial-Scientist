@@ -25,7 +25,7 @@ The current lab router uses a single shared `X-Lab-API-Key` outside development.
 - [x] Add provider-neutral OIDC bearer-token validation using maintained PyJWT/JWKS support; configure issuer, audience, and HTTPS JWKS URL explicitly. This validates identity claims but does not implement a provider-specific login flow.
 - [ ] Select and document the production identity provider and verify its access-token format, key rotation, and deployment configuration.
 - [x] Add SQLite persistence primitives for immutable principal IDs, tenants, explicit memberships, supported roles, and security audit events.
-- [ ] Add schema migration and legacy-record ownership tests; wire these records into protected run/artifact storage before claiming tenant isolation.
+- [x] Add additive schema-migration and legacy-record ownership regression tests; legacy records remain unowned and are excluded from tenant-scoped run/artifact storage. A production migration rehearsal and review remain open.
 - [x] Enforce configured OIDC bearer validation on the lab router; when any OIDC setting is configured, partial configuration fails closed and the legacy shared API key cannot bypass OIDC.
 - [x] Propagate the validated identity into request context; add an explicit role/action matrix that denies unknown roles and actions.
 - [x] Resolve validated request identity to a stable principal ID and require active tenant membership and action permission on run, execution-status, JSON artifact, binary artifact, verification, and export routes.
