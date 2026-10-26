@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 import time
 from datetime import UTC, datetime
@@ -10,6 +9,7 @@ from uuid import uuid4
 
 from pydantic import ValidationError
 
+from artificial_scientist.lab.integrity import result_digest
 from artificial_scientist.lab.models import LabRunRequest, LabRunResponse, LabStepResult
 from artificial_scientist.math_tools.engine import (
     MathToolError,
@@ -107,22 +107,13 @@ def run_lab(request: LabRunRequest) -> LabRunResponse:
 
     completed = datetime.now(UTC)
     duration_ms = max(0.0, (time.perf_counter() - start_clock) * 1000)
-    result_payload = {
-        "run_id": str(run_id),
-        "configuration_sha256": configuration_hash,
-        "status": "failed" if failed else "completed",
-        "steps": [item.model_dump(mode="json") for item in results],
-    }
-    result_hash = hashlib.sha256(
-        _canonical_json(result_payload).encode("utf-8")
-    ).hexdigest()
     logs.append(f"run_status={'failed' if failed else 'completed'} duration_ms={duration_ms:.3f}")
-    return LabRunResponse(
+    response = LabRunResponse(
         run_id=run_id,
         title=request.title,
         status="failed" if failed else "completed",
         configuration_sha256=configuration_hash,
-        result_sha256=result_hash,
+        result_sha256="0" * 64,
         started_at=started.isoformat(),
         completed_at=completed.isoformat(),
         duration_ms=duration_ms,
@@ -131,3 +122,5 @@ def run_lab(request: LabRunRequest) -> LabRunResponse:
         plan_record_id=request.plan_record_id,
         random_seed=request.random_seed,
     )
+    digest = result_digest(response.model_dump(mode="json"))
+    return response.model_copy(update={"result_sha256": digest})
