@@ -89,7 +89,10 @@ def test_assessment_is_transparent_and_does_not_claim_truth() -> None:
             candidate(sources=[uuid4()]),
             candidate(
                 "Hypothesis B",
-                "Catalyst concentration is the dominant driver of reaction rate in a closed reactor.",
+                (
+                    "Catalyst concentration is the dominant driver of reaction rate "
+                    "in a closed reactor."
+                ),
                 sources=[uuid4()],
             ),
         ],
