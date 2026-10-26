@@ -184,7 +184,7 @@ def create_lab_run(
     try:
         run = run_lab(lab_request, run_id=run_id)
     except Exception:
-        store.fail_execution(run_id)
+        store.fail_execution(run_id, tenant_id=tenant_id)
         raise
     return store.save(run, tenant_id=tenant_id)
 
