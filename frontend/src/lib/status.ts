@@ -24,3 +24,21 @@ export function getStatusPresentation(status: ServiceStatus): StatusPresentation
       }
   }
 }
+
+
+export interface HealthPayload {
+  status: 'ok'
+  service: string
+  version: string
+}
+
+export function isHealthyResponse(payload: unknown): payload is HealthPayload {
+  if (typeof payload !== 'object' || payload === null) return false
+
+  const record = payload as Record<string, unknown>
+  return (
+    record.status === 'ok' &&
+    typeof record.service === 'string' &&
+    typeof record.version === 'string'
+  )
+}
