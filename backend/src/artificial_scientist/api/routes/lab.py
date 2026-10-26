@@ -450,6 +450,7 @@ async def upload_lab_binary_artifact(
     filename: str = Query(min_length=1, max_length=180),
 ) -> dict[str, object]:
     """Upload a bounded binary attachment using the request body as its bytes."""
+    tenant_id = require_tenant_access(request, "artifact:upload")
     content_length = request.headers.get("content-length")
     if content_length is not None:
         try:
@@ -489,6 +490,7 @@ async def upload_lab_binary_artifact(
             .strip(),
             content,
             scan_status=scan_status,
+            tenant_id=tenant_id,
         )
         return {**artifact, "scan_status": scan_status}
     except LabRunNotFound as error:
@@ -504,11 +506,13 @@ async def upload_lab_binary_artifact(
 @router.get("/runs/{run_id}/binary-artifacts")
 def list_lab_binary_artifacts(
     run_id: UUID,
+    request: Request,
     store: Annotated[LabRunStore, Depends(get_lab_store)],
 ) -> list[dict[str, object]]:
     """List validated binary attachment metadata for a run."""
+    tenant_id = require_tenant_access(request, "artifact:read")
     try:
-        return store.list_binary_artifacts(run_id)
+        return store.list_binary_artifacts(run_id, tenant_id=tenant_id)
     except LabRunNotFound as error:
         raise HTTPException(status_code=404, detail="Lab run not found.") from error
     except RuntimeError as error:
@@ -520,11 +524,13 @@ def list_lab_binary_artifacts(
 @router.get("/binary-artifacts/{artifact_id}")
 def download_lab_binary_artifact(
     artifact_id: UUID,
+    request: Request,
     store: Annotated[LabRunStore, Depends(get_lab_store)],
 ) -> Response:
     """Download a binary attachment after digest and provenance validation."""
+    tenant_id = require_tenant_access(request, "artifact:read")
     try:
-        artifact = store.get_binary_artifact(artifact_id)
+        artifact = store.get_binary_artifact(artifact_id, tenant_id=tenant_id)
     except LabArtifactNotFound as error:
         raise HTTPException(status_code=404, detail="Lab binary artifact not found.") from error
     except RuntimeError as error:
