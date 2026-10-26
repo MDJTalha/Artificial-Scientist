@@ -381,7 +381,8 @@ class LabRunStore:
 
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,179}", filename):
             raise ValueError("filename must be a safe 1–180 character filename.")
-        if not re.fullmatch(r"[A-Za-z0-9!#$&^_.+-]+/[A-Za-z0-9!#$&^_.+-]+", content_type):
+        media_type_pattern = r"[A-Za-z0-9!#        if not re.fullmatch(r"[A-Za-z0-9!#$&^_.+-]+/[A-Za-z0-9!#$&^_.+-]+", content_type):^_.+-]+/[A-Za-z0-9!#        if not re.fullmatch(r"[A-Za-z0-9!#$&^_.+-]+/[A-Za-z0-9!#$&^_.+-]+", content_type):^_.+-]+"
+        if not re.fullmatch(media_type_pattern, content_type):
             raise ValueError("content_type must be a valid media type.")
         if not content or len(content) > 10 * 1024 * 1024:
             raise ValueError("Binary artifacts must be between 1 byte and 10 MiB.")
