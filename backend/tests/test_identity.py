@@ -125,7 +125,7 @@ def test_oidc_validator_fails_closed_when_jwks_key_lookup_fails(monkeypatch):
                 "exp": 2_000_000_000,
                 "iat": 1_900_000_000,
             },
-            "subject is missing",
+            "subject is missing or invalid",
         ),
         (
             {
@@ -136,6 +136,26 @@ def test_oidc_validator_fails_closed_when_jwks_key_lookup_fails(monkeypatch):
                 "iat": 1_900_000_000,
             },
             "audience is invalid",
+        ),
+        (
+            {
+                "sub": "s" * 256,
+                "iss": "https://identity.example.test/",
+                "aud": "scientific-api",
+                "exp": 2_000_000_000,
+                "iat": 1_900_000_000,
+            },
+            "subject is missing or invalid",
+        ),
+        (
+            {
+                "sub": "principal-123",
+                "iss": "i" * 513,
+                "aud": "scientific-api",
+                "exp": 2_000_000_000,
+                "iat": 1_900_000_000,
+            },
+            "issuer is missing or invalid",
         ),
     ],
 )
