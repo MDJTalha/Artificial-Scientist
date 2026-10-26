@@ -484,6 +484,21 @@ def test_negative_content_length_is_rejected_before_scanning(monkeypatch, tmp_pa
             },
         )
         assert oversized_decimal.status_code == 413
+
+        empty_upload = TestClient(app).post(
+            f"/api/v1/lab/runs/{run.run_id}/binary-artifacts?filename=probe.bin",
+            content=b"",
+            headers={
+                "Authorization": "Bearer signed-token",
+                "X-Tenant-ID": tenant_id,
+                "Content-Type": "application/octet-stream",
+                "Content-Length": "0",
+            },
+        )
+        assert empty_upload.status_code == 422
+        assert empty_upload.json()["detail"] == (
+            "Binary artifacts must be between 1 byte and 10 MiB."
+        )
     finally:
         app.dependency_overrides.pop(get_lab_store, None)
 
