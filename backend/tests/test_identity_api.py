@@ -42,6 +42,52 @@ def test_unauthenticated_lab_request_is_audited_as_anonymous(monkeypatch, tmp_pa
     assert all(event["correlation_id"] for event in anonymous_denials)
 
 
+def test_malformed_tenant_selector_is_bounded_and_audited(monkeypatch, tmp_path):
+    database = str(tmp_path / "malformed-tenant-selector.sqlite3")
+    principal = AuthenticatedPrincipal(
+        subject="malformed-tenant-selector-user",
+        issuer="https://identity.example.test/",
+        audience="scientific-api",
+    )
+    monkeypatch.setattr(
+        lab_routes,
+        "get_settings",
+        lambda: SimpleNamespace(
+            environment="production",
+            lab_api_key=None,
+            oidc_issuer="https://identity.example.test/",
+            oidc_audience="scientific-api",
+            oidc_jwks_url="https://identity.example.test/jwks.json",
+            database_path=database,
+        ),
+    )
+    monkeypatch.setattr(
+        lab_routes, "validate_oidc_bearer_token", lambda *_args, **_kwargs: principal
+    )
+
+    response = TestClient(app).get(
+        "/api/v1/lab/runs",
+        headers={
+            "Authorization": "Bearer signed-token",
+            "X-Tenant-ID": "x" * 100_000,
+        },
+    )
+    assert response.status_code == 404
+
+    events = TenantDirectory(database).list_audit_events(None, limit=100)
+    selector_denials = [
+        event
+        for event in events
+        if event["action"] == "run:list"
+        and event["target_type"] == "request"
+        and event["outcome"] == "denied"
+        and event["metadata"].get("http_status") == 404
+    ]
+    assert selector_denials
+    assert all(event["tenant_id"] is None for event in selector_denials)
+    assert all(event["target_id"] is None for event in selector_denials)
+
+
 def test_configured_oidc_cannot_be_bypassed_with_legacy_api_key(monkeypatch):
     monkeypatch.setattr(
         lab_routes,
