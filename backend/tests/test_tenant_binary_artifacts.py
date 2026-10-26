@@ -180,7 +180,8 @@ def test_concurrent_binary_uploads_cannot_oversubscribe_tenant_count_quota(
         outcomes = list(executor.map(attach, range(workers)))
 
     assert sum(outcomes) == quota
-    persisted = store.list_binary_artifacts(runs[0].run_id, tenant_id="tenant-concurrent")
-    # The per-run list is only a smoke check; the tenant quota outcome above
-    # verifies the count across all six independently owned runs.
-    assert len(persisted) <= 1
+    persisted_count = sum(
+        len(store.list_binary_artifacts(run.run_id, tenant_id="tenant-concurrent"))
+        for run in runs
+    )
+    assert persisted_count == quota
