@@ -10,6 +10,7 @@ from uuid import uuid4
 
 from pydantic import ValidationError
 
+from artificial_scientist.lab.models import LabRunRequest, LabRunResponse, LabStepResult
 from artificial_scientist.math_tools.engine import (
     MathToolError,
     convert_unit,
@@ -25,11 +26,10 @@ from artificial_scientist.math_tools.models import (
     SymbolicRequest,
     UnitConversionRequest,
 )
-from artificial_scientist.lab.models import LabRunRequest, LabRunResponse, LabStepResult
 
 
 def _canonical_json(value: object) -> str:
-    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False)
+    return json.dumps(\n        value, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False\n    )
 
 
 def _execute_step(operation: str, inputs: dict[str, object]) -> dict[str, object]:
@@ -52,7 +52,7 @@ def run_lab(request: LabRunRequest) -> LabRunResponse:
     started = datetime.now(UTC)
     start_clock = time.perf_counter()
     configuration = request.model_dump(mode="json")
-    configuration_hash = hashlib.sha256(_canonical_json(configuration).encode("utf-8")).hexdigest()
+    configuration_hash = hashlib.sha256(\n        _canonical_json(configuration).encode("utf-8")\n    ).hexdigest()
     run_id = uuid4()
     logs = [f"run={run_id} accepted_steps={len(request.steps)}"]
     results: list[LabStepResult] = []
@@ -105,7 +105,7 @@ def run_lab(request: LabRunRequest) -> LabRunResponse:
         "status": "failed" if failed else "completed",
         "steps": [item.model_dump(mode="json") for item in results],
     }
-    result_hash = hashlib.sha256(_canonical_json(result_payload).encode("utf-8")).hexdigest()
+    result_hash = hashlib.sha256(\n        _canonical_json(result_payload).encode("utf-8")\n    ).hexdigest()
     logs.append(f"run_status={'failed' if failed else 'completed'} duration_ms={duration_ms:.3f}")
     return LabRunResponse(
         run_id=run_id,
