@@ -142,6 +142,43 @@ def test_lab_api_returns_structured_run_response() -> None:
 
 
 
+
+def test_lab_run_records_manifest_and_verification_replays_outputs(tmp_path) -> None:
+    store = LabRunStore(str(tmp_path / "lab-verification.sqlite3"))
+    app.dependency_overrides[get_lab_store] = lambda: store
+    client = TestClient(app)
+    try:
+        response = client.post(
+            "/api/v1/lab/runs",
+            json={
+                "title": "Replay verification",
+                "steps": [
+                    {
+                        "step_id": "stats",
+                        "operation": "statistics",
+                        "inputs": {"values": [2, 4, 6], "variance_mode": "population"},
+                    }
+                ],
+            },
+        )
+        assert response.status_code == 201
+        run = response.json()
+        assert run["configuration"]["title"] == "Replay verification"
+        assert run["environment_manifest"]["python_version"]
+        assert run["environment_manifest"]["package:numpy"]
+
+        verification = client.post(f"/api/v1/lab/runs/{run['run_id']}/verify")
+        assert verification.status_code == 200
+        result = verification.json()
+        assert result["reproducible"] is True
+        assert result["configuration_matches"] is True
+        assert result["environment_matches"] is True
+        assert result["outputs_match"] is True
+        assert result["differences"] == []
+    finally:
+        app.dependency_overrides.pop(get_lab_store, None)
+
+
 def test_lab_api_exposes_durable_result_artifact_and_provenance(tmp_path) -> None:
     store = LabRunStore(str(tmp_path / "api-lab-artifacts.sqlite3"))
     app.dependency_overrides[get_lab_store] = lambda: store
