@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-import importlib.metadata
 import platform
 import sys
+from importlib.metadata import PackageNotFoundError, version
 
 
 _RELEVANT_PACKAGES = ("artificial-scientist", "numpy", "scipy", "sympy", "pint", "pydantic")
@@ -22,7 +22,7 @@ def capture_environment_manifest() -> dict[str, str]:
     }
     for package in _RELEVANT_PACKAGES:
         try:
-            manifest[f"package:{package}"] = importlib.metadata.version(package)
-        except importlib.metadata.PackageNotFoundError:
+            manifest[f"package:{package}"] = version(package)
+        except PackageNotFoundError:
             manifest[f"package:{package}"] = "not-installed"
     return dict(sorted(manifest.items()))
