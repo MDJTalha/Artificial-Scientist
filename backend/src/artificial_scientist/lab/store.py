@@ -22,6 +22,9 @@ from artificial_scientist.lab.models import (
 _MAX_ARTIFACT_BYTES = 1_048_576
 _MAX_BINARY_ARTIFACTS_PER_RUN = 100
 _MAX_BINARY_BYTES_PER_RUN = 50 * 1024 * 1024
+# Conservative initial tenant-wide caps; make these configurable after workload baselining.
+_MAX_BINARY_ARTIFACTS_PER_TENANT = 500
+_MAX_BINARY_BYTES_PER_TENANT = 250 * 1024 * 1024
 _EXECUTION_STALE_AFTER_SECONDS = 15 * 60
 
 
@@ -651,11 +654,29 @@ class LabRunStore:
         }
         with closing(self._connect()) as connection:
             with connection:
+                # Serialize quota check + insert so concurrent uploads cannot both
+                # observe the same remaining tenant capacity.
+                connection.execute("BEGIN IMMEDIATE")
                 existing = connection.execute(
                     "SELECT * FROM lab_binary_artifacts WHERE artifact_id = ?",
                     (str(artifact_id),),
                 ).fetchone()
                 if existing is None:
+                    if tenant_id is not None:
+                        tenant_usage = connection.execute(
+                            """
+                            SELECT COUNT(*) AS artifact_count,
+                                   COALESCE(SUM(binary.size_bytes), 0) AS total_bytes
+                            FROM lab_binary_artifacts AS binary
+                            JOIN lab_runs AS runs ON runs.run_id = binary.run_id
+                            WHERE runs.tenant_id = ?
+                            """,
+                            (tenant_id,),
+                        ).fetchone()
+                        if int(tenant_usage["artifact_count"]) >= _MAX_BINARY_ARTIFACTS_PER_TENANT:
+                            raise ValueError("Tenant has reached its binary artifact count quota.")
+                        if int(tenant_usage["total_bytes"]) + len(content) > _MAX_BINARY_BYTES_PER_TENANT:
+                            raise ValueError("Tenant has reached its binary artifact storage quota.")
                     usage = connection.execute(
                         """
                         SELECT COUNT(*) AS artifact_count,
