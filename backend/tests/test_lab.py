@@ -355,3 +355,68 @@ def test_lab_replay_verification_rejects_legacy_record_without_configuration(tmp
         )
     finally:
         app.dependency_overrides.pop(get_lab_store, None)
+
+
+def test_retention_purge_deletes_artifacts_and_preserves_audit_tombstone(tmp_path) -> None:
+    database = str(tmp_path / "lab-retention.sqlite3")
+    store = LabRunStore(database)
+    run = run_lab(
+        LabRunRequest(
+            title="Expired retention fixture",
+            steps=[
+                {
+                    "step_id": "stats",
+                    "operation": "statistics",
+                    "inputs": {"values": [1, 2, 3]},
+                }
+            ],
+        )
+    )
+    store.save(run)
+    artifact_id = store.list_artifacts(run.run_id)[0].artifact_id
+    with sqlite3.connect(database) as connection:
+        connection.execute(
+            "UPDATE lab_runs SET created_at = ? WHERE run_id = ?",
+            ("2020-01-01T00:00:00+00:00", str(run.run_id)),
+        )
+
+    deleted = store.purge_runs_before(
+        "2021-01-01T00:00:00+00:00",
+        limit=10,
+        reason="test_retention",
+    )
+    assert deleted == [str(run.run_id)]
+    with sqlite3.connect(database) as connection:
+        run_count = connection.execute(
+            "SELECT COUNT(*) FROM lab_runs WHERE run_id = ?", (str(run.run_id),)
+        ).fetchone()[0]
+        artifact_count = connection.execute(
+            "SELECT COUNT(*) FROM lab_artifacts WHERE run_id = ?", (str(run.run_id),)
+        ).fetchone()[0]
+        tombstone = connection.execute(
+            """
+            SELECT result_sha256, configuration_sha256, retention_cutoff,
+                   reason, artifacts_deleted
+            FROM lab_run_retention_events WHERE run_id = ?
+            """,
+            (str(run.run_id),),
+        ).fetchone()
+    assert run_count == 0
+    assert artifact_count == 0
+    assert tombstone == (
+        run.result_sha256,
+        run.configuration_sha256,
+        "2021-01-01T00:00:00+00:00",
+        "test_retention",
+        1,
+    )
+    with pytest.raises(Exception):
+        store.get_artifact(artifact_id)
+
+
+def test_retention_purge_requires_timezone_and_bounded_limit(tmp_path) -> None:
+    store = LabRunStore(str(tmp_path / "lab-retention-validation.sqlite3"))
+    with pytest.raises(ValueError, match="timezone"):
+        store.purge_runs_before("2021-01-01T00:00:00")
+    with pytest.raises(ValueError, match="between 1 and 100"):
+        store.purge_runs_before("2021-01-01T00:00:00+00:00", limit=101)
