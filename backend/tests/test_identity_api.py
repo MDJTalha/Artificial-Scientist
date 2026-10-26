@@ -398,6 +398,75 @@ def test_cross_tenant_binary_upload_is_rejected_before_body_scanning(
 
 
 
+def test_negative_content_length_is_rejected_before_scanning(monkeypatch, tmp_path):
+    database = str(tmp_path / "negative-content-length.sqlite3")
+    principal = AuthenticatedPrincipal(
+        subject="negative-content-length-user",
+        issuer="https://identity.example.test/",
+        audience="scientific-api",
+    )
+    monkeypatch.setattr(
+        lab_routes,
+        "get_settings",
+        lambda: SimpleNamespace(
+            environment="production",
+            lab_api_key=None,
+            oidc_issuer="https://identity.example.test/",
+            oidc_audience="scientific-api",
+            oidc_jwks_url="https://identity.example.test/jwks.json",
+            database_path=database,
+        ),
+    )
+    monkeypatch.setattr(
+        lab_routes, "validate_oidc_bearer_token", lambda *_args, **_kwargs: principal
+    )
+    monkeypatch.setattr(
+        lab_routes,
+        "scan_binary_content",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("Invalid Content-Length must be rejected before scanning.")
+        ),
+    )
+    directory = TenantDirectory(database)
+    principal_id = directory.register_principal(principal.issuer, principal.subject)
+    tenant_id = directory.create_tenant("negative-length-tenant", "Negative Length Tenant")
+    directory.grant_membership(principal_id, tenant_id, "researcher")
+
+    from artificial_scientist.lab.engine import run_lab
+    from artificial_scientist.lab.models import LabRunRequest
+
+    store = LabRunStore(database)
+    run = run_lab(
+        LabRunRequest(
+            title="Content length validation target",
+            steps=[
+                {
+                    "step_id": "summary",
+                    "operation": "statistics",
+                    "inputs": {"values": [1, 2, 3], "variance_mode": "population"},
+                }
+            ],
+        )
+    )
+    store.save(run, tenant_id=tenant_id)
+    app.dependency_overrides[get_lab_store] = lambda: store
+    try:
+        response = TestClient(app).post(
+            f"/api/v1/lab/runs/{run.run_id}/binary-artifacts?filename=probe.bin",
+            content=b"",
+            headers={
+                "Authorization": "Bearer signed-token",
+                "X-Tenant-ID": tenant_id,
+                "Content-Type": "application/octet-stream",
+                "Content-Length": "-1",
+            },
+        )
+        assert response.status_code == 400
+        assert response.json()["detail"] == "Invalid Content-Length header."
+    finally:
+        app.dependency_overrides.pop(get_lab_store, None)
+
+
 
 def test_result_persistence_failure_marks_execution_failed(monkeypatch, tmp_path):
     from uuid import UUID
