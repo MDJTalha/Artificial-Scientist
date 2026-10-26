@@ -77,3 +77,17 @@ def test_tenant_failure_update_cannot_mutate_unowned_legacy_attempt(tmp_path) ->
     with pytest.raises(LabExecutionNotFound):
         store.get_execution_status(run_id, tenant_id="tenant-a")
 
+def test_tenant_wide_lab_run_quota_is_enforced_atomically(tmp_path, monkeypatch) -> None:
+    import artificial_scientist.lab.store as store_module
+
+    monkeypatch.setattr(store_module, "_MAX_RUNS_PER_TENANT", 1)
+    store = LabRunStore(str(tmp_path / "execution-tenant-quota.sqlite3"))
+    store.begin_execution(uuid4(), _request(), tenant_id="tenant-a")
+
+    with pytest.raises(ValueError, match="Tenant has reached its lab run quota"):
+        store.begin_execution(uuid4(), _request(), tenant_id="tenant-a")
+
+    # The cap is tenant-specific, not a global service-wide limit.
+    other_tenant = store.begin_execution(uuid4(), _request(), tenant_id="tenant-b")
+    assert other_tenant["status"] == "running"
+
