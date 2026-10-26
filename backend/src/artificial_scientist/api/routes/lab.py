@@ -29,10 +29,10 @@ def require_lab_access(x_lab_api_key: str | None = Header(default=None)) -> None
     settings = get_settings()
     if settings.environment.lower() == "development":
         return
-    if not settings.lab_api_key:
+    if not settings.lab_api_key or len(settings.lab_api_key) < 32:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Lab API authentication is not configured.",
+            detail="Lab API authentication requires a configured key of at least 32 characters.",
         )
     if not x_lab_api_key or not hmac.compare_digest(x_lab_api_key, settings.lab_api_key):
         raise HTTPException(
