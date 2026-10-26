@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import sqlite3
+from contextlib import closing
 from pathlib import Path
 from typing import Any
 from uuid import UUID
@@ -31,7 +32,7 @@ class LabRunStore:
         return connection
 
     def _initialize(self) -> None:
-        with self._connect() as connection:
+        with closing(self._connect()) as connection:
             connection.execute(
                 """
                 CREATE TABLE IF NOT EXISTS lab_runs (
@@ -47,6 +48,7 @@ class LabRunStore:
             connection.execute(
                 "CREATE INDEX IF NOT EXISTS idx_lab_runs_created_at ON lab_runs(created_at DESC)"
             )
+            connection.commit()
 
     def save(self, run: LabRunResponse) -> LabRunResponse:
         payload = json.dumps(
@@ -72,6 +74,7 @@ class LabRunStore:
                     payload,
                 ),
             )
+            connection.commit()
         return run
 
     @staticmethod
