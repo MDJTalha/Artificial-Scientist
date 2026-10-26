@@ -6,6 +6,8 @@ from pydantic import ValidationError
 
 from artificial_scientist.lab.engine import run_lab
 from artificial_scientist.lab.models import LabRunRequest
+from artificial_scientist.lab.store import LabRunStore
+from artificial_scientist.api.routes.lab import get_lab_store
 from artificial_scientist.main import app
 
 
@@ -126,3 +128,45 @@ def test_lab_api_returns_structured_run_response() -> None:
     assert payload["status"] == "completed"
     assert payload["steps"][0]["output"]["mean"] == pytest.approx(2.5)
     assert len(payload["configuration_sha256"]) == 64
+
+
+
+def test_lab_api_exposes_durable_result_artifact_and_provenance(tmp_path) -> None:
+    store = LabRunStore(str(tmp_path / "api-lab-artifacts.sqlite3"))
+    app.dependency_overrides[get_lab_store] = lambda: store
+    client = TestClient(app)
+    try:
+        response = client.post(
+            "/api/v1/lab/runs",
+            json={
+                "title": "Artifact API test",
+                "plan_record_id": "b1fce9e0-3c7c-4a7c-9b75-0a2a3a1e8c2f",
+                "steps": [
+                    {
+                        "step_id": "stats",
+                        "operation": "statistics",
+                        "inputs": {"values": [2, 4, 6], "variance_mode": "population"},
+                    }
+                ],
+            },
+        )
+        assert response.status_code == 201
+        run = response.json()
+        run_id = run["run_id"]
+
+        listing = client.get(f"/api/v1/lab/runs/{run_id}/artifacts")
+        assert listing.status_code == 200
+        assert len(listing.json()) == 1
+        metadata = listing.json()[0]
+        assert metadata["provenance"]["plan_record_id"] == (
+            "b1fce9e0-3c7c-4a7c-9b75-0a2a3a1e8c2f"
+        )
+
+        artifact_response = client.get(f"/api/v1/lab/artifacts/{metadata['artifact_id']}")
+        assert artifact_response.status_code == 200
+        artifact = artifact_response.json()
+        assert artifact["sha256"] == metadata["sha256"]
+        assert artifact["content"]["run_id"] == run_id
+        assert artifact["content"]["result_sha256"] == run["result_sha256"]
+    finally:
+        app.dependency_overrides.pop(get_lab_store, None)
