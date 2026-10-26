@@ -15,6 +15,7 @@ from pydantic import ValidationError
 from artificial_scientist.api.routes import lab as lab_routes
 from artificial_scientist.api.routes.lab import get_lab_store
 from artificial_scientist.lab import execution as lab_execution
+from artificial_scientist.lab import store as lab_store_module
 from artificial_scientist.lab.engine import run_lab
 from artificial_scientist.lab.execution import LabExecutionTimeout, _stop_process, run_isolated
 from artificial_scientist.lab.integrity import result_digest
@@ -801,3 +802,61 @@ def test_binary_artifact_upload_rejects_unsafe_filename_and_empty_content(tmp_pa
         assert empty.status_code == 422
     finally:
         app.dependency_overrides.pop(get_lab_store, None)
+
+
+
+def test_binary_artifact_quotas_are_enforced_per_run(tmp_path, monkeypatch) -> None:
+    store = LabRunStore(str(tmp_path / "binary-artifact-quota.sqlite3"))
+    run = run_lab(
+        LabRunRequest(
+            title="Quota enforcement",
+            steps=[
+                {
+                    "step_id": "stats",
+                    "operation": "statistics",
+                    "inputs": {"values": [1, 2, 3]},
+                }
+            ],
+        )
+    )
+    store.save(run)
+    monkeypatch.setattr(lab_store_module, "_MAX_BINARY_ARTIFACTS_PER_RUN", 2)
+    monkeypatch.setattr(lab_store_module, "_MAX_BINARY_BYTES_PER_RUN", 5)
+
+    first = store.save_binary_artifact(
+        run.run_id, "first.bin", "application/octet-stream", b"abc"
+    )
+    second = store.save_binary_artifact(
+        run.run_id, "second.bin", "application/octet-stream", b"de"
+    )
+    assert first["size_bytes"] == 3
+    assert second["size_bytes"] == 2
+
+    with pytest.raises(ValueError, match="storage quota"):
+        store.save_binary_artifact(
+            run.run_id, "third.bin", "application/octet-stream", b"x"
+        )
+
+    # Repeating an identical upload is idempotent and does not consume quota twice.
+    duplicate = store.save_binary_artifact(
+        run.run_id, "first.bin", "application/octet-stream", b"abc"
+    )
+    assert duplicate["artifact_id"] == first["artifact_id"]
+
+    other_run = run_lab(
+        LabRunRequest(
+            title="Independent quota",
+            steps=[
+                {
+                    "step_id": "stats",
+                    "operation": "statistics",
+                    "inputs": {"values": [4, 5, 6]},
+                }
+            ],
+        )
+    )
+    store.save(other_run)
+    independent = store.save_binary_artifact(
+        other_run.run_id, "fresh.bin", "application/octet-stream", b"12345"
+    )
+    assert independent["size_bytes"] == 5
