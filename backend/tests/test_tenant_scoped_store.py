@@ -104,7 +104,7 @@ def test_tenant_wide_json_artifact_byte_quota_is_enforced(
             """,
             ("tenant-a",),
         ).fetchone()[0]
-    monkeypatch.setattr(store_module, "_MAX_JSON_BYTES_PER_TENANT", used_bytes)
+    monkeypatch.setattr(store_module, "_MAX_JSON_BYTES_PER_TENANT", used_bytes + 1)
 
     with pytest.raises(ValueError, match="JSON artifact storage quota"):
         store.save(_run("Tenant A second"), tenant_id="tenant-a")
