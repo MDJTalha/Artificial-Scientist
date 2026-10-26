@@ -514,6 +514,19 @@ def test_negative_content_length_is_rejected_before_scanning(monkeypatch, tmp_pa
         assert invalid_media_type.json()["detail"] == (
             "Invalid binary artifact content type."
         )
+
+        invalid_filename = TestClient(app).post(
+            f"/api/v1/lab/runs/{run.run_id}/binary-artifacts?filename=..%2Fprobe.bin",
+            content=b"not-empty",
+            headers={
+                "Authorization": "Bearer signed-token",
+                "X-Tenant-ID": tenant_id,
+                "Content-Type": "application/octet-stream",
+                "Content-Length": "9",
+            },
+        )
+        assert invalid_filename.status_code == 422
+        assert invalid_filename.json()["detail"] == "Invalid binary artifact filename."
     finally:
         app.dependency_overrides.pop(get_lab_store, None)
 
