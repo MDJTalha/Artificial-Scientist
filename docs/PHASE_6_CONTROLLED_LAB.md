@@ -41,7 +41,7 @@ The configuration and result hashes support integrity comparison; the result dig
 
 ## Current limitations — do not treat Phase 6 as complete
 
-- Canonical JSON run-result artifacts are persisted as SQLite BLOBs with SHA-256 verification and provenance links to the run, configuration digest, result digest, optional plan ID, and step IDs. General binary scientific attachments, retention/deletion policy, export packages, and artifact lifecycle management remain unimplemented.
+- Canonical JSON run-result artifacts are persisted as SQLite BLOBs with SHA-256 verification and provenance links to the run, configuration digest, result digest, optional plan ID, and step IDs. An internal, explicitly invoked, bounded retention purge now deletes expired runs and cascades their artifacts while preserving a tombstone with both digests, cutoff, reason, deletion time, and artifact count. It is not exposed through the unauthenticated API and is not automatically scheduled. General binary scientific attachments, export packages, retention scheduling, and complete cross-system lifecycle management remain unimplemented.
 - Each allowlisted lab step now runs in a separate spawned child process with a configurable hard wall-clock deadline (default 10 seconds, maximum 30 seconds); timed-out workers are terminated. This is process separation, not an OS security sandbox, and no OS-level CPU/memory quota is enforced.
 - This is not an operating-system sandbox. The endpoint must remain on trusted local infrastructure; the application currently has no authentication.
 - A seed is recorded as metadata only; these deterministic math operations do not currently consume it.
@@ -59,7 +59,7 @@ The configuration and result hashes support integrity comparison; the result dig
 - [ ] CI passes on the final Phase 6 head (must be checked from a fresh GitHub Actions run).
 - [x] Durable SQLite run storage, bounded listing/retrieval, and full-record integrity checks.
 - [x] Durable JSON result artifacts with byte-digest verification and run/plan/step provenance metadata.
-- [ ] General binary artifact support, lifecycle policy, and complete provenance linkage to experiment plans/records.
+- [ ] General binary artifact support, automated retention scheduling, export packages, and complete provenance linkage to experiment plans/records. The bounded internal purge primitive and audit tombstones are implemented, but no public deletion API or scheduler is enabled.
 - [x] Enforced per-step wall-clock timeout and child-process termination test.
 - [ ] OS-level process/resource isolation and CPU/memory quota tests.
 - [x] Runtime environment manifest and stored-configuration rerun/verification endpoint with output comparison tests.
