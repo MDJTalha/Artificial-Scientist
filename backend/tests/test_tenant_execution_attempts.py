@@ -127,6 +127,11 @@ def test_concurrent_run_creation_cannot_oversubscribe_tenant_quota(
         outcomes = list(executor.map(attempt, range(workers)))
 
     assert sum(outcomes) == quota
-    runs, total = store.list_runs(tenant_id="tenant-concurrent")
-    assert total == 0  # Reservations live in execution-attempt records pre-result.
-    assert len(runs) == 0
+    import sqlite3
+
+    with sqlite3.connect(store.database_path) as connection:
+        persisted_attempts = connection.execute(
+            "SELECT COUNT(*) FROM lab_execution_attempts WHERE tenant_id = ?",
+            ("tenant-concurrent",),
+        ).fetchone()[0]
+    assert persisted_attempts == quota
