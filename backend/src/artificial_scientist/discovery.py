@@ -125,7 +125,10 @@ def decompose_research_question(
     patterns = (
         (r"how does (.+?) affect (.+?)(?: under | in | among | for | when |\?|$)", "causal"),
         (r"effect of (.+?) on (.+?)(?: under | in | among | for | when |\?|$)", "causal"),
-        (r"relationship between (.+?) and (.+?)(?: under | in | among | for | when |\?|$)", "exploratory"),
+        (
+            r"relationship between (.+?) and (.+?)(?: under | in | among | for | when |\?|$)",
+            "exploratory",
+        ),
         (r"compare (.+?) and (.+?)(?: under | in | among | for | when |\?|$)", "comparative"),
     )
     normalized = question.casefold()
@@ -166,7 +169,9 @@ def decompose_research_question(
         prompts.append("Which population, system, dataset, or environment is in scope?")
     if not context:
         missing.append("domain_context")
-        prompts.append("What domain, setting, and boundary conditions should constrain the question?")
+        prompts.append(
+            "What domain, setting, and boundary conditions should constrain the question?"
+        )
     if not re.search(r"\b(control|adjust|hold constant|confound|baseline)\b", normalized):
         missing.append("confounders_and_controls")
         prompts.append("Which confounders, controls, and baseline comparisons must be considered?")
@@ -185,9 +190,12 @@ def decompose_research_question(
         clarification_prompts=prompts,
         method="bounded_heuristic",
         limitations=[
-            "This is a conservative text-pattern heuristic, not semantic understanding or an LLM result.",
-            "Extracted variables may be incomplete or misleading; a researcher must confirm or edit them.",
-            "The response does not generate hypotheses, establish causality, or verify scientific validity.",
+            "This is a conservative text-pattern heuristic, not semantic understanding "
+            "or an LLM result.",
+            "Extracted variables may be incomplete or misleading; a researcher must "
+            "confirm or edit them.",
+            "The response does not generate hypotheses, establish causality, or verify "
+            "scientific validity.",
         ],
     )
 
