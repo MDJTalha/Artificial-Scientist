@@ -9,7 +9,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from artificial_scientist.config import get_settings
 from artificial_scientist.lab.engine import run_lab
 from artificial_scientist.lab.models import LabRunRequest, LabRunResponse
-from artificial_scientist.lab.store import LabRunNotFound, LabRunStore
+from artificial_scientist.lab.store import (
+    LabArtifactNotFound,
+    LabRunNotFound,
+    LabRunStore,
+)
 
 router = APIRouter(prefix="/api/v1/lab", tags=["controlled computational laboratory"])
 
@@ -57,4 +61,38 @@ def get_lab_run(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Stored lab run failed integrity validation.",
+        ) from error
+
+
+
+@router.get("/runs/{run_id}/artifacts", response_model=list[object])
+def list_lab_run_artifacts(
+    run_id: UUID,
+    store: Annotated[LabRunStore, Depends(get_lab_store)],
+) -> list[object]:
+    """List artifact metadata and provenance attached to one run."""
+    try:
+        return store.list_artifacts(run_id)
+    except LabRunNotFound as error:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Lab run not found."
+        ) from error
+
+
+@router.get("/artifacts/{artifact_id}", response_model=dict[str, object])
+def get_lab_artifact(
+    artifact_id: UUID,
+    store: Annotated[LabRunStore, Depends(get_lab_store)],
+) -> dict[str, object]:
+    """Retrieve an artifact after validating its byte digest and run provenance."""
+    try:
+        return store.get_artifact(artifact_id).model_dump(mode="json")
+    except LabArtifactNotFound as error:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Lab artifact not found."
+        ) from error
+    except RuntimeError as error:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Stored lab artifact failed integrity validation.",
         ) from error
