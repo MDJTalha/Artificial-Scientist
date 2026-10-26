@@ -10,6 +10,7 @@ from pydantic import ValidationError
 from artificial_scientist.api.routes.lab import get_lab_store
 from artificial_scientist.lab.engine import run_lab
 from artificial_scientist.lab.execution import LabExecutionTimeout, run_isolated
+from artificial_scientist.lab.integrity import result_digest
 from artificial_scientist.lab.models import LabRunRequest
 from artificial_scientist.lab.store import LabRunStore
 from artificial_scientist.main import app
@@ -218,6 +219,41 @@ def test_lab_api_exposes_durable_result_artifact_and_provenance(tmp_path) -> Non
         assert artifact["content"]["result_sha256"] == run["result_sha256"]
     finally:
         app.dependency_overrides.pop(get_lab_store, None)
+
+
+
+def test_store_verifies_legacy_run_payloads_without_new_manifest_fields(tmp_path) -> None:
+    database = str(tmp_path / "legacy-lab-record.sqlite3")
+    store = LabRunStore(database)
+    from artificial_scientist.lab.engine import run_lab
+
+    run = run_lab(
+        LabRunRequest(
+            title="Legacy record compatibility",
+            steps=[
+                {
+                    "step_id": "stats",
+                    "operation": "statistics",
+                    "inputs": {"values": [1, 2, 3]},
+                }
+            ],
+        )
+    )
+    store.save(run)
+    legacy_payload = run.model_dump(mode="json")
+    legacy_payload.pop("configuration")
+    legacy_payload.pop("environment_manifest")
+    legacy_payload["result_sha256"] = result_digest(legacy_payload)
+    with sqlite3.connect(database) as connection:
+        connection.execute(
+            "UPDATE lab_runs SET payload_json = ? WHERE run_id = ?",
+            (json.dumps(legacy_payload), str(run.run_id)),
+        )
+
+    restored = store.get(run.run_id)
+    assert restored.run_id == run.run_id
+    assert restored.configuration == {}
+    assert restored.environment_manifest == {}
 
 
 def test_lab_api_returns_generic_server_error_for_tampered_run_listing(tmp_path) -> None:
