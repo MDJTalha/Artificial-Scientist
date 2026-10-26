@@ -22,6 +22,7 @@ from artificial_scientist.records.models import (
     ConceptStatus,
     ConceptType,
     KnowledgeConceptRecord,
+    KnowledgePredicate,
     KnowledgeRelationshipRecord,
     RecordEnvelope,
     ScientificDomain,
@@ -158,7 +159,7 @@ def list_concept_relationships(
     concept_id: UUID,
     store: Annotated[RecordStore, Depends(get_record_store)],
     direction: Literal["incoming", "outgoing", "both"] = Query(default="both"),
-    predicate: str | None = Query(default=None, max_length=40),
+    predicate: KnowledgePredicate | None = Query(default=None),
     limit: int = Query(default=100, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
 ) -> KnowledgeRelationshipListResponse:
@@ -216,6 +217,9 @@ def get_graph_neighborhood(
             for edge in edges:
                 if edge.payload.get("assertion_status") == "rejected":
                     continue
+                if edge.id not in relationships and len(relationships) >= edge_limit:
+                    truncated = True
+                    break
                 relationships.setdefault(edge.id, edge)
                 source_id = UUID(str(edge.payload["source_concept_id"]))
                 target_id = UUID(str(edge.payload["target_concept_id"]))
