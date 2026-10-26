@@ -5,12 +5,10 @@ from __future__ import annotations
 import hashlib
 import json
 import sqlite3
+from contextlib import closing
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import TypeVar
 from uuid import UUID, uuid4
-
-from pydantic import BaseModel
 
 from artificial_scientist.records.models import (
     ApprovalRequestRecord,
@@ -30,8 +28,6 @@ from artificial_scientist.records.models import (
 )
 
 SCHEMA_VERSION = 1
-RecordModel = TypeVar("RecordModel", bound=RecordBase)
-
 MODEL_BY_TYPE: dict[str, type[RecordBase]] = {
     "research_task": ResearchTaskRecord,
     "source": SourceRecord,
@@ -109,7 +105,7 @@ class RecordStore:
         return connection
 
     def _initialize_database(self) -> None:
-        with self._connect() as connection:
+        with closing(self._connect()) as connection:
             connection.execute("BEGIN IMMEDIATE")
             current_version = int(connection.execute("PRAGMA user_version").fetchone()[0])
             if current_version > SCHEMA_VERSION:
