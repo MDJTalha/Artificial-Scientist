@@ -196,6 +196,18 @@ def test_tenant_scoped_run_api_hides_runs_from_other_tenants(monkeypatch, tmp_pa
             denied = client.request(method, path, headers=headers)
             assert denied.status_code == 404, (method, path, denied.text)
 
+        audit_events = directory.list_audit_events(tenant_a, limit=100)
+        denied_run_events = [
+            event
+            for event in audit_events
+            if event["target_id"] == str(run_b.run_id)
+            and event["outcome"] == "denied"
+            and event["metadata"].get("http_status") == 404
+        ]
+        assert denied_run_events
+        assert all(event["principal_id"] == principal_id for event in denied_run_events)
+        assert all(event["correlation_id"] for event in denied_run_events)
+
         no_tenant = client.get(
             "/api/v1/lab/runs",
             headers={"Authorization": "Bearer signed-token"},
