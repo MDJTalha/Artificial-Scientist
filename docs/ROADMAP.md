@@ -106,3 +106,7 @@ The status above reflects recorded repository evidence. Passing CI is necessary 
 Before every material milestone, publish an internal evidence report containing: scope completed; commit/version; commands run; test counts and outcomes; failures; known limitations; dependency or data constraints; security and scientific-integrity risks; and the next smallest justified step.
 
 Never claim a phase is complete merely because its UI or documentation exists. Capability and tests determine status.
+
+### Phase 6 identity and authorization progress
+
+The branch now contains OIDC bearer-token validation, request-context identity propagation, a SQLite tenant directory (principal, tenant, membership and audit tables), explicit membership checks, and a deny-by-default role/action matrix. Automated tests cover stable opaque identifiers, absent/revoked membership, unknown roles/actions, and audit metadata bounds. This is foundation work only: lab run and artifact tables are not yet tenant-owned, and route/storage enforcement is still required before multi-tenant exposure. See [authorization model](PHASE_6_AUTHORIZATION_MODEL.md).
