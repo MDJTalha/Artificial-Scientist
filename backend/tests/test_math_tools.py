@@ -530,3 +530,15 @@ def test_unit_check_api_returns_dimension_mismatch_as_a_check_result(tmp_path) -
             assert body["matches_expected_unit"] is False
     finally:
         app.dependency_overrides.clear()
+
+
+def test_deeply_nested_expression_fails_as_a_bounded_math_error() -> None:
+    expression = "(" * 200 + "x" + ")" * 200
+    with pytest.raises(MathToolError):
+        run_symbolic(
+            SymbolicRequest(
+                operation="simplify",
+                expression=expression,
+                symbols=["x"],
+            )
+        )
