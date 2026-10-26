@@ -99,3 +99,5 @@ def run_isolated(
         receive_connection.close()
         if process.is_alive():
             _stop_process(process)
+        if not process.is_alive():
+            process.close()
