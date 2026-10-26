@@ -87,6 +87,61 @@ class DiscoveryAssessmentResponse(BaseModel):
     limitations: list[str]
 
 
+class PriorWorkCandidate(BaseModel):
+    """A single candidate submitted for bounded prior-work screening."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    title: str = Field(min_length=3, max_length=300)
+    statement: str = Field(min_length=10, max_length=6000)
+
+
+class PriorWorkScreenRequest(BaseModel):
+    """A bounded live metadata search for competing candidate hypotheses."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    research_question: str = Field(min_length=10, max_length=5000)
+    candidates: list[PriorWorkCandidate] = Field(min_length=2, max_length=5)
+    providers: list[Literal["openalex", "crossref"]] = Field(
+        default_factory=lambda: ["openalex", "crossref"], min_length=1, max_length=2
+    )
+    results_per_candidate: int = Field(default=5, ge=1, le=5)
+
+    @field_validator("providers")
+    @classmethod
+    def unique_providers(cls, values: list[str]) -> list[str]:
+        if len(values) != len(set(values)):
+            raise ValueError("providers must not contain duplicates")
+        return values
+
+
+class PriorWorkMatch(BaseModel):
+    title: str
+    doi: str | None
+    publication_year: int | None
+    source_url: str
+    cited_by_count: int | None
+    is_retracted: bool | None
+
+
+class PriorWorkCandidateResult(BaseModel):
+    title: str
+    query: str
+    search_status: Literal["ok", "partial", "unavailable"]
+    total_results: int
+    matches: list[PriorWorkMatch]
+    provider_status: list[dict[str, object]]
+    interpretation: str
+
+
+class PriorWorkScreenResponse(BaseModel):
+    research_question: str
+    results: list[PriorWorkCandidateResult]
+    overall_status: Literal["complete", "partial", "unavailable"]
+    limitations: list[str]
+
+
 def _tokens(value: str) -> set[str]:
     return set(re.findall(r"[a-z0-9]{3,}", value.casefold()))
 
