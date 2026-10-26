@@ -1,7 +1,7 @@
 """Canonical source-identity keys used for duplicate detection."""
 
-from urllib.parse import urlsplit, urlunsplit
 import re
+from urllib.parse import urlsplit, urlunsplit
 
 from artificial_scientist.records.models import SourceRecord
 
