@@ -8,11 +8,11 @@ This is **not a commercial SaaS product**. Its guiding objective is to contribut
 
 ## Current status
 
-**Phase 0–2 foundations have passing CI. Phase 3 — Scholarly Literature Retrieval is being implemented on `phase-3-literature-retrieval`; its acceptance depends on the current CI results.**
+**Phase 0–2 foundations have passing CI. Phase 3 — Scholarly Literature Retrieval is implemented with passing CI checks and is available as draft Pull Request #3 for review.**
 
 The foundation includes a FastAPI backend, health/readiness endpoints, a React + TypeScript overview dashboard that checks the actual local API, typed research records, SQLite provenance storage, and GitHub Actions verification.
 
-Phase 3 adds real metadata search adapters for OpenAlex and Crossref, source normalization, DOI-based deduplication, and optional persistent source records. Full-text ingestion, claim verification, autonomous hypothesis generation, scientific computation, and agent orchestration **are not implemented yet**. Planned capabilities are not presented as active features.
+Phase 3 adds OpenAlex and Crossref metadata search adapters, source normalization, DOI-based deduplication, and optional persistent source records. The Phase 3 CI run passed 33 backend tests on Python 3.12, 33 on Python 3.13, and all 6 frontend tests, type-checks, and production build. Full-text ingestion, claim verification, autonomous hypothesis generation, scientific computation, and agent orchestration **are not implemented yet**. Planned capabilities are not presented as active features.
 
 ## Scientific principles
 
