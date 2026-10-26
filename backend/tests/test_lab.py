@@ -1174,3 +1174,52 @@ def test_clamav_scanner_rejects_invalid_utf8_response(monkeypatch) -> None:
     )
     with pytest.raises(lab_scanning.ScannerUnavailable, match="invalid response"):
         lab_scanning.scan_binary_content(b"test sample", environment="production")
+
+
+
+def test_posix_worker_resource_limits_never_raise_existing_hard_limits(monkeypatch) -> None:
+    """Worker setup must respect tighter host/container hard limits."""
+    if lab_execution.resource is None:
+        pytest.skip("POSIX resource limits are unavailable on this platform")
+
+    resource = lab_execution.resource
+    hard_limits = {
+        resource.RLIMIT_CPU: 7,
+        resource.RLIMIT_AS: 256 * 1024 * 1024,
+        resource.RLIMIT_FSIZE: 1024 * 1024,
+        resource.RLIMIT_NOFILE: 32,
+    }
+    configured: dict[int, tuple[int, int]] = {}
+
+    monkeypatch.setattr(lab_execution.os, "name", "posix")
+    monkeypatch.setattr(
+        resource,
+        "getrlimit",
+        lambda limit: (resource.RLIM_INFINITY, hard_limits[limit]),
+    )
+    monkeypatch.setattr(
+        resource,
+        "setrlimit",
+        lambda limit, bounds: configured.__setitem__(limit, bounds),
+    )
+
+    lab_execution._apply_worker_resource_limits()
+
+    for limit, host_hard_limit in hard_limits.items():
+        soft, hard = configured[limit]
+        assert soft <= host_hard_limit
+        assert hard <= host_hard_limit
+        assert soft <= hard
+
+
+def test_worker_resource_limit_setup_does_not_claim_windows_isolation(monkeypatch) -> None:
+    """On Windows the POSIX rlimit helper is a no-op, not a sandbox substitute."""
+    monkeypatch.setattr(lab_execution.os, "name", "nt")
+    if lab_execution.resource is not None:
+        monkeypatch.setattr(
+            lab_execution.resource,
+            "setrlimit",
+            lambda *_args: pytest.fail("POSIX limits must not be applied on Windows"),
+        )
+
+    lab_execution._apply_worker_resource_limits()
