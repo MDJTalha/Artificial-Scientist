@@ -1,6 +1,6 @@
 # Phase 2 — Research Records and Provenance
 
-**Status:** Implementation and acceptance testing in progress.  
+**Status:** Acceptance checks passed on implementation commit `48ce326a4402da23ad5787b7eceb82943f2d071f`. See the [passing pull-request CI run](https://github.com/MDJTalha/Artificial-Scientist/actions/runs/40263258124).  
 **Branch:** \`phase-2-research-records\`  
 **Design objective:** ensure every research item can be stored, retrieved, related to its evidence, and checked for accidental or out-of-band modification.
 
@@ -99,16 +99,27 @@ The database defaults to \`data/artificial_scientist.sqlite3\` relative to the b
 
 ## Verification plan
 
-- [ ] Type and field validation rejects malformed/unknown fields.
-- [ ] Create/get/list/filter/pagination API tests pass.
-- [ ] Cross-record references reject missing IDs and wrong record types.
-- [ ] Record and audit-event writes are transactional.
-- [ ] Data persists across separate store instances.
-- [ ] Checksum verification detects simulated out-of-band modification.
-- [ ] Database triggers reject record update and delete.
-- [ ] Approval requests can be created, but cannot be set to approved through the public record schema.
-- [ ] Ruff, backend tests on Python 3.12/3.13, frontend tests/type-check/build pass.
-- [ ] Current CI results are reviewed and linked here.
+- [x] Type and field validation rejects malformed/unknown fields.
+- [x] Create/get/list/filter/pagination API tests pass.
+- [x] Cross-record references reject missing IDs and wrong record types.
+- [x] Record and audit-event writes are transactional.
+- [x] Data persists across separate store instances.
+- [x] Checksum verification detects simulated out-of-band modification.
+- [x] Database triggers reject record update and delete.
+- [x] Approval requests can be created, but cannot be set to approved through the public record schema.
+- [x] Ruff, backend tests on Python 3.12/3.13, frontend tests/type-check/build pass.
+- [x] Current CI results are reviewed and linked here.
+
+## Verified CI result
+
+- [Pull-request CI run](https://github.com/MDJTalha/Artificial-Scientist/actions/runs/40263258124): passed.
+- [Push CI run](https://github.com/MDJTalha/Artificial-Scientist/actions/runs/40263256552): passed.
+- Backend: Ruff checks passed; 18 tests passed on Python 3.12 and 18 tests passed on Python 3.13.
+- Frontend: TypeScript type-check passed, all 6 unit tests passed, and the production build completed.
+
+## Local backup guidance
+
+The initial store uses a single SQLite database file and does not yet automate backups. For a simple backup, stop the API, copy `data/artificial_scientist.sqlite3` to a protected backup location, verify the copied file can be opened and queried, then restart the API. The configured path may differ when `ARTIFICIAL_SCIENTIST_DB_PATH` is set. For a live-service backup in a later phase, use SQLite's supported backup API and test restoration before schema changes. Backup procedures and backup artifacts must not be committed to the public repository.
 
 ## Out of scope
 
