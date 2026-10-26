@@ -138,8 +138,8 @@ def test_concurrent_run_creation_cannot_oversubscribe_tenant_quota(
 
 
 def test_retention_purge_releases_tenant_run_quota(tmp_path, monkeypatch) -> None:
-    from artificial_scientist.lab.engine import run_lab
     import artificial_scientist.lab.store as store_module
+    from artificial_scientist.lab.engine import run_lab
 
     monkeypatch.setattr(store_module, "_MAX_RUNS_PER_TENANT", 1)
     store = LabRunStore(str(tmp_path / "execution-retention-quota.sqlite3"))
