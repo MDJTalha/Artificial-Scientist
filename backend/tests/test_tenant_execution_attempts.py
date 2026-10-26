@@ -154,3 +154,17 @@ def test_retention_purge_releases_tenant_run_quota(tmp_path, monkeypatch) -> Non
     # the tenant's live run quota.
     second = store.begin_execution(uuid4(), _request(), tenant_id=tenant_id)
     assert second["status"] == "running"
+
+
+def test_failed_execution_releases_tenant_run_quota(tmp_path, monkeypatch) -> None:
+    import artificial_scientist.lab.store as store_module
+
+    monkeypatch.setattr(store_module, "_MAX_RUNS_PER_TENANT", 1)
+    store = LabRunStore(str(tmp_path / "failed-execution-quota.sqlite3"))
+    tenant_id = "tenant-failed-quota"
+    failed_run_id = uuid4()
+    store.begin_execution(failed_run_id, _request(), tenant_id=tenant_id)
+    store.fail_execution(failed_run_id, tenant_id=tenant_id)
+
+    next_attempt = store.begin_execution(uuid4(), _request(), tenant_id=tenant_id)
+    assert next_attempt["status"] == "running"
