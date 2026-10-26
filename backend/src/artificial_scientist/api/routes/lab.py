@@ -7,7 +7,7 @@ import json
 import zipfile
 from functools import lru_cache
 from typing import Annotated
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response, status
 
@@ -23,6 +23,7 @@ from artificial_scientist.lab.models import (
 )
 from artificial_scientist.lab.store import (
     LabArtifactNotFound,
+    LabExecutionNotFound,
     LabRunNotFound,
     LabRunStore,
 )
@@ -70,8 +71,29 @@ def create_lab_run(
     store: Annotated[LabRunStore, Depends(get_lab_store)],
 ) -> LabRunResponse:
     """Execute a bounded declarative run and persist its traceable response."""
-    run = run_lab(request)
+    run_id = uuid4()
+    store.begin_execution(run_id, request)
+    try:
+        run = run_lab(request, run_id=run_id)
+    except Exception:
+        store.fail_execution(run_id)
+        raise
     return store.save(run)
+
+
+@router.get("/runs/{run_id}/execution-status", response_model=dict[str, object])
+def get_lab_execution_status(
+    run_id: UUID,
+    store: Annotated[LabRunStore, Depends(get_lab_store)],
+) -> dict[str, object]:
+    """Retrieve durable execution status, including recovered interruptions."""
+    try:
+        return store.get_execution_status(run_id)
+    except LabExecutionNotFound as error:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Lab execution attempt not found.",
+        ) from error
 
 
 @router.get("/runs", response_model=dict[str, object])
