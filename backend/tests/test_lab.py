@@ -503,6 +503,12 @@ def test_retention_purge_deletes_artifacts_and_preserves_audit_tombstone(tmp_pat
     )
     store.save(run)
     artifact_id = store.list_artifacts(run.run_id)[0].artifact_id
+    store.save_binary_artifact(
+        run.run_id,
+        "retention-evidence.bin",
+        "application/octet-stream",
+        b"retention fixture",
+    )
     with sqlite3.connect(database) as connection:
         connection.execute(
             "UPDATE lab_runs SET created_at = ? WHERE run_id = ?",
@@ -537,7 +543,7 @@ def test_retention_purge_deletes_artifacts_and_preserves_audit_tombstone(tmp_pat
         run.configuration_sha256,
         "2021-01-01T00:00:00+00:00",
         "test_retention",
-        1,
+        2,
     )
     with pytest.raises(LabArtifactNotFound):
         store.get_artifact(artifact_id)
