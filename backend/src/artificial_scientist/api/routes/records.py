@@ -1,5 +1,6 @@
 """API endpoints for traceable research records."""
 
+from functools import lru_cache
 from typing import Annotated
 from uuid import UUID
 
@@ -25,6 +26,7 @@ from artificial_scientist.records.store import (
 router = APIRouter(prefix="/api/v1/records", tags=["research records"])
 
 
+@lru_cache(maxsize=1)
 def get_record_store() -> RecordStore:
     """Create a short-lived store facade; every operation opens its own connection."""
     return RecordStore(get_settings().database_path)
