@@ -282,6 +282,20 @@ def test_cross_tenant_binary_upload_is_rejected_before_body_scanning(
             },
         )
         assert response.status_code == 404
+
+        # The denial must be auditable even though the request body is rejected
+        # before it reaches the malware/content scanner.
+        upload_denials = [
+            event
+            for event in directory.list_audit_events(tenant_a, limit=100)
+            if event["target_id"] == str(run_b.run_id)
+            and event["action"] == "binary_artifact:upload"
+            and event["outcome"] == "denied"
+            and event["metadata"].get("http_status") == 404
+        ]
+        assert upload_denials
+        assert all(event["principal_id"] == principal_id for event in upload_denials)
+        assert all(event["correlation_id"] for event in upload_denials)
     finally:
         app.dependency_overrides.pop(get_lab_store, None)
 
