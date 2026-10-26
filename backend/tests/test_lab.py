@@ -924,6 +924,19 @@ def test_interrupted_execution_attempts_are_recovered_and_auditable(tmp_path) ->
     assert interrupted["finished_at"] is not None
     assert "Process stopped" in interrupted["failure_reason"]
 
+    with sqlite3.connect(database) as connection:
+        connection.execute(
+            "UPDATE lab_execution_attempts SET started_at = ? WHERE run_id = ?",
+            ("2020-01-01T00:00:00+00:00", str(interrupted_id)),
+        )
+    assert restarted_store.purge_runs_before("2021-01-01T00:00:00+00:00") == []
+    with sqlite3.connect(database) as connection:
+        redacted_request = connection.execute(
+            "SELECT request_json FROM lab_execution_attempts WHERE run_id = ?",
+            (str(interrupted_id),),
+        ).fetchone()[0]
+    assert redacted_request == "{}"
+
     app.dependency_overrides[get_lab_store] = lambda: restarted_store
     try:
         status_response = TestClient(app).get(
