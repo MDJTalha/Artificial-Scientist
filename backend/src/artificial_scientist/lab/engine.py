@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import time
 from datetime import UTC, datetime
@@ -91,7 +92,14 @@ def run_lab(request: LabRunRequest) -> LabRunResponse:
                 )
             )
             logs.append(f"step={step.step_id} status=completed operation={step.operation}")
-        except (ValidationError, MathToolError, ArithmeticError, RecursionError, TypeError, ValueError) as error:
+        except (
+            ValidationError,
+            MathToolError,
+            ArithmeticError,
+            RecursionError,
+            TypeError,
+            ValueError,
+        ) as error:
             failed = True
             message = str(error).replace("\n", " ")[:500] or "Invalid operation inputs."
             results.append(
