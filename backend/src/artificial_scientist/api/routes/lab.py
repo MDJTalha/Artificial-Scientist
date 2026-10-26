@@ -1,10 +1,11 @@
 """API endpoints for the controlled computational laboratory."""
 
 from functools import lru_cache
+import hmac
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 
 from artificial_scientist.config import get_settings
 from artificial_scientist.lab.engine import run_lab
@@ -22,7 +23,29 @@ from artificial_scientist.lab.store import (
     LabRunStore,
 )
 
-router = APIRouter(prefix="/api/v1/lab", tags=["controlled computational laboratory"])
+def require_lab_access(x_lab_api_key: str | None = Header(default=None)) -> None:
+    """Require a configured shared API key outside local development."""
+    settings = get_settings()
+    if settings.environment.lower() == "development":
+        return
+    if not settings.lab_api_key:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Lab API authentication is not configured.",
+        )
+    if not x_lab_api_key or not hmac.compare_digest(x_lab_api_key, settings.lab_api_key):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Valid lab API key required.",
+            headers={"WWW-Authenticate": "ApiKey"},
+        )
+
+
+router = APIRouter(
+    prefix="/api/v1/lab",
+    tags=["controlled computational laboratory"],
+    dependencies=[Depends(require_lab_access)],
+)
 
 
 @lru_cache(maxsize=1)
