@@ -1,6 +1,6 @@
 """HTTP endpoints for the bounded mathematical and scientific-tools service."""
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Response
 
 from artificial_scientist.math_tools.engine import (
     MathToolError,
@@ -10,6 +10,7 @@ from artificial_scientist.math_tools.engine import (
     find_root,
     integrate_numerically,
     list_supported_units,
+    render_function_plot,
     run_symbolic,
 )
 from artificial_scientist.math_tools.models import (
@@ -17,6 +18,7 @@ from artificial_scientist.math_tools.models import (
     DimensionCheckResponse,
     NumericIntegrationRequest,
     NumericIntegrationResponse,
+    PlotRequest,
     RootRequest,
     RootResponse,
     StatisticsRequest,
@@ -78,6 +80,29 @@ def numerical_root_finding(request: RootRequest) -> RootResponse:
         return find_root(request)
     except MathToolError as error:
         raise _translate_math_error(error) from error
+
+
+@router.post(
+    "/plot",
+    response_class=Response,
+    responses={200: {"content": {"image/png": {}}}},
+    summary="Render a bounded mathematical function as a PNG",
+)
+def function_plot(request: PlotRequest) -> Response:
+    """Render a restricted scalar function without saving files to the host."""
+    try:
+        image = render_function_plot(request)
+    except MathToolError as error:
+        raise _translate_math_error(error) from error
+    return Response(
+        content=image,
+        media_type="image/png",
+        headers={
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff",
+            "Content-Disposition": 'inline; filename="scientific-plot.png"',
+        },
+    )
 
 
 @router.post("/statistics", response_model=StatisticsResponse)
