@@ -1,6 +1,6 @@
 # Phase 6 — Identity, Authorization, and Tenant-Isolation Design
 
-**Status: OIDC validation, tenant directory, tenant membership checks on lab routes, and tenant-scoped run/artifact persistence are implemented on the working branch; complete adversarial coverage, quotas, production identity-provider verification, and independent security review remain outstanding.**  
+**Status: OIDC validation, tenant directory, tenant membership checks on lab routes, and tenant-scoped run/artifact persistence are implemented on the working branch. Tenant-wide binary attachment quotas are now implemented with a serialized SQLite quota-check/insert transaction; run-count and general storage budgets, complete adversarial coverage, production identity-provider verification, and independent security review remain outstanding.**  
 **Scope:** controlled-lab runs, execution attempts, JSON artifacts, binary attachments, exports, and retention records.
 
 ## Security problem
@@ -32,7 +32,7 @@ The current lab router uses a single shared `X-Lab-API-Key` outside development.
 - [x] Add nullable tenant ownership columns to run and execution-attempt records; legacy rows remain unowned rather than being assigned arbitrarily.
 - [ ] Define, test, and review the operational migration/claim process for legacy records before production rollout.
 - [x] Add tenant filters to run lists/reads, execution-status reads, JSON artifact lists/reads, binary artifact lists/reads, and export/verification route storage calls.
-- [ ] Add transactional per-tenant quotas and tests for concurrent uploads and run creation.
+- [x] Add transactionally enforced per-tenant binary-attachment count and byte caps, with regression tests across multiple runs.\n- [ ] Add tenant-wide run-count and general storage budgets; add concurrency tests for uploads and run creation.
 - [ ] Add security audit events without recording secrets or raw request payloads.
 - [ ] Complete negative cross-tenant tests across every object endpoint, including UUID substitution for export, verification, execution status, uploads, and downloads. Current coverage includes store-level run/artifact/binary isolation, execution status, and API-level denial for read/export/verification/download paths; a regression test now checks that cross-tenant binary uploads are rejected before scanning.
 - [ ] Verify behavior in CI and conduct an independent security review before exposing untrusted or multi-tenant traffic.
@@ -67,4 +67,4 @@ This is an incremental authorization implementation, not a claim of production S
 
 The current branch adds `artificial_scientist.authorization.TenantDirectory`, which persists opaque principal IDs derived from the trusted issuer/subject pair, tenant records, explicit active memberships, and append-only-style security audit events. The supported roles are `tenant_admin`, `researcher`, `viewer`, and `auditor`; unknown roles/actions deny by default. Membership checks record allowed and denied outcomes without recording credentials or scientific payloads.
 
-This is an incremental authorization and persistence layer, not a completed migration or enforcement layer. The current branch adds nullable tenant ownership to run and execution-attempt records and scopes protected run/artifact operations by tenant; legacy rows remain unowned and must stay inaccessible to tenant-scoped requests. Migration/claim handling, transactional tenant quotas, complete cross-tenant endpoint coverage, production identity-provider verification, and independent security review remain open. Do not expose this branch to multiple customers until those controls and reviews are complete.
+This is an incremental authorization and persistence layer, not a completed migration or enforcement layer. The current branch adds nullable tenant ownership to run and execution-attempt records and scopes protected run/artifact operations by tenant; legacy rows remain unowned and must stay inaccessible to tenant-scoped requests. Migration/claim handling, tenant-wide run-count/general-storage quotas, concurrency tests, complete cross-tenant endpoint coverage, production identity-provider verification, and independent security review remain open. Tenant-wide binary attachment quotas are implemented on this branch, but their latest CI verification is pending. Do not expose this branch to multiple customers until those controls and reviews are complete.
