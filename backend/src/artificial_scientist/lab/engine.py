@@ -29,7 +29,13 @@ from artificial_scientist.math_tools.models import (
 
 
 def _canonical_json(value: object) -> str:
-    return json.dumps(\n        value, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False\n    )
+    return json.dumps(
+        value,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        allow_nan=False,
+    )
 
 
 def _execute_step(operation: str, inputs: dict[str, object]) -> dict[str, object]:
@@ -52,7 +58,9 @@ def run_lab(request: LabRunRequest) -> LabRunResponse:
     started = datetime.now(UTC)
     start_clock = time.perf_counter()
     configuration = request.model_dump(mode="json")
-    configuration_hash = hashlib.sha256(\n        _canonical_json(configuration).encode("utf-8")\n    ).hexdigest()
+    configuration_hash = hashlib.sha256(
+        _canonical_json(configuration).encode("utf-8")
+    ).hexdigest()
     run_id = uuid4()
     logs = [f"run={run_id} accepted_steps={len(request.steps)}"]
     results: list[LabStepResult] = []
@@ -96,7 +104,7 @@ def run_lab(request: LabRunRequest) -> LabRunResponse:
                 )
             )
             logs.append(f"step={step.step_id} status=failed operation={step.operation}")
-    
+
     completed = datetime.now(UTC)
     duration_ms = max(0.0, (time.perf_counter() - start_clock) * 1000)
     result_payload = {
@@ -105,7 +113,9 @@ def run_lab(request: LabRunRequest) -> LabRunResponse:
         "status": "failed" if failed else "completed",
         "steps": [item.model_dump(mode="json") for item in results],
     }
-    result_hash = hashlib.sha256(\n        _canonical_json(result_payload).encode("utf-8")\n    ).hexdigest()
+    result_hash = hashlib.sha256(
+        _canonical_json(result_payload).encode("utf-8")
+    ).hexdigest()
     logs.append(f"run_status={'failed' if failed else 'completed'} duration_ms={duration_ms:.3f}")
     return LabRunResponse(
         run_id=run_id,
