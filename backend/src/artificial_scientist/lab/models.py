@@ -82,6 +82,8 @@ class LabRunResponse(BaseModel):
     logs: list[str]
     plan_record_id: UUID | None = None
     random_seed: int | None = None
+    configuration: dict[str, Any] = Field(default_factory=dict)
+    environment_manifest: dict[str, str] = Field(default_factory=dict)
     execution_policy: str = (
         "Declarative allowlisted operations only; arbitrary generated code is never executed."
     )
@@ -112,3 +114,16 @@ class LabArtifactResponse(LabArtifactMetadata):
     """Artifact metadata plus its validated JSON document."""
 
     content: dict[str, Any]
+
+class LabRunVerificationResponse(BaseModel):
+    """Outcome of replaying a stored run against the current runtime."""
+
+    run_id: UUID
+    reproducible: bool
+    configuration_matches: bool
+    environment_matches: bool
+    outputs_match: bool
+    differences: list[str]
+    recorded_environment: dict[str, str]
+    current_environment: dict[str, str]
+
