@@ -57,7 +57,7 @@ Six equally weighted checks contribute to completeness: explicit assumptions, al
 - Candidate hypotheses are supplied by a caller. No model-driven hypothesis generation is claimed.
 - Novelty assessment is provisional. The endpoint does not itself run a literature search or guarantee that a hypothesis is novel.
 - Lexical similarity can miss paraphrases and can flag unrelated wording; a human should review every duplicate warning.
-- Record writes use the existing append-only record store, but this endpoint does not provide a cross-record database transaction. A storage failure during a multi-candidate write could leave a subset persisted; inspect the returned error and record list before retrying.
+- Candidate persistence uses one SQLite transaction for the whole batch; a validation or write failure rolls back every candidate and its audit event.
 - The existing research-record API is not tenant-scoped. Do not expose Phase 7 or the general records API to untrusted multi-tenant traffic until the Phase 6 identity and authorization release gates are independently satisfied.
 - Scientific validity requires domain-expert review, a documented literature-search protocol, and subsequent Phase 8 experiment planning and Phase 9 independent analysis.
 
