@@ -611,6 +611,7 @@ class LabRunStore:
         content: bytes,
         *,
         scan_status: str = "not_scanned",
+        tenant_id: str | None = None,
     ) -> dict[str, Any]:
         """Persist a bounded immutable binary attachment with run and scan provenance."""
         import re
@@ -624,7 +625,7 @@ class LabRunStore:
             raise ValueError("Binary artifacts must be between 1 byte and 10 MiB.")
         if scan_status not in {"clean", "skipped_development", "not_scanned"}:
             raise ValueError("scan_status must be a recognized scanner outcome.")
-        run = self.get(run_id)
+        run = self.get(run_id, tenant_id=tenant_id)
         artifact_id = uuid5(
             NAMESPACE_URL,
             f"artificial-scientist:binary:{run_id}:{filename}:{hashlib.sha256(content).hexdigest()}",
@@ -725,24 +726,40 @@ class LabRunStore:
             document["content"] = content
         return document
 
-    def list_binary_artifacts(self, run_id: UUID) -> list[dict[str, Any]]:
+    def list_binary_artifacts(
+        self, run_id: UUID, tenant_id: str | None = None
+    ) -> list[dict[str, Any]]:
         """List binary attachment metadata after validating stored bytes."""
-        self.get(run_id)
+        self.get(run_id, tenant_id=tenant_id)
+        query = (
+            "SELECT lab_binary_artifacts.* FROM lab_binary_artifacts "
+            "JOIN lab_runs ON lab_runs.run_id = lab_binary_artifacts.run_id "
+            "WHERE lab_binary_artifacts.run_id = ?"
+        )
+        parameters: tuple[object, ...] = (str(run_id),)
+        if tenant_id is not None:
+            query += " AND lab_runs.tenant_id = ?"
+            parameters += (tenant_id,)
+        query += " ORDER BY lab_binary_artifacts.created_at, lab_binary_artifacts.artifact_id"
         with closing(self._connect()) as connection:
-            rows = connection.execute(
-                "SELECT * FROM lab_binary_artifacts WHERE run_id = ? "
-                "ORDER BY created_at, artifact_id",
-                (str(run_id),),
-            ).fetchall()
+            rows = connection.execute(query, parameters).fetchall()
         return [self._binary_artifact_document(row, include_content=False) for row in rows]
 
-    def get_binary_artifact(self, artifact_id: UUID) -> dict[str, Any]:
+    def get_binary_artifact(
+        self, artifact_id: UUID, tenant_id: str | None = None
+    ) -> dict[str, Any]:
         """Retrieve a binary attachment only after digest, size and provenance checks."""
+        query = (
+            "SELECT lab_binary_artifacts.* FROM lab_binary_artifacts "
+            "JOIN lab_runs ON lab_runs.run_id = lab_binary_artifacts.run_id "
+            "WHERE lab_binary_artifacts.artifact_id = ?"
+        )
+        parameters: tuple[object, ...] = (str(artifact_id),)
+        if tenant_id is not None:
+            query += " AND lab_runs.tenant_id = ?"
+            parameters += (tenant_id,)
         with closing(self._connect()) as connection:
-            row = connection.execute(
-                "SELECT * FROM lab_binary_artifacts WHERE artifact_id = ?",
-                (str(artifact_id),),
-            ).fetchone()
+            row = connection.execute(query, parameters).fetchone()
         if row is None:
             raise LabArtifactNotFound(str(artifact_id))
         return self._binary_artifact_document(row, include_content=True)
