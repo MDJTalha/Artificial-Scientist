@@ -36,6 +36,8 @@ class HypothesisCandidate(BaseModel):
         cleaned = [" ".join(value.split()) for value in values]
         if any(not value for value in cleaned):
             raise ValueError("list items must not be blank")
+        if any(len(value) > 2000 for value in cleaned):
+            raise ValueError("list items must be at most 2000 characters")
         if len({value.casefold() for value in cleaned}) != len(cleaned):
             raise ValueError("list items must be unique")
         return cleaned
