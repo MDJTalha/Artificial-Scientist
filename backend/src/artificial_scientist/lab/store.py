@@ -31,6 +31,10 @@ class LabArtifactNotFound(LookupError):
     """Raised when a requested artifact ID is not present in the lab store."""
 
 
+class LabExecutionNotFound(LookupError):
+    """Raised when a requested execution-attempt ID is not present in the lab store."""
+
+
 class LabRunStore:
     """Persist run records and their content-addressed, provenance-linked artifacts."""
 
@@ -39,6 +43,7 @@ class LabRunStore:
         if database_path != ":memory:":
             Path(database_path).parent.mkdir(parents=True, exist_ok=True)
         self._initialize()
+        self.recover_interrupted_executions()
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.database_path, timeout=5.0)
@@ -62,6 +67,24 @@ class LabRunStore:
             )
             connection.execute(
                 "CREATE INDEX IF NOT EXISTS idx_lab_runs_created_at ON lab_runs(created_at DESC)"
+            )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS lab_execution_attempts (
+                    run_id TEXT PRIMARY KEY,
+                    status TEXT NOT NULL CHECK (status IN ('running', 'completed', 'failed', 'interrupted')),
+                    configuration_sha256 TEXT NOT NULL CHECK (length(configuration_sha256) = 64),
+                    started_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    finished_at TEXT,
+                    failure_reason TEXT,
+                    result_sha256 TEXT,
+                    request_json TEXT NOT NULL
+                )
+                """
+            )
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_lab_execution_attempts_status ON lab_execution_attempts(status, updated_at)"
             )
             connection.execute(
                 """
