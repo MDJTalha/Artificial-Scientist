@@ -1127,7 +1127,7 @@ def test_clamav_scanner_rejects_invalid_utf8_response(monkeypatch) -> None:
             return None
 
         def recv(self, _size):
-            return b"stream: \xff OK\0"
+            return b"stream: " + bytes([0xFF]) + b" OK\0"
 
     monkeypatch.setenv("ARTIFICIAL_SCIENTIST_CLAMAV_HOST", "scanner.internal")
     monkeypatch.setattr(
