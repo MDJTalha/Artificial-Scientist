@@ -551,11 +551,20 @@ class LabRunStore:
             )
         return artifacts
 
-    def get_artifact(self, artifact_id: UUID) -> LabArtifactResponse:
+    def get_artifact(
+        self, artifact_id: UUID, tenant_id: str | None = None
+    ) -> LabArtifactResponse:
+        query = (
+            "SELECT lab_artifacts.* FROM lab_artifacts "
+            "JOIN lab_runs ON lab_runs.run_id = lab_artifacts.run_id "
+            "WHERE lab_artifacts.artifact_id = ?"
+        )
+        parameters: tuple[object, ...] = (str(artifact_id),)
+        if tenant_id is not None:
+            query += " AND lab_runs.tenant_id = ?"
+            parameters += (tenant_id,)
         with closing(self._connect()) as connection:
-            row = connection.execute(
-                "SELECT * FROM lab_artifacts WHERE artifact_id = ?", (str(artifact_id),)
-            ).fetchone()
+            row = connection.execute(query, parameters).fetchone()
         if row is None:
             raise LabArtifactNotFound(str(artifact_id))
         content_bytes = bytes(row["content_json"])
