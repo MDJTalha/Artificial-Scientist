@@ -115,6 +115,19 @@ def test_candidate_lists_reject_blank_or_duplicate_items() -> None:
         )
 
 
+def test_hypothesis_list_items_have_a_character_limit() -> None:
+    invalid = candidate()
+    invalid["assumptions"] = ["x" * 2001]
+    with pytest.raises(ValidationError, match="at most 2000 characters"):
+        DiscoveryAssessmentRequest(
+            research_question="How does temperature affect reaction rate?",
+            candidates=[
+                invalid,
+                candidate("Hypothesis B", "Catalyst concentration changes reaction rate."),
+            ],
+        )
+
+
 def test_declared_novelty_screen_requires_search_notes() -> None:
     with pytest.raises(ValidationError, match="novelty_screen_notes are required"):
         DiscoveryAssessmentRequest(
