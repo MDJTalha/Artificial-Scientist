@@ -1,5 +1,6 @@
 """Reference and adversarial tests for the controlled computational lab."""
 
+import asyncio
 import json
 import sqlite3
 from types import SimpleNamespace
@@ -15,7 +16,7 @@ from artificial_scientist.lab.execution import LabExecutionTimeout, _stop_proces
 from artificial_scientist.lab.integrity import result_digest
 from artificial_scientist.lab.models import LabRunRequest
 from artificial_scientist.lab.store import LabArtifactNotFound, LabRunStore
-from artificial_scientist.main import app
+from artificial_scientist.main import LabRequestBodyLimitMiddleware, app
 
 
 def _slow_lab_worker() -> dict[str, object]:
@@ -485,6 +486,34 @@ def test_lab_api_fails_closed_when_production_key_is_missing(monkeypatch) -> Non
     assert response.status_code == 503
     assert response.json()["detail"] == "Lab API authentication is not configured."
 
+
+
+def test_lab_body_limit_rejects_chunked_body_without_content_length() -> None:
+    messages = [
+        {"type": "http.request", "body": b"a" * (40 * 1024), "more_body": True},
+        {"type": "http.request", "body": b"b" * (30 * 1024), "more_body": False},
+    ]
+    sent: list[dict[str, object]] = []
+
+    async def receive() -> dict[str, object]:
+        return messages.pop(0)
+
+    async def send(message: dict[str, object]) -> None:
+        sent.append(message)
+
+    async def downstream(scope, receive, send) -> None:
+        raise AssertionError("Oversized request must be rejected before the app.")
+
+    middleware = LabRequestBodyLimitMiddleware(downstream)
+    scope = {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/v1/lab/runs",
+        "headers": [],
+    }
+    asyncio.run(middleware(scope, receive, send))
+    assert sent[0]["status"] == 413
+    assert b"65536-byte limit" in sent[1]["body"]
 
 
 def test_lab_run_rejects_request_body_over_64_kib_before_validation() -> None:
