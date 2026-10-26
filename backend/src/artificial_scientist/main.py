@@ -52,7 +52,7 @@ class LabSecurityAuditMiddleware:
                         else "allowed"
                     )
                     try:
-                        TenantDirectory(self.database_path).audit(
+                        TenantDirectory(context.get("database_path", self.database_path)).audit(
                             principal_id=context["principal_id"],
                             tenant_id=context["tenant_id"],
                             action=context["action"],
