@@ -11,7 +11,7 @@ from pydantic import ValidationError
 from artificial_scientist.api.routes import lab as lab_routes
 from artificial_scientist.api.routes.lab import get_lab_store
 from artificial_scientist.lab.engine import run_lab
-from artificial_scientist.lab.execution import LabExecutionTimeout, run_isolated
+from artificial_scientist.lab.execution import LabExecutionTimeout, _stop_process, run_isolated
 from artificial_scientist.lab.integrity import result_digest
 from artificial_scientist.lab.models import LabRunRequest
 from artificial_scientist.lab.store import LabArtifactNotFound, LabRunStore
@@ -296,6 +296,34 @@ def test_lab_api_returns_generic_server_error_for_tampered_run_listing(tmp_path)
         assert listing.json()["detail"] == "Stored lab run failed integrity validation."
     finally:
         app.dependency_overrides.pop(get_lab_store, None)
+
+def test_worker_cleanup_escalates_from_terminate_to_kill() -> None:
+    class StubbornProcess:
+        def __init__(self) -> None:
+            self.alive = True
+            self.terminate_called = False
+            self.kill_called = False
+            self.join_calls: list[float] = []
+
+        def is_alive(self) -> bool:
+            return self.alive
+
+        def terminate(self) -> None:
+            self.terminate_called = True
+
+        def join(self, timeout: float) -> None:
+            self.join_calls.append(timeout)
+
+        def kill(self) -> None:
+            self.kill_called = True
+            self.alive = False
+
+    process = StubbornProcess()
+    _stop_process(process)
+    assert process.terminate_called is True
+    assert process.kill_called is True
+    assert process.join_calls == [2, 2]
+
 
 def test_isolated_lab_worker_respects_deadline() -> None:
     import time
