@@ -12,6 +12,36 @@ from artificial_scientist.lab.store import LabRunStore
 from artificial_scientist.main import app
 
 
+def test_unauthenticated_lab_request_is_audited_as_anonymous(monkeypatch, tmp_path):
+    database = str(tmp_path / "anonymous-auth-audit.sqlite3")
+    monkeypatch.setattr(
+        lab_routes,
+        "get_settings",
+        lambda: SimpleNamespace(
+            environment="production",
+            lab_api_key=None,
+            oidc_issuer="https://identity.example.test/",
+            oidc_audience="scientific-api",
+            oidc_jwks_url="https://identity.example.test/jwks.json",
+            database_path=database,
+        ),
+    )
+
+    response = TestClient(app).get("/api/v1/lab/runs")
+    assert response.status_code == 401
+
+    events = TenantDirectory(database).list_audit_events(None, limit=100)
+    anonymous_denials = [
+        event for event in events
+        if event["action"] == "authentication:request"
+        and event["outcome"] == "denied"
+        and event["metadata"].get("http_status") == 401
+    ]
+    assert anonymous_denials
+    assert all(event["principal_id"] is None for event in anonymous_denials)
+    assert all(event["correlation_id"] for event in anonymous_denials)
+
+
 def test_configured_oidc_cannot_be_bypassed_with_legacy_api_key(monkeypatch):
     monkeypatch.setattr(
         lab_routes,
