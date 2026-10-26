@@ -42,7 +42,7 @@ The configuration and result hashes support integrity comparison; the result dig
 ## Current limitations — do not treat Phase 6 as complete
 
 - Canonical JSON run-result artifacts are persisted as SQLite BLOBs with SHA-256 verification and provenance links to the run, configuration digest, result digest, optional plan ID, and step IDs. General binary scientific attachments, retention/deletion policy, export packages, and artifact lifecycle management remain unimplemented.
-- Duration is measured, but no hard process-level wall-clock timeout or OS-level CPU/memory quota is enforced.
+- Each allowlisted lab step now runs in a separate spawned child process with a configurable hard wall-clock deadline (default 10 seconds, maximum 30 seconds); timed-out workers are terminated. This is process separation, not an OS security sandbox, and no OS-level CPU/memory quota is enforced.
 - This is not an operating-system sandbox. The endpoint must remain on trusted local infrastructure; the application currently has no authentication.
 - A seed is recorded as metadata only; these deterministic math operations do not currently consume it.
 - Environment/dependency manifests, replay across versions, interruption recovery, and cross-system durable audit linkage remain future acceptance work.
@@ -60,7 +60,8 @@ The configuration and result hashes support integrity comparison; the result dig
 - [x] Durable SQLite run storage, bounded listing/retrieval, and full-record integrity checks.
 - [x] Durable JSON result artifacts with byte-digest verification and run/plan/step provenance metadata.
 - [ ] General binary artifact support, lifecycle policy, and complete provenance linkage to experiment plans/records.
-- [ ] Enforced timeout and process/resource isolation tests.
+- [x] Enforced per-step wall-clock timeout and child-process termination test.
+- [ ] OS-level process/resource isolation and CPU/memory quota tests.
 - [ ] Reproducible environment manifest and rerun/verification workflow.
 - [ ] Security review of the execution boundary before enabling generated code or untrusted users.
 
