@@ -219,8 +219,10 @@ class LabRunStore:
                 )
         return self.get_execution_status(run_id, tenant_id=tenant_id)
 
-    def fail_execution(self, run_id: UUID) -> None:
-        """Mark an execution failed without storing sensitive exception details."""
+    def fail_execution(
+        self, run_id: UUID, tenant_id: str | None = None
+    ) -> None:
+        """Mark only the specified tenant's execution failed without storing exception details."""
         now = datetime.now(UTC).isoformat()
         with closing(self._connect()) as connection:
             with connection:
@@ -229,13 +231,14 @@ class LabRunStore:
                     UPDATE lab_execution_attempts
                     SET status = 'failed', updated_at = ?, finished_at = ?,
                         failure_reason = ?
-                    WHERE run_id = ? AND status = 'running'
+                    WHERE run_id = ? AND tenant_id IS ? AND status = 'running'
                     """,
                     (
                         now,
                         now,
                         "Execution failed before a terminal result was persisted.",
                         str(run_id),
+                        tenant_id,
                     ),
                 )
 
