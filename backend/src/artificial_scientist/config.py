@@ -12,6 +12,7 @@ class Settings:
     app_version: str
     environment: str
     allowed_origins: tuple[str, ...]
+    database_path: str
 
 
 def get_settings() -> Settings:
@@ -31,4 +32,7 @@ def get_settings() -> Settings:
         app_version=os.getenv("ARTIFICIAL_SCIENTIST_VERSION", "0.1.0"),
         environment=os.getenv("ARTIFICIAL_SCIENTIST_ENV", "development"),
         allowed_origins=allowed_origins,
+        database_path=os.getenv(
+            "ARTIFICIAL_SCIENTIST_DB_PATH", "data/artificial_scientist.sqlite3"
+        ),
     )
