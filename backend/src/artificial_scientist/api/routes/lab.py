@@ -53,6 +53,7 @@ def require_lab_access(
 ) -> None:
     """Require configured OIDC identity or the legacy deployment-level API key."""
     settings = get_settings()
+    request.state.security_audit_database_path = settings.database_path
     if settings.environment.lower() == "development":
         request.state.authenticated_principal = AuthenticatedPrincipal(
             subject="local-development-principal",
