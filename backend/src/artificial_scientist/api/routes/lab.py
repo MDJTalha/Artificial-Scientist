@@ -8,7 +8,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from artificial_scientist.config import get_settings
 from artificial_scientist.lab.engine import run_lab
-from artificial_scientist.lab.models import LabRunRequest, LabRunResponse
+from artificial_scientist.lab.models import (
+    LabArtifactMetadata,
+    LabArtifactResponse,
+    LabRunRequest,
+    LabRunResponse,
+)
 from artificial_scientist.lab.store import (
     LabArtifactNotFound,
     LabRunNotFound,
@@ -65,11 +70,11 @@ def get_lab_run(
 
 
 
-@router.get("/runs/{run_id}/artifacts", response_model=list[object])
+@router.get("/runs/{run_id}/artifacts", response_model=list[LabArtifactMetadata])
 def list_lab_run_artifacts(
     run_id: UUID,
     store: Annotated[LabRunStore, Depends(get_lab_store)],
-) -> list[object]:
+) -> list[LabArtifactMetadata]:
     """List artifact metadata and provenance attached to one run."""
     try:
         return store.list_artifacts(run_id)
@@ -79,14 +84,14 @@ def list_lab_run_artifacts(
         ) from error
 
 
-@router.get("/artifacts/{artifact_id}", response_model=dict[str, object])
+@router.get("/artifacts/{artifact_id}", response_model=LabArtifactResponse)
 def get_lab_artifact(
     artifact_id: UUID,
     store: Annotated[LabRunStore, Depends(get_lab_store)],
-) -> dict[str, object]:
+) -> LabArtifactResponse:
     """Retrieve an artifact after validating its byte digest and run provenance."""
     try:
-        return store.get_artifact(artifact_id).model_dump(mode="json")
+        return store.get_artifact(artifact_id)
     except LabArtifactNotFound as error:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Lab artifact not found."
