@@ -350,3 +350,58 @@ def test_result_persistence_failure_marks_execution_failed(monkeypatch, tmp_path
         assert status["status"] == "failed"
     finally:
         app.dependency_overrides.pop(get_lab_store, None)
+
+
+
+def test_lab_request_fails_closed_when_final_audit_persistence_fails(
+    monkeypatch, tmp_path
+):
+    database = str(tmp_path / "audit-unavailable.sqlite3")
+    principal = AuthenticatedPrincipal(
+        subject="audit-failure-user",
+        issuer="https://identity.example.test/",
+        audience="scientific-api",
+    )
+    monkeypatch.setattr(
+        lab_routes,
+        "get_settings",
+        lambda: SimpleNamespace(
+            environment="production",
+            lab_api_key=None,
+            oidc_issuer="https://identity.example.test/",
+            oidc_audience="scientific-api",
+            oidc_jwks_url="https://identity.example.test/jwks.json",
+            database_path=database,
+        ),
+    )
+    monkeypatch.setattr(
+        lab_routes, "validate_oidc_bearer_token", lambda *_args, **_kwargs: principal
+    )
+    directory = TenantDirectory(database)
+    principal_id = directory.register_principal(principal.issuer, principal.subject)
+    tenant_id = directory.create_tenant("audit-failure-tenant", "Audit Failure Tenant")
+    directory.grant_membership(principal_id, tenant_id, "researcher")
+
+    original_audit = TenantDirectory.audit
+
+    def fail_final_outcome(self, **kwargs):
+        metadata = kwargs.get("metadata") or {}
+        if "http_status" in metadata:
+            raise RuntimeError("simulated audit persistence outage")
+        return original_audit(self, **kwargs)
+
+    monkeypatch.setattr(TenantDirectory, "audit", fail_final_outcome)
+    store = LabRunStore(database)
+    app.dependency_overrides[get_lab_store] = lambda: store
+    try:
+        response = TestClient(app).get(
+            "/api/v1/lab/runs",
+            headers={
+                "Authorization": "Bearer signed-token",
+                "X-Tenant-ID": tenant_id,
+            },
+        )
+        assert response.status_code == 503
+        assert response.json()["detail"] == "Security audit persistence is unavailable."
+    finally:
+        app.dependency_overrides.pop(get_lab_store, None)
