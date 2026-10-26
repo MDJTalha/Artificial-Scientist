@@ -456,3 +456,15 @@ def test_lab_api_fails_closed_when_production_key_is_missing(monkeypatch) -> Non
     response = TestClient(app).get("/api/v1/lab/runs")
     assert response.status_code == 503
     assert response.json()["detail"] == "Lab API authentication is not configured."
+
+
+
+def test_lab_run_rejects_request_body_over_64_kib_before_validation() -> None:
+    response = TestClient(app).post(
+        "/api/v1/lab/runs",
+        json={"title": "x" * (65 * 1024), "steps": []},
+    )
+    assert response.status_code == 413
+    assert response.json()["detail"] == (
+        "Lab run request body exceeds the 65536-byte limit."
+    )
