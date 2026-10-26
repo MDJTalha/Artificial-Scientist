@@ -15,6 +15,18 @@ class LabExecutionTimeout(LabExecutionError):
     """An isolated lab operation exceeded its wall-clock deadline."""
 
 
+def _stop_process(process: Any) -> None:
+    """Stop a worker and escalate to kill if termination does not finish promptly."""
+    if not process.is_alive():
+        process.join(timeout=0)
+        return
+    process.terminate()
+    process.join(timeout=2)
+    if process.is_alive() and hasattr(process, "kill"):
+        process.kill()
+        process.join(timeout=2)
+
+
 def _worker_entry(
     send_connection: Any,
     target: Callable[..., dict[str, Any]],
@@ -64,12 +76,7 @@ def run_isolated(
     send_connection.close()
     try:
         if not receive_connection.poll(timeout_seconds):
-            if process.is_alive():
-                process.terminate()
-            process.join(timeout=2)
-            if process.is_alive() and hasattr(process, "kill"):
-                process.kill()
-                process.join(timeout=2)
+            _stop_process(process)
             raise LabExecutionTimeout(
                 f"Lab step exceeded its {timeout_seconds:g}-second execution deadline."
             )
@@ -79,8 +86,7 @@ def run_isolated(
             raise LabExecutionError("Isolated lab worker exited without a result.") from error
         process.join(timeout=2)
         if process.is_alive():
-            process.terminate()
-            process.join(timeout=2)
+            _stop_process(process)
         if not message.get("ok"):
             error_type = str(message.get("error_type", "WorkerError"))[:80]
             error = str(message.get("error", "Isolated operation failed."))[:500]
@@ -92,5 +98,4 @@ def run_isolated(
     finally:
         receive_connection.close()
         if process.is_alive():
-            process.terminate()
-            process.join(timeout=2)
+            _stop_process(process)
