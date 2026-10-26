@@ -222,3 +222,30 @@ def test_tenant_ownership_schema_migrates_legacy_records_without_assignment(tmp_
     assert run_tenant is None
     assert attempt_tenant is None
 
+
+
+def test_tenant_migration_creates_missing_execution_attempt_table(tmp_path) -> None:
+    database = str(tmp_path / "legacy-runs-only.sqlite3")
+    with sqlite3.connect(database) as connection:
+        connection.execute(
+            """
+            CREATE TABLE lab_runs (
+                run_id TEXT PRIMARY KEY,
+                status TEXT NOT NULL,
+                configuration_sha256 TEXT NOT NULL,
+                result_sha256 TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                payload_json TEXT NOT NULL
+            )
+            """
+        )
+
+    LabRunStore(database)
+
+    with sqlite3.connect(database) as connection:
+        attempt_columns = {
+            row[1]
+            for row in connection.execute("PRAGMA table_info(lab_execution_attempts)")
+        }
+
+    assert "tenant_id" in attempt_columns
