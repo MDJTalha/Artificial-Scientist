@@ -418,6 +418,10 @@ class LabRunStore:
                             artifact_count,
                         ),
                     )
+                    connection.execute(
+                        "UPDATE lab_execution_attempts SET request_json = '{}' WHERE run_id = ?",
+                        (run_id,),
+                    )
                     connection.execute("DELETE FROM lab_runs WHERE run_id = ?", (run_id,))
                     purged.append(run_id)
         return purged
