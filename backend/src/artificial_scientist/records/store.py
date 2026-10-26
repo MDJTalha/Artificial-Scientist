@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from uuid import UUID, uuid4
 
+from artificial_scientist.records.identity import source_identity_key
 from artificial_scientist.records.models import (
     ApprovalRequestRecord,
     ArtifactRecord,
@@ -26,7 +27,7 @@ from artificial_scientist.records.models import (
     SourceRecord,
 )
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 MODEL_BY_TYPE: dict[str, type[RecordBase]] = {
     "research_task": ResearchTaskRecord,
     "source": SourceRecord,
@@ -50,6 +51,14 @@ class RecordNotFound(RecordStoreError):
 
 class RecordConflict(RecordStoreError):
     """Raised when a new record reuses an existing record ID."""
+
+
+class DuplicateSource(RecordStoreError):
+    """Raised when equivalent source metadata is already stored."""
+
+    def __init__(self, existing_record_id: UUID) -> None:
+        self.existing_record_id = existing_record_id
+        super().__init__(f"An equivalent source record already exists: {existing_record_id}.")
 
 
 class InvalidRelationship(RecordStoreError):
@@ -153,6 +162,59 @@ class RecordStore:
             )
             connection.execute(
                 """
+                CREATE TABLE IF NOT EXISTS source_identity (
+                    identity_key TEXT PRIMARY KEY,
+                    record_id TEXT NOT NULL UNIQUE
+                        REFERENCES research_records(id) ON DELETE RESTRICT
+                )
+                """
+            )
+            connection.execute(
+                """
+                CREATE TRIGGER IF NOT EXISTS source_identity_no_update
+                BEFORE UPDATE ON source_identity
+                BEGIN
+                    SELECT RAISE(ABORT, 'source identities are append-only');
+                END
+                """
+            )
+            connection.execute(
+                """
+                CREATE TRIGGER IF NOT EXISTS source_identity_no_delete
+                BEFORE DELETE ON source_identity
+                BEGIN
+                    SELECT RAISE(ABORT, 'source identities are append-only');
+                END
+                """
+            )
+            # Backfill schema-v1 source records during migration. Preserve existing
+            # record history and map duplicate identities to the first record.
+            source_rows = connection.execute(
+                """
+                SELECT id, content_sha256, payload_json
+                FROM research_records
+                WHERE record_type = 'source'
+                ORDER BY created_at ASC, id ASC
+                """
+            ).fetchall()
+            for source_row in source_rows:
+                payload_json = str(source_row["payload_json"])
+                if _sha256_text(payload_json) != str(source_row["content_sha256"]):
+                    raise RecordIntegrityError(
+                        f"Existing source {source_row['id']} failed its checksum during migration."
+                    )
+                try:
+                    source_record = SourceRecord.model_validate_json(payload_json)
+                except Exception as exc:
+                    raise RecordIntegrityError(
+                        f"Existing source {source_row['id']} failed schema validation during migration."
+                    ) from exc
+                connection.execute(
+                    "INSERT OR IGNORE INTO source_identity(identity_key, record_id) VALUES (?, ?)",
+                    (source_identity_key(source_record), str(source_record.id)),
+                )
+            connection.execute(
+                """
                 CREATE TRIGGER IF NOT EXISTS research_records_no_update
                 BEFORE UPDATE ON research_records
                 BEGIN
@@ -187,7 +249,7 @@ class RecordStore:
                 END
                 """
             )
-            if current_version == 0:
+            if current_version < SCHEMA_VERSION:
                 connection.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
             connection.commit()
 
@@ -281,6 +343,14 @@ class RecordStore:
         try:
             with self._connect() as connection:
                 connection.execute("BEGIN IMMEDIATE")
+                if isinstance(record, SourceRecord):
+                    identity_key = source_identity_key(record)
+                    duplicate = connection.execute(
+                        "SELECT record_id FROM source_identity WHERE identity_key = ?",
+                        (identity_key,),
+                    ).fetchone()
+                    if duplicate is not None:
+                        raise DuplicateSource(UUID(str(duplicate["record_id"])))
                 self._validate_relationships(connection, record)
                 connection.execute(
                     """
@@ -297,6 +367,11 @@ class RecordStore:
                         payload_json,
                     ),
                 )
+                if isinstance(record, SourceRecord):
+                    connection.execute(
+                        "INSERT INTO source_identity(identity_key, record_id) VALUES (?, ?)",
+                        (source_identity_key(record), record_id),
+                    )
                 connection.execute(
                     """
                     INSERT INTO audit_events
@@ -369,6 +444,18 @@ class RecordStore:
         if row is None:
             raise RecordNotFound(f"Record {record_id} was not found.")
         return self._row_to_envelope(row)
+
+    def find_source_by_identity(self, record: SourceRecord) -> RecordEnvelope | None:
+        """Find an existing source with the same DOI, identifier, or landing URL."""
+        identity_key = source_identity_key(record)
+        with closing(self._connect()) as connection:
+            row = connection.execute(
+                "SELECT record_id FROM source_identity WHERE identity_key = ?",
+                (identity_key,),
+            ).fetchone()
+        if row is None:
+            return None
+        return self.get(UUID(str(row["record_id"])))
 
     def list_records(
         self,
