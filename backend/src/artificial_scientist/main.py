@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from artificial_scientist.api.routes.discovery import router as discovery_router
 from artificial_scientist.api.routes.health import router as health_router
 from artificial_scientist.api.routes.knowledge import router as knowledge_router
 from artificial_scientist.api.routes.lab import router as lab_router
@@ -200,8 +201,9 @@ app = FastAPI(
     title=settings.app_name,
     version=settings.app_version,
     description=(
-        "Research-first software foundation. Scientific research engines and "
-        "autonomous discovery capabilities are not implemented yet."
+        "Research-first scientific system with traceable records, literature metadata, "
+        "bounded mathematics, controlled computation, and structured hypothesis assessment. "
+        "Automated truth verification and autonomous scientific discovery are not claimed."
     ),
 )
 app.add_middleware(LabRequestBodyLimitMiddleware)
@@ -216,6 +218,7 @@ app.add_middleware(
 )
 
 app.include_router(health_router)
+app.include_router(discovery_router)
 app.include_router(literature_router)
 app.include_router(math_tools_router)
 app.include_router(lab_router)
