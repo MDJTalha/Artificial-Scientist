@@ -8,12 +8,15 @@ on:
       - phase-2-research-records
       - phase-3-literature-retrieval
       - phase-4-knowledge-graph
+      - phase-5-mathematical-tools
   pull_request:
     branches:
       - main
       - phase-0-foundation
       - phase-2-research-records
       - phase-3-literature-retrieval
+      - phase-4-knowledge-graph
+      - phase-5-mathematical-tools
   workflow_dispatch:
 
 permissions:
