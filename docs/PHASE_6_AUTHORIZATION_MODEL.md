@@ -1,6 +1,6 @@
 # Phase 6 — Identity, Authorization, and Tenant-Isolation Design
 
-**Status: OIDC bearer-token validation implemented at the lab API boundary; tenant ownership, role authorization, security audit records, and full security verification remain outstanding.**  
+**Status: OIDC validation, tenant directory, tenant membership checks on lab routes, and tenant-scoped run/artifact persistence are implemented on the working branch; complete adversarial coverage, quotas, production identity-provider verification, and independent security review remain outstanding.**  
 **Scope:** controlled-lab runs, execution attempts, JSON artifacts, binary attachments, exports, and retention records.
 
 ## Security problem
@@ -28,12 +28,12 @@ The current lab router uses a single shared `X-Lab-API-Key` outside development.
 - [ ] Add schema migration and legacy-record ownership tests; wire these records into protected run/artifact storage before claiming tenant isolation.
 - [x] Enforce configured OIDC bearer validation on the lab router; when any OIDC setting is configured, partial configuration fails closed and the legacy shared API key cannot bypass OIDC.
 - [x] Propagate the validated identity into request context; add an explicit role/action matrix that denies unknown roles and actions.
-- [ ] Resolve request identity to a persisted principal and require tenant membership at every protected route.
+- [x] Resolve validated request identity to a stable principal ID and require active tenant membership and action permission on run, execution-status, JSON artifact, binary artifact, verification, and export routes.
 - [ ] Add tenant ownership to run and execution-attempt records; define a reviewed legacy-data migration.
-- [ ] Enforce tenant scoping inside all run, artifact, export, verification, and status store operations.
+- [x] Add tenant filters to run lists/reads, execution-status reads, JSON artifact lists/reads, binary artifact lists/reads, and export/verification route storage calls.
 - [ ] Add transactional per-tenant quotas and tests for concurrent uploads and run creation.
 - [ ] Add security audit events without recording secrets or raw request payloads.
-- [ ] Add negative cross-tenant tests for every object endpoint, including UUID substitution, export, verification, status, and binary downloads.
+- [ ] Expand negative cross-tenant tests across every object endpoint, including UUID substitution for export, verification, execution status, uploads, and downloads.
 - [ ] Verify behavior in CI and conduct an independent security review before exposing untrusted or multi-tenant traffic.
 
 ## Minimum acceptance tests
@@ -60,7 +60,7 @@ Set all three environment variables to enable OIDC validation for the lab API:
 
 The validator accepts signed RS256 tokens only, validates issuer, audience, expiry and issued-at claims, and requires `sub`, `iss`, `aud`, `iat`, and `exp`. A missing or partial OIDC configuration fails closed outside development. Once any OIDC setting is supplied, the shared API key cannot be used as a fallback. The JWKS endpoint must use HTTPS.
 
-This is an authentication and authorization-foundation layer, not a complete SaaS authorization system. Validated identity is stored in request context, and tenant-directory primitives and a deny-by-default role matrix exist, but these are not yet enforced by run/artifact storage operations. No tenant isolation is claimed. Until tenant scoping and cross-tenant tests are implemented, the service must still be treated as a trusted single-deployment service. Development mode continues to bypass the lab authentication dependency for local development only.
+This is an incremental authorization implementation, not a claim of production SaaS readiness. In production-like environments, each protected route requires a validated principal, an `X-Tenant-ID` selector, an active membership, and permission for the requested action. The tenant header selects a tenant but never grants access by itself. Run and artifact storage calls are tenant-scoped, and unknown or unowned object IDs return not-found responses. Development mode uses a fixed local-only principal and intentionally leaves storage unscoped for backwards-compatible local testing; do not expose development mode to untrusted traffic. End-to-end verification is still in progress, and production rollout remains blocked on CI, expanded negative tests, tenant quotas, provider-specific configuration review, and independent security review.
 
 ## Tenant-directory foundation added
 
