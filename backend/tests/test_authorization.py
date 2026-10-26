@@ -93,3 +93,49 @@ def test_unknown_membership_role_is_rejected(tmp_path):
     tenant = directory.create_tenant("tenant-a", "Tenant A")
     with pytest.raises(ValueError, match="Unknown tenant role"):
         directory.grant_membership(principal, tenant, "owner")
+
+
+
+@pytest.mark.parametrize(
+    "metadata",
+    [
+        {"access_token": "should-not-be-recorded"},
+        {"nested": {"request_body": "private data"}},
+        {"cookie_value": "session"},
+        {"too_deep": {"a": {"b": {"c": {"d": {"e": {"f": "value"}}}}}}},
+        {"long_text": "x" * 1001},
+        {"items": list(range(101))},
+    ],
+)
+def test_audit_rejects_sensitive_or_unbounded_metadata(tmp_path, metadata):
+    directory = TenantDirectory(str(tmp_path / "audit-safe.sqlite3"))
+    with pytest.raises(ValueError):
+        directory.audit(
+            principal_id=None,
+            tenant_id=None,
+            action="run:read",
+            target_type="run",
+            target_id="run-1",
+            outcome="failed",
+            metadata=metadata,
+        )
+
+
+def test_audit_accepts_bounded_operational_metadata(tmp_path):
+    directory = TenantDirectory(str(tmp_path / "audit-operational.sqlite3"))
+    event_id = directory.audit(
+        principal_id="principal-1",
+        tenant_id="tenant-1",
+        action="run:read",
+        target_type="run",
+        target_id="run-1",
+        outcome="allowed",
+        metadata={"http_status": 200, "route": "/api/v1/lab/runs", "attempt": 2},
+    )
+    assert event_id
+    events = directory.list_audit_events("tenant-1")
+    assert events[0]["metadata"] == {
+        "http_status": 200,
+        "route": "/api/v1/lab/runs",
+        "attempt": 2,
+    }
