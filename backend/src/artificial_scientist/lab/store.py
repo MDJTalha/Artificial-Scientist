@@ -170,6 +170,108 @@ class LabRunStore:
             provenance=json.loads(row["provenance_json"]),
         )
 
+    def begin_execution(self, run_id: UUID, request: object) -> dict[str, Any]:
+        """Durably record an execution before starting its computational work."""
+        configuration = request.model_dump(mode="json")
+        request_json = self._canonical_json(configuration)
+        configuration_sha256 = hashlib.sha256(request_json.encode("utf-8")).hexdigest()
+        now = datetime.now(UTC).isoformat()
+        with closing(self._connect()) as connection:
+            with connection:
+                connection.execute(
+                    """
+                    INSERT INTO lab_execution_attempts (
+                        run_id, status, configuration_sha256, started_at, updated_at,
+                        finished_at, failure_reason, result_sha256, request_json
+                    ) VALUES (?, 'running', ?, ?, ?, NULL, NULL, NULL, ?)
+                    """,
+                    (str(run_id), configuration_sha256, now, now, request_json),
+                )
+        return self.get_execution_status(run_id)
+
+    def fail_execution(self, run_id: UUID) -> None:
+        """Mark an execution failed without storing sensitive exception details."""
+        now = datetime.now(UTC).isoformat()
+        with closing(self._connect()) as connection:
+            with connection:
+                connection.execute(
+                    """
+                    UPDATE lab_execution_attempts
+                    SET status = 'failed', updated_at = ?, finished_at = ?,
+                        failure_reason = ?
+                    WHERE run_id = ? AND status = 'running'
+                    """,
+                    (
+                        now,
+                        now,
+                        "Execution failed before a terminal result was persisted.",
+                        str(run_id),
+                    ),
+                )
+
+    def get_execution_status(self, run_id: UUID) -> dict[str, Any]:
+        """Return safe execution metadata without exposing stored request data."""
+        with closing(self._connect()) as connection:
+            row = connection.execute(
+                """
+                SELECT run_id, status, configuration_sha256, started_at, updated_at,
+                       finished_at, failure_reason, result_sha256
+                FROM lab_execution_attempts WHERE run_id = ?
+                """,
+                (str(run_id),),
+            ).fetchone()
+        if row is None:
+            raise LabExecutionNotFound(str(run_id))
+        return dict(row)
+
+    def recover_interrupted_executions(self) -> int:
+        """Reconcile stale running attempts with durable run records after restart."""
+        now = datetime.now(UTC).isoformat()
+        recovered = 0
+        with closing(self._connect()) as connection:
+            with connection:
+                rows = connection.execute(
+                    "SELECT run_id FROM lab_execution_attempts WHERE status = 'running'"
+                ).fetchall()
+                for row in rows:
+                    run = connection.execute(
+                        "SELECT status, result_sha256 FROM lab_runs WHERE run_id = ?",
+                        (row["run_id"],),
+                    ).fetchone()
+                    if run is not None:
+                        connection.execute(
+                            """
+                            UPDATE lab_execution_attempts
+                            SET status = ?, updated_at = ?, finished_at = ?,
+                                result_sha256 = ?, failure_reason = NULL
+                            WHERE run_id = ? AND status = 'running'
+                            """,
+                            (
+                                run["status"],
+                                now,
+                                now,
+                                run["result_sha256"],
+                                row["run_id"],
+                            ),
+                        )
+                    else:
+                        connection.execute(
+                            """
+                            UPDATE lab_execution_attempts
+                            SET status = 'interrupted', updated_at = ?, finished_at = ?,
+                                failure_reason = ?
+                            WHERE run_id = ? AND status = 'running'
+                            """,
+                            (
+                                now,
+                                now,
+                                "Process stopped before a terminal run record was persisted.",
+                                row["run_id"],
+                            ),
+                        )
+                    recovered += 1
+        return recovered
+
     def save(self, run: LabRunResponse) -> LabRunResponse:
         """Atomically save a run and its immutable JSON result artifact."""
         self._verify_result_hash(run)
