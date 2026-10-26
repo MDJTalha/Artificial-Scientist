@@ -138,9 +138,11 @@ def screen_prior_work(
         overall_status=overall_status,
         limitations=[
             "This searches bibliographic metadata only; it does not retrieve or assess full text.",
-            "Search coverage, indexing delays, query wording, and provider outages can hide relevant work.",
+            "Search coverage, indexing delays, query wording, and provider outages can hide "
+            "relevant work.",
             "A result is a prior-work lead, not evidence that the candidate is true or false.",
-            "No result is not proof of novelty. Expert review and a documented search strategy remain required.",
+            "No result is not proof of novelty. Expert review and a documented search "
+            "strategy remain required.",
         ],
     )
 
