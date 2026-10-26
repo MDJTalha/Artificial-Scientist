@@ -30,6 +30,8 @@ The project is organized into **15 phases, Phase 0 through Phase 14**. These are
 **Build:** structured scientific concepts, terminology, equation metadata, and supported relationships between concepts.  
 **Exit criteria:** search and relationship tests pass; concept provenance is traceable; conflicting definitions are not silently merged.
 
+**Current implementation:** typed concept and relation records, controlled vocabulary enums, concept/alias/definition search with server-side pagination, evidence-source links, directed relationships with explicit assertion status, self-link rejection, hierarchy-cycle checks, and bounded graph-neighborhood traversal are implemented on `phase-4-knowledge-graph`. Current CI is validating this branch; acceptance depends on the final run recorded in `docs/PHASE_4_KNOWLEDGE_GRAPH.md`.
+
 ## Phase 5 — Mathematics and scientific tools
 
 **Build:** symbolic computation, numerical calculations, units/dimensional checks where supported, statistics, and plotting.  
