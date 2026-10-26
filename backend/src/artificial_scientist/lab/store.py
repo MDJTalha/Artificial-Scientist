@@ -327,6 +327,22 @@ class LabRunStore:
                         artifact_bytes,
                     ),
                 )
+                terminal_at = datetime.now(UTC).isoformat()
+                connection.execute(
+                    """
+                    UPDATE lab_execution_attempts
+                    SET status = ?, updated_at = ?, finished_at = ?,
+                        result_sha256 = ?, failure_reason = NULL
+                    WHERE run_id = ?
+                    """,
+                    (
+                        run.status,
+                        terminal_at,
+                        terminal_at,
+                        run.result_sha256,
+                        str(run.run_id),
+                    ),
+                )
         return run
 
     def purge_runs_before(
