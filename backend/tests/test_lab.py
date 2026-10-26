@@ -820,7 +820,7 @@ def test_binary_artifact_quotas_are_enforced_per_run(tmp_path, monkeypatch) -> N
         )
     )
     store.save(run)
-    monkeypatch.setattr(lab_store_module, "_MAX_BINARY_ARTIFACTS_PER_RUN", 2)
+    monkeypatch.setattr(lab_store_module, "_MAX_BINARY_ARTIFACTS_PER_RUN", 3)
     monkeypatch.setattr(lab_store_module, "_MAX_BINARY_BYTES_PER_RUN", 5)
 
     first = store.save_binary_artifact(
@@ -842,6 +842,13 @@ def test_binary_artifact_quotas_are_enforced_per_run(tmp_path, monkeypatch) -> N
         run.run_id, "first.bin", "application/octet-stream", b"abc"
     )
     assert duplicate["artifact_id"] == first["artifact_id"]
+
+    monkeypatch.setattr(lab_store_module, "_MAX_BINARY_ARTIFACTS_PER_RUN", 2)
+    monkeypatch.setattr(lab_store_module, "_MAX_BINARY_BYTES_PER_RUN", 100)
+    with pytest.raises(ValueError, match="count quota"):
+        store.save_binary_artifact(
+            run.run_id, "fourth.bin", "application/octet-stream", b"x"
+        )
 
     other_run = run_lab(
         LabRunRequest(
