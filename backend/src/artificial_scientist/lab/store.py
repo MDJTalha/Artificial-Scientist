@@ -111,6 +111,7 @@ class LabRunStore:
 
     def save(self, run: LabRunResponse) -> LabRunResponse:
         """Atomically save a run and its immutable JSON result artifact."""
+        self._verify_result_hash(run)
         run_payload = self._canonical_json(run.model_dump(mode="json"))
         artifact_bytes = run_payload.encode("utf-8")
         if len(artifact_bytes) > _MAX_ARTIFACT_BYTES:
@@ -229,6 +230,18 @@ class LabRunStore:
             self._verify_result_hash(run)
             if str(run.run_id) != row["run_id"]:
                 raise ValueError("Artifact run ID does not match its provenance.")
+            expected_provenance = {
+                "run_id": str(run.run_id),
+                "title": run.title,
+                "status": run.status,
+                "configuration_sha256": run.configuration_sha256,
+                "result_sha256": run.result_sha256,
+                "plan_record_id": str(run.plan_record_id) if run.plan_record_id else None,
+                "step_ids": [step.step_id for step in run.steps],
+                "artifact_role": "canonical-run-result",
+            }
+            if metadata.provenance != expected_provenance:
+                raise ValueError("Artifact provenance does not match the canonical run record.")
         except (json.JSONDecodeError, TypeError, ValueError) as error:
             raise RuntimeError("Stored lab artifact failed schema or integrity validation.") from error
         return LabArtifactResponse(**metadata.model_dump(), content=content)
