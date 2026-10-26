@@ -37,7 +37,7 @@ The project is organized into **15 phases, Phase 0 through Phase 14**. These are
 **Build:** symbolic computation, numerical calculations, units/dimensional checks where supported, statistics, and plotting.  
 **Exit criteria:** reference cases and numerical tolerances documented; independent checks used where feasible; failures and unsupported operations are explicit.
 
-**Current implementation:** bounded symbolic simplify/differentiate/integrate/solve/substitute/evaluate; bracketed real root finding; adaptive definite integration with error estimates; descriptive statistics; safe one-dimensional PNG plotting; and an allowlisted unit registry and dimensional-expression checker. The implementation uses a strict expression-AST allowlist rather than evaluating arbitrary Python text. Acceptance depends on current GitHub Actions and is tracked in `docs/PHASE_5_MATH_TOOLS.md`.
+**Current implementation:** bounded symbolic simplify/differentiate/integrate/solve/substitute/evaluate; bracketed real root finding; adaptive definite integration with error estimates; descriptive statistics; safe one-dimensional PNG plotting; and an allowlisted unit registry and dimensional-expression checker. The implementation uses a strict expression-AST allowlist rather than evaluating arbitrary Python text. The code commit passed Ruff, 75 backend tests on both Python 3.12 and 3.13, plus frontend type-check, 6 tests and production build; see the [verified CI run](https://github.com/MDJTalha/Artificial-Scientist/actions/runs/40266731194) and `docs/PHASE_5_MATH_TOOLS.md`. Phase 5 is implementation-validated and awaiting review/integration.
 
 ## Phase 6 — Controlled computational laboratory
 
@@ -92,6 +92,8 @@ The project is organized into **15 phases, Phase 0 through Phase 14**. These are
 - **Phase 3 — literature retrieval:** implementation tests passed on code commit `a3d139a56526ad0d512ab568c1dca71cba815b8a`; see the [passing CI run](https://github.com/MDJTalha/Artificial-Scientist/actions/runs/40264595989) and `docs/PHASE_3_LITERATURE.md`. It is awaiting review/integration.
 
 - **Phase 4 — knowledge graph and vocabulary:** implementation tests passed on code commit `2e652fd211c0b32d4dd77bace69240223c3cbccb`; see the [passing CI run](https://github.com/MDJTalha/Artificial-Scientist/actions/runs/40265564598) and `docs/PHASE_4_KNOWLEDGE_GRAPH.md`. Pull Request #4 is draft and targets Phase 3; it is not merged.
+
+- **Phase 5 — mathematics and scientific tools:** core implementation CI passed on commit `bdf3dfffea45ed428fcb21667d282c035fc8d49d`; see the [passing run](https://github.com/MDJTalha/Artificial-Scientist/actions/runs/40266731194) and `docs/PHASE_5_MATH_TOOLS.md`. Draft Pull Request #5 targets Phase 4; it remains unmerged.
 
 The status above reflects recorded repository evidence. It is not a declaration of scientific discovery capability.
 
