@@ -47,6 +47,7 @@ class LabRunRequest(LabModel):
     steps: list[LabStep] = Field(min_length=1, max_length=20)
     plan_record_id: UUID | None = None
     random_seed: int | None = Field(default=None, ge=0, le=2**32 - 1)
+    step_timeout_seconds: float = Field(default=10.0, gt=0, le=30)
 
     @model_validator(mode="after")
     def validate_unique_steps_and_size(self) -> LabRunRequest:
