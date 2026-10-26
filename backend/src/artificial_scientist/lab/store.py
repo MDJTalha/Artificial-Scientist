@@ -15,6 +15,7 @@ from artificial_scientist.lab.integrity import result_digest
 from artificial_scientist.lab.models import (
     LabArtifactMetadata,
     LabArtifactResponse,
+    LabRunRequest,
     LabRunResponse,
 )
 
@@ -72,7 +73,9 @@ class LabRunStore:
                 """
                 CREATE TABLE IF NOT EXISTS lab_execution_attempts (
                     run_id TEXT PRIMARY KEY,
-                    status TEXT NOT NULL CHECK (status IN ('running', 'completed', 'failed', 'interrupted')),
+                    status TEXT NOT NULL CHECK (
+                        status IN ('running', 'completed', 'failed', 'interrupted')
+                    ),
                     configuration_sha256 TEXT NOT NULL CHECK (length(configuration_sha256) = 64),
                     started_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL,
@@ -84,7 +87,8 @@ class LabRunStore:
                 """
             )
             connection.execute(
-                "CREATE INDEX IF NOT EXISTS idx_lab_execution_attempts_status ON lab_execution_attempts(status, updated_at)"
+                "CREATE INDEX IF NOT EXISTS idx_lab_execution_attempts_status "
+                "ON lab_execution_attempts(status, updated_at)"
             )
             connection.execute(
                 """
@@ -170,7 +174,7 @@ class LabRunStore:
             provenance=json.loads(row["provenance_json"]),
         )
 
-    def begin_execution(self, run_id: UUID, request: object) -> dict[str, Any]:
+    def begin_execution(self, run_id: UUID, request: LabRunRequest) -> dict[str, Any]:
         """Durably record an execution before starting its computational work."""
         configuration = request.model_dump(mode="json")
         request_json = self._canonical_json(configuration)
