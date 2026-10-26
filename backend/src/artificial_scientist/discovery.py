@@ -87,6 +87,111 @@ class DiscoveryAssessmentResponse(BaseModel):
     limitations: list[str]
 
 
+class ResearchQuestionDecompositionRequest(BaseModel):
+    """A bounded request to structure a question before hypothesis review."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    research_question: str = Field(min_length=10, max_length=5000)
+    domain_context: str | None = Field(default=None, max_length=1000)
+
+
+class ResearchQuestionDecompositionResponse(BaseModel):
+    research_question: str
+    question_type: Literal[
+        "causal", "comparative", "descriptive", "predictive", "exploratory", "unclassified"
+    ]
+    independent_variable: str | None
+    dependent_variable: str | None
+    system_or_population: str | None
+    context: str | None
+    missing_elements: list[str]
+    clarification_prompts: list[str]
+    method: Literal["bounded_heuristic"]
+    limitations: list[str]
+
+
+def decompose_research_question(
+    request: ResearchQuestionDecompositionRequest,
+) -> ResearchQuestionDecompositionResponse:
+    """Extract only conservative patterns and report every unknown explicitly."""
+    question = " ".join(request.research_question.split())
+    independent: str | None = None
+    dependent: str | None = None
+    question_type: Literal[
+        "causal", "comparative", "descriptive", "predictive", "exploratory", "unclassified"
+    ] = "unclassified"
+
+    patterns = (
+        (r"how does (.+?) affect (.+?)(?: under | in | among | for | when |\?|$)", "causal"),
+        (r"effect of (.+?) on (.+?)(?: under | in | among | for | when |\?|$)", "causal"),
+        (r"relationship between (.+?) and (.+?)(?: under | in | among | for | when |\?|$)", "exploratory"),
+        (r"compare (.+?) and (.+?)(?: under | in | among | for | when |\?|$)", "comparative"),
+    )
+    normalized = question.casefold()
+    for pattern, detected_type in patterns:
+        match = re.search(pattern, normalized, flags=re.IGNORECASE)
+        if match:
+            independent = match.group(1).strip(" .?!")
+            dependent = match.group(2).strip(" .?!")
+            question_type = detected_type
+            break
+
+    if question_type == "unclassified":
+        if normalized.startswith(("what is ", "what are ", "which factors ")):
+            question_type = "descriptive"
+        elif normalized.startswith(("will ", "can ", "to what extent ")):
+            question_type = "predictive"
+        else:
+            question_type = "exploratory"
+
+    system_match = re.search(
+        r"\b(?:in|among|for|within)\s+([^,;?]+)",
+        question,
+        flags=re.IGNORECASE,
+    )
+    system_or_population = system_match.group(1).strip() if system_match else None
+    context = request.domain_context.strip() if request.domain_context else None
+
+    missing: list[str] = []
+    prompts: list[str] = []
+    if not independent:
+        missing.append("independent_variable")
+        prompts.append("What factor, intervention, or condition is being varied or compared?")
+    if not dependent:
+        missing.append("dependent_variable")
+        prompts.append("What measurable outcome or response should be explained?")
+    if not system_or_population:
+        missing.append("system_or_population")
+        prompts.append("Which population, system, dataset, or environment is in scope?")
+    if not context:
+        missing.append("domain_context")
+        prompts.append("What domain, setting, and boundary conditions should constrain the question?")
+    if not re.search(r"\b(control|adjust|hold constant|confound|baseline)\b", normalized):
+        missing.append("confounders_and_controls")
+        prompts.append("Which confounders, controls, and baseline comparisons must be considered?")
+    if not re.search(r"\b(day|week|month|year|hour|minute|longitudinal|time period)\b", normalized):
+        missing.append("time_horizon")
+        prompts.append("What time horizon or observation window is relevant, if any?")
+
+    return ResearchQuestionDecompositionResponse(
+        research_question=question,
+        question_type=question_type,
+        independent_variable=independent,
+        dependent_variable=dependent,
+        system_or_population=system_or_population,
+        context=context,
+        missing_elements=missing,
+        clarification_prompts=prompts,
+        method="bounded_heuristic",
+        limitations=[
+            "This is a conservative text-pattern heuristic, not semantic understanding or an LLM result.",
+            "Extracted variables may be incomplete or misleading; a researcher must confirm or edit them.",
+            "The response does not generate hypotheses, establish causality, or verify scientific validity.",
+        ],
+    )
+
+
 class PriorWorkCandidate(BaseModel):
     """A single candidate submitted for bounded prior-work screening."""
 
