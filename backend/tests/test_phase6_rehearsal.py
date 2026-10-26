@@ -73,7 +73,7 @@ def test_rehearsal_rejects_missing_operator(tmp_path):
     run = run_lab(_request())
     store.save(run)
 
-    with pytest.raises(LegacyClaimError, match="operator principal"):
+    with pytest.raises(LegacyClaimError, match="does not exist in the tenant directory"):
         rehearse_legacy_claims(
             database,
             [{"run_id": str(run.run_id), "tenant_id": tenant_id}],
