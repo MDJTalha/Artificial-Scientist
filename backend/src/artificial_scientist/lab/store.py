@@ -116,7 +116,8 @@ class LabRunStore:
         with closing(self._connect()) as connection:
             total = int(connection.execute("SELECT COUNT(*) FROM lab_runs").fetchone()[0])
             rows = connection.execute(
-                "SELECT payload_json FROM lab_runs ORDER BY created_at DESC, run_id LIMIT ? OFFSET ?",
+                "SELECT payload_json FROM lab_runs ORDER BY created_at DESC, run_id "
+                "LIMIT ? OFFSET ?",
                 (limit, offset),
             ).fetchall()
         runs: list[LabRunResponse] = []
