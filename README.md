@@ -8,7 +8,7 @@ This is **not a commercial SaaS product**. Its guiding objective is to contribut
 
 ## Current status
 
-**Phases 0–5 have recorded implementation CI evidence on their respective historical commits. Phase 5 is available as [draft Pull Request #5](https://github.com/MDJTalha/Artificial-Scientist/pull/5). Phase 6 — Controlled Computational Laboratory has an initial declarative runner and SQLite-backed run history on `phase-6-controlled-lab`; its new-head CI and full exit criteria are still pending. All phase pull requests remain unmerged by design.**
+**Phases 0–5 have recorded implementation CI evidence on their respective historical commits. Phase 5 is available as [draft Pull Request #5](https://github.com/MDJTalha/Artificial-Scientist/pull/5). Phase 6 — Controlled Computational Laboratory has a declarative runner, SQLite-backed run history, and full-record integrity checks on `phase-6-controlled-lab`; the latest-head CI run is queued and full exit criteria remain pending. All phase pull requests remain unmerged by design.**
 
 The foundation includes a FastAPI backend, health/readiness endpoints, a React + TypeScript overview dashboard that checks the actual local API, typed research records, SQLite provenance storage, and GitHub Actions verification.
 
