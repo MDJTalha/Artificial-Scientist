@@ -1189,6 +1189,8 @@ def test_posix_worker_resource_limits_never_raise_existing_hard_limits(monkeypat
         resource.RLIMIT_FSIZE: 1024 * 1024,
         resource.RLIMIT_NOFILE: 32,
     }
+    if hasattr(resource, "RLIMIT_CORE"):
+        hard_limits[resource.RLIMIT_CORE] = 0
     configured: dict[int, tuple[int, int]] = {}
 
     monkeypatch.setattr(lab_execution.os, "name", "posix")
