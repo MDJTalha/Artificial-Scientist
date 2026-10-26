@@ -310,7 +310,9 @@ async def upload_lab_binary_artifact(
     if content_length is not None:
         try:
             if int(content_length) > _MAX_BINARY_ARTIFACT_BYTES:
-                raise HTTPException(status_code=413, detail="Binary artifact exceeds the 10 MiB limit.")
+                raise HTTPException(
+                    status_code=413, detail="Binary artifact exceeds the 10 MiB limit."
+                )
         except ValueError as error:
             raise HTTPException(status_code=400, detail="Invalid Content-Length header.") from error
     chunks: list[bytes] = []
@@ -324,7 +326,9 @@ async def upload_lab_binary_artifact(
         return store.save_binary_artifact(
             run_id,
             filename,
-            request.headers.get("content-type", "application/octet-stream").split(";", 1)[0].strip(),
+            request.headers.get("content-type", "application/octet-stream")
+            .split(";", 1)[0]
+            .strip(),
             b"".join(chunks),
         )
     except LabRunNotFound as error:
