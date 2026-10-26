@@ -683,7 +683,7 @@ class RecordStore:
         if model_type is None:
             raise RecordIntegrityError(f"Unknown stored record type '{record_type}'.")
         try:
-            validated_record = model_type.model_validate_json(payload_json)
+            model_type.model_validate_json(payload_json)
         except Exception as exc:
             raise RecordIntegrityError(
                 f"Stored record {row['id']} no longer matches its declared schema."
