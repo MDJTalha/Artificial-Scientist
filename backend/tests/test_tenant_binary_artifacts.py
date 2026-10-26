@@ -66,3 +66,74 @@ def test_unowned_legacy_binary_artifact_is_not_visible_to_tenant(tmp_path) -> No
             __import__("uuid").UUID(artifact["artifact_id"]), tenant_id="tenant-a"
         )
 
+def test_tenant_wide_binary_count_quota_is_enforced_across_runs(
+    tmp_path, monkeypatch
+) -> None:
+    import artificial_scientist.lab.store as store_module
+
+    monkeypatch.setattr(store_module, "_MAX_BINARY_ARTIFACTS_PER_TENANT", 1)
+    store = LabRunStore(str(tmp_path / "tenant-binary-quota.sqlite3"))
+    run_a = _run()
+    run_b = _run()
+    store.save(run_a, tenant_id="tenant-a")
+    store.save(run_b, tenant_id="tenant-a")
+
+    store.save_binary_artifact(
+        run_a.run_id,
+        "first.bin",
+        "application/octet-stream",
+        b"first",
+        scan_status="clean",
+        tenant_id="tenant-a",
+    )
+    with pytest.raises(ValueError, match="Tenant has reached its binary artifact count quota"):
+        store.save_binary_artifact(
+            run_b.run_id,
+            "second.bin",
+            "application/octet-stream",
+            b"second",
+            scan_status="clean",
+            tenant_id="tenant-a",
+        )
+
+    # A separate tenant has an independent quota.
+    store.save_binary_artifact(
+        run_b.run_id,
+        "other-tenant.bin",
+        "application/octet-stream",
+        b"third",
+        scan_status="clean",
+        tenant_id="tenant-b",
+    )
+
+
+def test_tenant_wide_binary_byte_quota_is_enforced_across_runs(
+    tmp_path, monkeypatch
+) -> None:
+    import artificial_scientist.lab.store as store_module
+
+    monkeypatch.setattr(store_module, "_MAX_BINARY_BYTES_PER_TENANT", 5)
+    store = LabRunStore(str(tmp_path / "tenant-binary-byte-quota.sqlite3"))
+    run_a = _run()
+    run_b = _run()
+    store.save(run_a, tenant_id="tenant-a")
+    store.save(run_b, tenant_id="tenant-a")
+    store.save_binary_artifact(
+        run_a.run_id,
+        "first.bin",
+        "application/octet-stream",
+        b"12345",
+        scan_status="clean",
+        tenant_id="tenant-a",
+    )
+
+    with pytest.raises(ValueError, match="Tenant has reached its binary artifact storage quota"):
+        store.save_binary_artifact(
+            run_b.run_id,
+            "second.bin",
+            "application/octet-stream",
+            b"x",
+            scan_status="clean",
+            tenant_id="tenant-a",
+        )
+
