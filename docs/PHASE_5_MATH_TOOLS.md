@@ -108,7 +108,7 @@ Deterministic tests include:
 
 - [x] Ruff and all backend tests passed on Python 3.12 and 3.13.
 - [x] Frontend type-check, all 6 frontend tests, and production build passed.
-- [x] The verified code-head push run is linked below. Documentation-head and pull-request CI will be recorded after their results are confirmed.
+- [x] Code and documentation-head/pull-request CI passed: [code run](https://github.com/MDJTalha/Artificial-Scientist/actions/runs/40266731194), [documentation-head push run](https://github.com/MDJTalha/Artificial-Scientist/actions/runs/40266878173), and [pull-request run](https://github.com/MDJTalha/Artificial-Scientist/actions/runs/40266895491).
 - [x] Symbolic expressions never evaluate arbitrary Python text.
 - [x] Numerical integration returns an error estimate and an explicit convergence status.
 - [x] Root finding requires and reports a finite bracket.
@@ -126,7 +126,7 @@ Deterministic tests include:
 - The suite includes mathematical reference cases, invalid-input/security tests, unit dimensionality cases, and PNG plotting output checks.
 - Tests establish code behavior for these cases; they do not certify every mathematical expression, numeric stability for every domain, or scientific validity.
 
-The core Phase 5 acceptance checks have passed. The change remains stacked on Phase 4 and awaits review/integration; no earlier pull request is merged.
+The core Phase 5 acceptance checks have passed. The code commit's CI and the subsequent documentation-head and pull-request CI runs are green. The change remains stacked on Phase 4 and awaits review/integration; no earlier pull request is merged.
 
 ## Not implemented in this phase
 
