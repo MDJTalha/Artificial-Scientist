@@ -107,25 +107,32 @@ def assess_candidates(request: DiscoveryAssessmentRequest) -> DiscoveryAssessmen
         score = round(sum(rubric.values()) * 100 / len(rubric))
         concerns: list[str] = []
         if not rubric["traceable_sources"]:
-            concerns.append("No source or claim records are linked; evidence traceability is missing.")
+            concerns.append(
+                "No source or claim records are linked; evidence traceability is missing."
+            )
         if not rubric["alternative_explanations"]:
             concerns.append("At least one serious alternative explanation is required.")
         if not rubric["falsification_criteria"]:
-            concerns.append("Specify an observable result that would count against this hypothesis.")
+            concerns.append(
+                "Specify an observable result that would count against this hypothesis."
+            )
         if not rubric["discriminating_test"]:
             concerns.append("Describe a test that distinguishes this candidate from alternatives.")
         duplicate_of = None
         for previous in request.candidates[:index]:
             if _similarity(candidate.statement, previous.statement) >= 0.82:
                 duplicate_of = previous.title
-                concerns.append(f"Potential near-duplicate of '{previous.title}'; compare explicitly.")
+                concerns.append(
+                    f"Potential near-duplicate of '{previous.title}'; compare explicitly."
+                )
                 break
         if request.novelty_screen_status == "not_run":
             novelty_status = "not_assessed"
         else:
             novelty_status = "provisional_screen_only"
             concerns.append(
-                "Novelty screening is provisional and depends on the scope and quality of the recorded search."
+                "Novelty screening is provisional and depends on the scope and quality "
+                "of the recorded search."
             )
         assessments.append(
             CandidateAssessment(
@@ -150,9 +157,13 @@ def assess_candidates(request: DiscoveryAssessmentRequest) -> DiscoveryAssessmen
         assessments=assessments,
         overall_status=overall_status,
         limitations=[
-            "Completeness scores measure the presence of required fields, not truth, probability, importance, or scientific merit.",
-            "Text similarity is a simple heuristic and can miss paraphrases or flag unrelated statements.",
-            "Novelty cannot be guaranteed by a search; expert review and reproducible literature-search records are required.",
-            "Candidates are supplied by the caller; this endpoint does not independently generate hypotheses or verify evidence.",
+            "Completeness scores measure required fields, not truth, probability, importance, "
+            "or scientific merit.",
+            "Text similarity is a simple heuristic and can miss paraphrases or flag "
+            "unrelated statements.",
+            "Novelty cannot be guaranteed by a search; expert review and reproducible "
+            "literature-search records are required.",
+            "Candidates are supplied by the caller; this endpoint does not independently "
+            "generate hypotheses or verify evidence.",
         ],
     )
