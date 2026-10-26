@@ -17,11 +17,13 @@ from artificial_scientist.math_tools.engine import (
     describe_statistics,
     find_root,
     integrate_numerically,
+    render_function_plot,
     run_symbolic,
 )
 from artificial_scientist.math_tools.models import (
     DimensionCheckRequest,
     NumericIntegrationRequest,
+    PlotRequest,
     RootRequest,
     StatisticsRequest,
     SymbolicRequest,
@@ -268,6 +270,38 @@ def test_statistics_reject_nonfinite_and_oversized_input() -> None:
         StatisticsRequest(values=[1] * 100_001)
 
 
+def test_function_plot_renders_a_bounded_png_without_writing_files() -> None:
+    image = render_function_plot(
+        PlotRequest(
+            expression="sin(x)",
+            variable="x",
+            lower=-math.pi,
+            upper=math.pi,
+            points=100,
+            title="Sine reference",
+            x_label="Angle",
+            y_label="sin(x)",
+        )
+    )
+    assert image.startswith(b"\x89PNG\r\n\x1a\n")
+    assert len(image) < 2 * 1024 * 1024
+
+
+def test_function_plot_rejects_non_finite_domain_and_excessive_point_count() -> None:
+    with pytest.raises(MathToolError, match="undefined or numerically unstable"):
+        render_function_plot(
+            PlotRequest(
+                expression="sqrt(x)",
+                variable="x",
+                lower=-1,
+                upper=1,
+                points=50,
+            )
+        )
+    with pytest.raises(ValidationError):
+        PlotRequest(expression="x", variable="x", lower=0, upper=1, points=5000)
+
+
 def test_unit_conversion_matches_length_and_temperature_reference_cases() -> None:
     length = convert_unit(
         UnitConversionRequest(value=1000, source_unit="m", target_unit="km")
@@ -412,6 +446,21 @@ def test_math_api_exposes_symbolic_numerical_statistics_and_units(tmp_path) -> N
             )
             assert stats.status_code == 200
             assert stats.json()["variance"] == pytest.approx(1.25)
+
+            plot = client.post(
+                "/api/v1/math/plot",
+                json={
+                    "expression": "sin(x)",
+                    "variable": "x",
+                    "lower": -math.pi,
+                    "upper": math.pi,
+                    "points": 100,
+                },
+            )
+            assert plot.status_code == 200
+            assert plot.headers["content-type"].startswith("image/png")
+            assert plot.content.startswith(b"\\x89PNG\\r\\n\\x1a\\n")
+            assert len(plot.content) < 2 * 1024 * 1024
 
             units = client.get("/api/v1/math/units")
             assert units.status_code == 200
