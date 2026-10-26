@@ -319,7 +319,7 @@ def test_cross_tenant_binary_upload_is_rejected_before_body_scanning(
             event
             for event in directory.list_audit_events(tenant_a, limit=100)
             if event["target_id"] == str(run_b.run_id)
-            and event["action"] == "binary_artifact:upload"
+            and event["action"] == "artifact:upload"
             and event["outcome"] == "denied"
             and event["metadata"].get("http_status") == 404
         ]
