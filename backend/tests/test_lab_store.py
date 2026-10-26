@@ -6,6 +6,7 @@ import sqlite3
 import pytest
 
 from artificial_scientist.lab.engine import run_lab
+from artificial_scientist.lab.integrity import result_digest
 from artificial_scientist.lab.models import LabRunRequest
 from artificial_scientist.lab.store import LabRunNotFound, LabRunStore
 
@@ -129,9 +130,11 @@ def test_artifact_integrity_detects_content_tampering(tmp_path) -> None:
 def test_oversized_run_artifact_is_rejected_atomically(tmp_path) -> None:
     database = str(tmp_path / "lab-artifacts.sqlite3")
     store = LabRunStore(database)
-    run = _sample_run().model_copy(
-        update={"logs": ["x" * (1_048_577)]}
-    )
+    original = _sample_run()
+    payload = original.model_dump(mode="json")
+    payload["logs"] = ["x" * (1_048_577)]
+    payload["result_sha256"] = result_digest(payload)
+    run = original.model_copy(update=payload)
 
     with pytest.raises(ValueError, match="1 MiB"):
         store.save(run)
