@@ -629,3 +629,72 @@ def test_lab_run_rejects_request_body_over_64_kib_before_validation() -> None:
     assert response.json()["detail"] == (
         "Lab run request body exceeds the 65536-byte limit."
     )
+
+
+
+def test_opt_in_retention_job_removes_only_expired_runs_and_keeps_tombstones(tmp_path) -> None:
+    from datetime import UTC, datetime
+
+    from artificial_scientist.lab.retention import run_retention
+
+    store = LabRunStore(str(tmp_path / "scheduled-retention.sqlite3"))
+    old_run = run_lab(
+        LabRunRequest(
+            title="Expired scheduled retention fixture",
+            steps=[
+                {
+                    "step_id": "stats",
+                    "operation": "statistics",
+                    "inputs": {"values": [1, 2, 3]},
+                }
+            ],
+        )
+    )
+    recent_run = run_lab(
+        LabRunRequest(
+            title="Recent retention fixture",
+            steps=[
+                {
+                    "step_id": "stats",
+                    "operation": "statistics",
+                    "inputs": {"values": [3, 4, 5]},
+                }
+            ],
+        )
+    )
+    store.save(old_run)
+    store.save(recent_run)
+    with sqlite3.connect(str(tmp_path / "scheduled-retention.sqlite3")) as connection:
+        connection.execute(
+            "UPDATE lab_runs SET created_at = ? WHERE run_id = ?",
+            ("2020-01-01T00:00:00+00:00", str(old_run.run_id)),
+        )
+
+    deleted_count = run_retention(
+        store,
+        30,
+        now=datetime(2026, 10, 26, tzinfo=UTC),
+    )
+
+    assert deleted_count == 1
+    with pytest.raises(LabRunNotFound):
+        store.get(old_run.run_id)
+    assert store.get(recent_run.run_id).run_id == recent_run.run_id
+    with sqlite3.connect(str(tmp_path / "scheduled-retention.sqlite3")) as connection:
+        tombstone = connection.execute(
+            "SELECT reason FROM lab_run_retention_events WHERE run_id = ?",
+            (str(old_run.run_id),),
+        ).fetchone()
+    assert tombstone == ("scheduled_retention_30_days",)
+
+
+def test_opt_in_retention_job_validates_days_and_timezone(tmp_path) -> None:
+    from datetime import datetime
+
+    from artificial_scientist.lab.retention import run_retention
+
+    store = LabRunStore(str(tmp_path / "retention-validation.sqlite3"))
+    with pytest.raises(ValueError, match="between 1 and"):
+        run_retention(store, 0)
+    with pytest.raises(ValueError, match="timezone"):
+        run_retention(store, 30, now=datetime(2026, 10, 26))
