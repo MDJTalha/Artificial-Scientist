@@ -924,6 +924,16 @@ def test_interrupted_execution_attempts_are_recovered_and_auditable(tmp_path) ->
     assert interrupted["finished_at"] is not None
     assert "Process stopped" in interrupted["failure_reason"]
 
+    app.dependency_overrides[get_lab_store] = lambda: restarted_store
+    try:
+        status_response = TestClient(app).get(
+            f"/api/v1/lab/runs/{interrupted_id}/execution-status"
+        )
+        assert status_response.status_code == 200
+        assert status_response.json()["status"] == "interrupted"
+    finally:
+        app.dependency_overrides.pop(get_lab_store, None)
+
     completed_id = uuid4()
     store.begin_execution(completed_id, request)
     run = run_lab(request, run_id=completed_id)
