@@ -7,7 +7,7 @@ from difflib import SequenceMatcher
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class HypothesisCandidate(BaseModel):
@@ -58,6 +58,14 @@ class DiscoveryAssessmentRequest(BaseModel):
             return None
         cleaned = " ".join(value.split())
         return cleaned or None
+
+    @model_validator(mode="after")
+    def require_notes_for_completed_screen(self) -> DiscoveryAssessmentRequest:
+        if self.novelty_screen_status == "screened" and not self.novelty_screen_notes:
+            raise ValueError(
+                "novelty_screen_notes are required when novelty_screen_status is screened"
+            )
+        return self
 
 
 class CandidateAssessment(BaseModel):
