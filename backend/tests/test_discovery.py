@@ -11,7 +11,7 @@ from artificial_scientist.api.routes.records import get_record_store
 from artificial_scientist.discovery import DiscoveryAssessmentRequest, assess_candidates
 from artificial_scientist.main import app
 from artificial_scientist.records.models import ClaimRecord, HypothesisRecord, SourceRecord
-from artificial_scientist.records.store import RecordStore
+from artificial_scientist.records.store import InvalidRelationship, RecordStore
 
 
 def candidate(
@@ -196,7 +196,7 @@ def test_batch_record_creation_rolls_back_every_record_on_reference_failure(
         falsification_criteria=["The predicted effect is absent."],
         source_record_ids=[uuid4()],
     )
-    with pytest.raises(Exception, match="does not exist"):
+    with pytest.raises(InvalidRelationship, match="does not exist"):
         store.create_many([first, second])
     _, total = store.list_records()
     assert total == 0
