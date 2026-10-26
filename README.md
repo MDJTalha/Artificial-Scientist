@@ -8,11 +8,11 @@ This is **not a commercial SaaS product**. Its guiding objective is to contribut
 
 ## Current status
 
-**Phases 0–4 have recorded passing implementation CI checks. Phase 5 — Mathematics & Scientific Tools is being implemented on `phase-5-mathematical-tools`; acceptance is pending its final CI and review. All phase pull requests remain unmerged by design.**
+**Phases 0–4 have recorded passing implementation CI checks. Phase 5 — Mathematics & Scientific Tools has passed its implementation CI checks and is available as draft Pull Request #5 for review. All phase pull requests remain unmerged by design.**
 
 The foundation includes a FastAPI backend, health/readiness endpoints, a React + TypeScript overview dashboard that checks the actual local API, typed research records, SQLite provenance storage, and GitHub Actions verification.
 
-Phase 3 adds OpenAlex and Crossref metadata search adapters, source normalization, DOI-based deduplication, and optional persistent source records. Phase 4 adds typed scientific concepts, a controlled vocabulary, evidence-linked relationship assertions, server-side concept search, and bounded graph-neighborhood traversal. Phase 4 CI passed 46 backend tests on Python 3.12 and 46 on Python 3.13, plus frontend type-checking, 6 frontend tests, and the production build; see the [verified run](https://github.com/MDJTalha/Artificial-Scientist/actions/runs/40265564598). Phase 5 introduces bounded symbolic and numerical math, descriptive statistics, unit conversion, and dimensional checks; it is not yet accepted until current CI completes. Full-text ingestion, claim verification, autonomous hypothesis generation, scientific computation, and agent orchestration **are not implemented yet**. Planned capabilities are not presented as active features.
+Phase 3 adds OpenAlex and Crossref metadata search adapters, source normalization, DOI-based deduplication, and optional persistent source records. Phase 4 adds typed scientific concepts, a controlled vocabulary, evidence-linked relationship assertions, server-side concept search, and bounded graph-neighborhood traversal. Phase 4 CI passed 46 backend tests on Python 3.12 and 46 on Python 3.13, plus frontend type-checking, 6 frontend tests, and the production build; see the [verified run](https://github.com/MDJTalha/Artificial-Scientist/actions/runs/40265564598). Phase 5 adds bounded symbolic and numerical math, descriptive statistics, allowlisted unit conversion, dimensional checks, and in-memory PNG plotting. Its implementation CI passed 75 backend tests on Python 3.12 and 75 on Python 3.13, plus frontend type-checking, 6 frontend tests, and the production build; see the [verified run](https://github.com/MDJTalha/Artificial-Scientist/actions/runs/40266731194). Full-text ingestion, automated claim verification, autonomous hypothesis generation, a secured general-purpose experiment lab, and agent orchestration **are not implemented yet**. Planned capabilities are not presented as active features.
 
 ## Scientific principles
 
@@ -57,7 +57,7 @@ See [docs/ROADMAP.md](docs/ROADMAP.md) for phase goals and exit criteria.
 
 - **Core API:** Python 3.12+, FastAPI, Pydantic through FastAPI request/response validation
 - **Interface:** React, TypeScript, Vite
-- **Scientific computing planned:** NumPy, SciPy, SymPy, pandas, Matplotlib; scikit-learn initially
+- **Mathematical tools implemented in Phase 5:** NumPy, SciPy, SymPy, Pint, and Matplotlib for bounded symbolic/numeric calculations, descriptive statistics, unit checks, and function plots. pandas, machine learning, and broader scientific workflows remain future scope.
 - **Persistence planned:** SQLite initially, behind repository interfaces that allow later migration
 - **Models planned:** provider-independent adapters; optional local inference with Ollama
 - **Workflow orchestration planned:** explicit, testable workflows; evaluate LangGraph when checkpointed orchestration is needed
@@ -124,6 +124,7 @@ Passing these checks verifies the current application foundation only; it does n
 - [backend/README.md](backend/README.md) — backend setup and endpoint reference
 - [docs/PHASE_3_LITERATURE.md](docs/PHASE_3_LITERATURE.md) — scholarly search API, provenance, rate limits, and acceptance criteria
 - [docs/PHASE_4_KNOWLEDGE_GRAPH.md](docs/PHASE_4_KNOWLEDGE_GRAPH.md) — concept schemas, controlled relations, graph API, verified CI results, and acceptance criteria
+- [docs/PHASE_5_MATH_TOOLS.md](docs/PHASE_5_MATH_TOOLS.md) — mathematical API contracts, supported operations, safety bounds, numerical reference cases, and CI evidence
 - [docs/PHASE_5_MATH_TOOLS.md](docs/PHASE_5_MATH_TOOLS.md) — mathematical API contracts, supported operations, safety bounds, numerical reference cases, and acceptance criteria
 
 ## Development approach
