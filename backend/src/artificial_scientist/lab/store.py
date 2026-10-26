@@ -548,8 +548,10 @@ class LabRunStore:
         filename: str,
         content_type: str,
         content: bytes,
+        *,
+        scan_status: str = "not_scanned",
     ) -> dict[str, Any]:
-        """Persist a bounded immutable binary attachment with run provenance."""
+        """Persist a bounded immutable binary attachment with run and scan provenance."""
         import re
 
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,179}", filename):
@@ -559,6 +561,8 @@ class LabRunStore:
             raise ValueError("content_type must be a valid media type.")
         if not content or len(content) > 10 * 1024 * 1024:
             raise ValueError("Binary artifacts must be between 1 byte and 10 MiB.")
+        if scan_status not in {"clean", "skipped_development", "not_scanned"}:
+            raise ValueError("scan_status must be a recognized scanner outcome.")
         run = self.get(run_id)
         artifact_id = uuid5(
             NAMESPACE_URL,
@@ -574,6 +578,11 @@ class LabRunStore:
             "plan_record_id": str(run.plan_record_id) if run.plan_record_id else None,
             "artifact_role": "binary-scientific-attachment",
             "filename": filename,
+            "malware_scan": {
+                "status": scan_status,
+                "scanner": "clamav-instream" if scan_status == "clean" else None,
+                "recorded_at": created_at,
+            },
         }
         with closing(self._connect()) as connection:
             with connection:
@@ -628,6 +637,19 @@ class LabRunStore:
             or provenance.get("filename") != row["filename"]
         ):
             raise RuntimeError("Stored binary artifact provenance validation failed.")
+        scan_record = provenance.get("malware_scan")
+        if scan_record is not None and (
+            not isinstance(scan_record, dict)
+            or scan_record.get("status") not in {
+                "clean", "skipped_development", "not_scanned"
+            }
+            or not isinstance(scan_record.get("recorded_at"), str)
+            or (
+                scan_record.get("status") == "clean"
+                and scan_record.get("scanner") != "clamav-instream"
+            )
+        ):
+            raise RuntimeError("Stored binary artifact scan provenance validation failed.")
         document: dict[str, Any] = {
             "artifact_id": row["artifact_id"],
             "run_id": row["run_id"],
