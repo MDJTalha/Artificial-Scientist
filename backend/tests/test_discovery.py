@@ -7,8 +7,14 @@ import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
+from artificial_scientist.api.routes.literature import get_literature_service
 from artificial_scientist.api.routes.records import get_record_store
 from artificial_scientist.discovery import DiscoveryAssessmentRequest, assess_candidates
+from artificial_scientist.literature.models import (
+    LiteratureResult,
+    LiteratureSearchResponse,
+    ProviderSearchStatus,
+)
 from artificial_scientist.main import app
 from artificial_scientist.records.models import ClaimRecord, HypothesisRecord, SourceRecord
 from artificial_scientist.records.store import InvalidRelationship, RecordStore
@@ -228,3 +234,66 @@ def test_batch_record_creation_rolls_back_every_record_on_reference_failure(
         store.create_many([first, second])
     _, total = store.list_records()
     assert total == 0
+
+
+def test_prior_work_screen_uses_metadata_search_without_persisting() -> None:
+    class FakeLiteratureService:
+        def __init__(self) -> None:
+            self.requests = []
+
+        def search(self, request):
+            self.requests.append(request)
+            return LiteratureSearchResponse(
+                query=request.query,
+                status="ok",
+                total_results=1,
+                results=[
+                    LiteratureResult(
+                        title="Related reaction kinetics study",
+                        doi="10.1234/example",
+                        publication_year=2024,
+                        source_url="https://example.org/related-study",
+                        matched_providers=["openalex"],
+                        cited_by_count=4,
+                    )
+                ],
+                providers=[
+                    ProviderSearchStatus(
+                        provider="openalex", status="ok", result_count=1
+                    ),
+                    ProviderSearchStatus(
+                        provider="crossref", status="ok", result_count=1
+                    ),
+                ],
+            )
+
+    fake_service = FakeLiteratureService()
+    app.dependency_overrides[get_literature_service] = lambda: fake_service
+    try:
+        with TestClient(app) as client:
+            response = client.post(
+                "/api/v1/discovery/prior-work-screen",
+                json={
+                    "research_question": "How does temperature affect reaction rate?",
+                    "candidates": [
+                        {
+                            "title": "Hypothesis A",
+                            "statement": "Temperature increases reaction rate under fixed pressure.",
+                        },
+                        {
+                            "title": "Hypothesis B",
+                            "statement": "Temperature decreases reaction rate under fixed pressure.",
+                        },
+                    ],
+                },
+            )
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert body["overall_status"] == "complete"
+        assert body["results"][0]["total_results"] == 1
+        assert body["results"][0]["matches"][0]["doi"] == "10.1234/example"
+        assert len(fake_service.requests) == 2
+        assert all(item.persist_results is False for item in fake_service.requests)
+        assert all(item.limit == 5 for item in fake_service.requests)
+    finally:
+        app.dependency_overrides.pop(get_literature_service, None)
