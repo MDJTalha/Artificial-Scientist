@@ -537,6 +537,16 @@ async def upload_lab_binary_artifact(
             status_code=500, detail="Stored lab data failed integrity validation."
         ) from error
 
+    raw_content_type = request.headers.get("content-type", "application/octet-stream")
+    media_type = raw_content_type.split(";", 1)[0].strip()
+    media_type_pattern = r"[A-Za-z0-9!#    content_length = request.headers.get("content-length")
+    if content_length is not None:
+^_.+-]+/[A-Za-z0-9!#    content_length = request.headers.get("content-length")
+    if content_length is not None:
+^_.+-]+"
+    if not re.fullmatch(media_type_pattern, media_type):
+        raise HTTPException(status_code=422, detail="Invalid binary artifact content type.")
+
     content_length = request.headers.get("content-length")
     if content_length is not None:
         # HTTP Content-Length is a non-negative ASCII decimal byte count. Reject
@@ -583,9 +593,7 @@ async def upload_lab_binary_artifact(
         artifact = store.save_binary_artifact(
             run_id,
             filename,
-            request.headers.get("content-type", "application/octet-stream")
-            .split(";", 1)[0]
-            .strip(),
+            media_type,
             content,
             scan_status=scan_status,
             tenant_id=tenant_id,
