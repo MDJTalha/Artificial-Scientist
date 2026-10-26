@@ -306,15 +306,18 @@ class LabRunStore:
             with connection:
                 rows = connection.execute(
                     """
-                    SELECT run_id FROM lab_execution_attempts
+                    SELECT run_id, tenant_id FROM lab_execution_attempts
                     WHERE status = 'running' AND updated_at < ?
                     """,
                     (stale_before,),
                 ).fetchall()
                 for row in rows:
                     run = connection.execute(
-                        "SELECT status, result_sha256 FROM lab_runs WHERE run_id = ?",
-                        (row["run_id"],),
+                        """
+                        SELECT status, result_sha256 FROM lab_runs
+                        WHERE run_id = ? AND tenant_id IS ?
+                        """,
+                        (row["run_id"], row["tenant_id"]),
                     ).fetchone()
                     if run is not None:
                         connection.execute(
@@ -322,7 +325,7 @@ class LabRunStore:
                             UPDATE lab_execution_attempts
                             SET status = ?, updated_at = ?, finished_at = ?,
                                 result_sha256 = ?, failure_reason = NULL
-                            WHERE run_id = ? AND status = 'running'
+                            WHERE run_id = ? AND tenant_id IS ? AND status = 'running'
                             """,
                             (
                                 run["status"],
@@ -330,6 +333,7 @@ class LabRunStore:
                                 now,
                                 run["result_sha256"],
                                 row["run_id"],
+                                row["tenant_id"],
                             ),
                         )
                     else:
@@ -338,13 +342,14 @@ class LabRunStore:
                             UPDATE lab_execution_attempts
                             SET status = 'interrupted', updated_at = ?, finished_at = ?,
                                 failure_reason = ?
-                            WHERE run_id = ? AND status = 'running'
+                            WHERE run_id = ? AND tenant_id IS ? AND status = 'running'
                             """,
                             (
                                 now,
                                 now,
                                 "Process stopped before a terminal run record was persisted.",
                                 row["run_id"],
+                                row["tenant_id"],
                             ),
                         )
                     recovered += 1
