@@ -23,7 +23,7 @@ from artificial_scientist.literature.providers import (
 )
 from artificial_scientist.literature.service import LiteratureService
 from artificial_scientist.main import app
-from artificial_scientist.records.identity import normalize_doi, source_identity_key
+from artificial_scientist.records.identity import normalize_doi
 from artificial_scientist.records.models import SourceRecord
 from artificial_scientist.records.store import RecordStore
 
