@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from uuid import uuid4
 
 import pytest
@@ -16,6 +17,11 @@ from artificial_scientist.records.models import (
     SourceRecord,
 )
 from artificial_scientist.records.store import InvalidRelationship, RecordStore
+
+
+@pytest.fixture
+def store(tmp_path: Path) -> RecordStore:
+    return RecordStore(tmp_path / "knowledge.sqlite3")
 
 
 def concept(
