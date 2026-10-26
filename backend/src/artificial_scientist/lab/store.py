@@ -9,7 +9,7 @@ from contextlib import closing
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
-from uuid import UUID, uuid5, NAMESPACE_URL
+from uuid import NAMESPACE_URL, UUID, uuid5
 
 from artificial_scientist.lab.integrity import result_digest
 from artificial_scientist.lab.models import (
@@ -134,7 +134,8 @@ class LabRunStore:
                 connection.execute(
                     """
                     INSERT INTO lab_runs (
-                        run_id, status, configuration_sha256, result_sha256, created_at, payload_json
+                        run_id, status, configuration_sha256, result_sha256,
+                        created_at, payload_json
                     ) VALUES (?, ?, ?, ?, ?, ?)
                     """,
                     (
@@ -185,7 +186,8 @@ class LabRunStore:
         with closing(self._connect()) as connection:
             total = int(connection.execute("SELECT COUNT(*) FROM lab_runs").fetchone()[0])
             rows = connection.execute(
-                "SELECT payload_json FROM lab_runs ORDER BY created_at DESC, run_id LIMIT ? OFFSET ?",
+                "SELECT payload_json FROM lab_runs "
+                "ORDER BY created_at DESC, run_id LIMIT ? OFFSET ?",
                 (limit, offset),
             ).fetchall()
         runs: list[LabRunResponse] = []
@@ -195,7 +197,9 @@ class LabRunStore:
                 self._verify_result_hash(run)
                 runs.append(run)
             except (json.JSONDecodeError, TypeError, ValueError) as error:
-                raise RuntimeError("Stored lab run failed schema or integrity validation.") from error
+                raise RuntimeError(
+                    "Stored lab run failed schema or integrity validation."
+                ) from error
         return runs, total
 
     def list_artifacts(self, run_id: UUID) -> list[LabArtifactMetadata]:
@@ -249,5 +253,7 @@ class LabRunStore:
             if metadata.provenance != expected_provenance:
                 raise ValueError("Artifact provenance does not match the canonical run record.")
         except (json.JSONDecodeError, TypeError, ValueError) as error:
-            raise RuntimeError("Stored lab artifact failed schema or integrity validation.") from error
+            raise RuntimeError(
+                "Stored lab artifact failed schema or integrity validation."
+            ) from error
         return LabArtifactResponse(**metadata.model_dump(), content=content)
