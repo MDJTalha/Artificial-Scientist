@@ -11,6 +11,7 @@ import argparse
 import json
 import sqlite3
 import tempfile
+from contextlib import closing
 from pathlib import Path
 from typing import Any
 
@@ -32,12 +33,12 @@ def rehearse_legacy_claims(
 
     with tempfile.TemporaryDirectory(prefix="asds-phase6-rehearsal-") as temporary:
         snapshot_path = Path(temporary) / "rehearsal.sqlite3"
-        with sqlite3.connect(str(source_path), timeout=10.0) as source:
-            with sqlite3.connect(str(snapshot_path), timeout=10.0) as snapshot:
+        with closing(sqlite3.connect(str(source_path), timeout=10.0)) as source:
+            with closing(sqlite3.connect(str(snapshot_path), timeout=10.0)) as snapshot:
                 source.backup(snapshot)
 
         dry_run = claim_legacy_runs(str(snapshot_path), claims)
-        with sqlite3.connect(str(snapshot_path), timeout=10.0) as connection:
+        with closing(sqlite3.connect(str(snapshot_path), timeout=10.0)) as connection:
             connection.row_factory = sqlite3.Row
             before_audit_count = int(
                 connection.execute(
