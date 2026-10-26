@@ -8,7 +8,7 @@ This is **not a commercial SaaS product**. Its guiding objective is to contribut
 
 ## Current status
 
-**Phase 0 documentation is established. Phase 1 — Core Application Foundation acceptance checks pass on the current implementation.**
+**Phase 0 is documented; Phase 1 checks pass; Phase 2 — Research Records & Provenance is in progress on `phase-2-research-records`.**
 
 The Phase 1 branch now contains a FastAPI backend foundation, health/readiness endpoints, a React + TypeScript overview dashboard that checks the actual local API, basic automated tests, and a GitHub Actions workflow. The CI result must be reviewed before this phase is accepted.
 
@@ -119,7 +119,8 @@ Passing these checks verifies the current application foundation only; it does n
 - [docs/ROADMAP.md](docs/ROADMAP.md) — 15 phases and acceptance gates
 - [docs/TECHNOLOGY_DECISIONS.md](docs/TECHNOLOGY_DECISIONS.md) — provisional architecture decisions
 - [docs/SCIENTIFIC_INTEGRITY_AND_SAFETY.md](docs/SCIENTIFIC_INTEGRITY_AND_SAFETY.md) — scientific integrity and safe autonomy requirements
-- [docs/PHASE_1_FOUNDATION.md](docs/PHASE_1_FOUNDATION.md) — Phase 1 setup, test commands, acceptance criteria, and limitations
+- [docs/PHASE_1_FOUNDATION.md](docs/PHASE_1_FOUNDATION.md) — Phase 1 setup, test commands, accepted CI results, and limitations
+- [docs/PHASE_2_RECORDS.md](docs/PHASE_2_RECORDS.md) — Phase 2 record schema, persistence, API examples, and test criteria
 - [backend/README.md](backend/README.md) — backend setup and endpoint reference
 
 ## Development approach
