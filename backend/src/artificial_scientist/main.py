@@ -4,6 +4,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from artificial_scientist.authorization import TenantDirectory
+
 from artificial_scientist.api.routes.health import router as health_router
 from artificial_scientist.api.routes.knowledge import router as knowledge_router
 from artificial_scientist.api.routes.lab import router as lab_router
@@ -14,6 +16,77 @@ from artificial_scientist.config import get_settings
 
 settings = get_settings()
 LAB_RUN_BODY_LIMIT_BYTES = 64 * 1024
+
+
+class LabSecurityAuditMiddleware:
+    """Persist final outcomes for tenant-scoped lab requests without logging payloads."""
+
+    def __init__(self, app: ASGIApp, database_path: str) -> None:
+        self.app = app
+        self.database_path = database_path
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        is_lab_request = (
+            scope["type"] == "http"
+            and scope.get("path", "").startswith("/api/v1/lab/")
+        )
+        if not is_lab_request:
+            await self.app(scope, receive, send)
+            return
+
+        audit_blocked = False
+
+        async def audited_send(message: Message) -> None:
+            nonlocal audit_blocked
+            if audit_blocked:
+                return
+            if message["type"] == "http.response.start":
+                state = scope.get("state") or {}
+                context = state.get("authorization_audit")
+                if context:
+                    status_code = int(message["status"])
+                    outcome = (
+                        "denied"
+                        if status_code in {401, 403, 404}
+                        else "failed"
+                        if status_code >= 500
+                        else "allowed"
+                    )
+                    try:
+                        TenantDirectory(self.database_path).audit(
+                            principal_id=context["principal_id"],
+                            tenant_id=context["tenant_id"],
+                            action=context["action"],
+                            target_type=context["target_type"],
+                            target_id=context["target_id"],
+                            outcome=outcome,
+                            correlation_id=context["correlation_id"],
+                            metadata={
+                                "method": context["method"],
+                                "route": context["route"],
+                                "http_status": status_code,
+                            },
+                        )
+                    except Exception:
+                        # Do not return a success response when required audit persistence
+                        # is unavailable. The original response has not been sent yet.
+                        body = b'{"detail":"Security audit persistence is unavailable."}'
+                        audit_blocked = True
+                        await send(
+                            {
+                                "type": "http.response.start",
+                                "status": 503,
+                                "headers": [
+                                    (b"content-type", b"application/json"),
+                                    (b"content-length", str(len(body)).encode("ascii")),
+                                ],
+                            }
+                        )
+                        await send({"type": "http.response.body", "body": body})
+                        return
+            await send(message)
+
+        await self.app(scope, receive, audited_send)
 
 
 class LabRequestBodyLimitMiddleware:
@@ -104,6 +177,7 @@ app = FastAPI(
     ),
 )
 app.add_middleware(LabRequestBodyLimitMiddleware)
+app.add_middleware(LabSecurityAuditMiddleware, database_path=settings.database_path)
 
 app.add_middleware(
     CORSMiddleware,
