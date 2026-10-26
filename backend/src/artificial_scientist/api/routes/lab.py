@@ -161,8 +161,6 @@ def require_tenant_access(request: Request, action: str) -> str | None:
         )
     principal_id = stable_principal_id(principal.issuer, principal.subject)
     directory = TenantDirectory(settings.database_path)
-    # Record the authorization decision against the requested object when one is
-    # present. Never include request bodies, headers, credentials, or artifact bytes.
     path_params = request.path_params
     target_id = next(
         (
@@ -201,16 +199,16 @@ def require_tenant_access(request: Request, action: str) -> str | None:
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Requested tenant resource is not available.",
         ) from error
-    directory.audit(
-        principal_id=principal_id,
-        tenant_id=tenant_id,
-        action=action,
-        target_type=target_type,
-        target_id=target_id,
-        outcome="allowed",
-        correlation_id=correlation_id,
-        metadata={"method": request.method, "route": request.url.path},
-    )
+    request.state.authorization_audit = {
+        "principal_id": principal_id,
+        "tenant_id": tenant_id,
+        "action": action,
+        "target_type": target_type,
+        "target_id": target_id,
+        "correlation_id": correlation_id,
+        "method": request.method,
+        "route": request.url.path,
+    }
     return tenant_id
 
 
