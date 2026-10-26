@@ -15,6 +15,13 @@ from artificial_scientist.lab.store import LabRunStore
 from artificial_scientist.main import app
 
 
+def _slow_lab_worker() -> dict[str, object]:
+    import time
+
+    time.sleep(2)
+    return {"completed": True}
+
+
 def test_lab_executes_allowlisted_steps_and_returns_trace_hashes() -> None:
     request = LabRunRequest(
         title="Reference derivative",
