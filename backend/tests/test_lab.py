@@ -1024,7 +1024,7 @@ def test_clamav_scanner_sends_instream_and_accepts_clean_result(monkeypatch) -> 
             sent.append(data)
 
         def recv(self, _size):
-            return b"stream: OK\\0"
+            return b"stream: OK\0"
 
     monkeypatch.setenv("ARTIFICIAL_SCIENTIST_CLAMAV_HOST", "scanner.internal")
     monkeypatch.setenv("ARTIFICIAL_SCIENTIST_CLAMAV_PORT", "3310")
@@ -1034,9 +1034,9 @@ def test_clamav_scanner_sends_instream_and_accepts_clean_result(monkeypatch) -> 
         lambda *_args, **_kwargs: FakeConnection(),
     )
     assert lab_scanning.scan_binary_content(b"clean sample", environment="production") == "clean"
-    assert sent[0] == b"zINSTREAM\\0"
+    assert sent[0] == b"zINSTREAM\0"
     assert sent[1] == len(b"clean sample").to_bytes(4, "big") + b"clean sample"
-    assert sent[2] == b"\\0\\0\\0\\0"
+    assert sent[2] == b"\0\0\0\0"
 
 
 def test_clamav_scanner_rejects_detected_malware(monkeypatch) -> None:
@@ -1054,7 +1054,7 @@ def test_clamav_scanner_rejects_detected_malware(monkeypatch) -> None:
             return None
 
         def recv(self, _size):
-            return b"stream: Eicar-Test-Signature FOUND\\0"
+            return b"stream: Eicar-Test-Signature FOUND\0"
 
     monkeypatch.setenv("ARTIFICIAL_SCIENTIST_CLAMAV_HOST", "scanner.internal")
     monkeypatch.setattr(
