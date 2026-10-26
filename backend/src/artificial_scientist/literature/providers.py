@@ -261,7 +261,9 @@ class OpenAlexProvider:
             identifier = row.get("id")
             if not isinstance(title, str) or len(title.strip()) < 2:
                 continue
-            if not isinstance(identifier, str) or not identifier.startswith("https://openalex.org/"):
+            if not isinstance(identifier, str) or not identifier.startswith(
+                "https://openalex.org/"
+            ):
                 continue
             doi = normalize_doi(row.get("doi") if isinstance(row.get("doi"), str) else None)
             location_values: list[object] = []
@@ -366,7 +368,11 @@ class CrossrefProvider:
             if year is None:
                 for field in ("published-online", "published-print", "published"):
                     date_value = row.get(field)
-                    date_parts = date_value.get("date-parts") if isinstance(date_value, dict) else None
+                    date_parts = (
+                        date_value.get("date-parts")
+                        if isinstance(date_value, dict)
+                        else None
+                    )
                     first = date_parts[0] if isinstance(date_parts, list) and date_parts else None
                     candidate = first[0] if isinstance(first, list) and first else None
                     if isinstance(candidate, int) and 1000 <= candidate <= 9999:
