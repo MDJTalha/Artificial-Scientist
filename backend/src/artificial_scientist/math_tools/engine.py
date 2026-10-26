@@ -10,11 +10,14 @@ import ast
 import math
 import operator
 import warnings
+from io import BytesIO
 from collections.abc import Callable
 from typing import Any
 
 import numpy as np
 import pint
+from matplotlib.backends.backend_agg import FigureCanvasAgg
+from matplotlib.figure import Figure
 import sympy as sp
 from pint.errors import DimensionalityError, PintError
 from scipy.integrate import IntegrationWarning, quad
@@ -496,6 +499,58 @@ def find_root(request: RootRequest) -> RootResponse:
         raise
     except (ArithmeticError, TypeError, ValueError, OverflowError) as error:
         raise MathToolError("The root solver failed on the supplied bracket.") from error
+
+
+def render_function_plot(request: PlotRequest) -> bytes:
+    """Render a bounded real-valued function as a PNG without writing files."""
+    function = _compiled_real_function(
+        request.expression,
+        request.variable,
+        request.parameters,
+    )
+    try:
+        x_values = np.linspace(
+            request.lower,
+            request.upper,
+            num=request.points,
+            dtype=np.float64,
+        )
+        y_values = np.fromiter(
+            (function(float(x_value)) for x_value in x_values),
+            dtype=np.float64,
+            count=request.points,
+        )
+    except MathToolError:
+        raise
+    except (ArithmeticError, TypeError, ValueError, OverflowError) as error:
+        raise MathToolError("The function could not be evaluated across the plot interval.") from error
+
+    if not np.all(np.isfinite(x_values)) or not np.all(np.isfinite(y_values)):
+        raise MathToolError("The plot contains non-finite values and was not generated.")
+
+    figure = Figure(figsize=(8, 5), dpi=100, layout="tight")
+    buffer = BytesIO()
+    try:
+        axis = figure.subplots()
+        axis.plot(x_values, y_values)
+        axis.set_title(request.title)
+        axis.set_xlabel(request.x_label)
+        axis.set_ylabel(request.y_label)
+        axis.grid(True, alpha=0.3)
+        canvas = FigureCanvasAgg(figure)
+        canvas.print_png(buffer, metadata={"Software": "Artificial Scientist"})
+    except (ArithmeticError, TypeError, ValueError, RuntimeError) as error:
+        raise MathToolError("The plot renderer could not complete this request.") from error
+    finally:
+        figure.clear()
+
+    image_bytes = buffer.getvalue()
+    buffer.close()
+    if not image_bytes.startswith(b"\x89PNG\r\n\x1a\n"):
+        raise MathToolError("The renderer did not produce a valid PNG image.")
+    if len(image_bytes) > 2 * 1024 * 1024:
+        raise MathToolError("The generated plot exceeds the 2 MiB response limit.")
+    return image_bytes
 
 
 def describe_statistics(request: StatisticsRequest) -> StatisticsResponse:
