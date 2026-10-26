@@ -674,9 +674,13 @@ class LabRunStore:
                             (tenant_id,),
                         ).fetchone()
                         if int(tenant_usage["artifact_count"]) >= _MAX_BINARY_ARTIFACTS_PER_TENANT:
-                            raise ValueError("Tenant has reached its binary artifact count quota.")
+                            raise ValueError(
+                                "Tenant has reached its binary artifact count quota."
+                            )
                         if int(tenant_usage["total_bytes"]) + len(content) > _MAX_BINARY_BYTES_PER_TENANT:
-                            raise ValueError("Tenant has reached its binary artifact storage quota.")
+                            raise ValueError(
+                                "Tenant has reached its binary artifact storage quota."
+                            )
                     usage = connection.execute(
                         """
                         SELECT COUNT(*) AS artifact_count,
