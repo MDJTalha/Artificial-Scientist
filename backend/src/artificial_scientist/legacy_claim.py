@@ -57,7 +57,9 @@ def claim_legacy_runs(
 
     path = Path(database_path)
     if database_path != ":memory:" and not path.is_file():
-        raise LegacyClaimError("Database file does not exist; refusing to initialize a new database.")
+        raise LegacyClaimError(
+            "Database file does not exist; refusing to initialize a new database."
+        )
 
     connection = sqlite3.connect(database_path, timeout=10.0)
     connection.row_factory = sqlite3.Row
