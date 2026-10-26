@@ -90,3 +90,23 @@ class LabRunResponse(BaseModel):
         "This service is not an operating-system sandbox and must remain on "
         "trusted local infrastructure.",
     ]
+
+
+
+class LabArtifactMetadata(LabModel):
+    """Metadata and provenance for an immutable persisted run artifact."""
+
+    artifact_id: UUID
+    run_id: UUID
+    artifact_type: Literal["run-result-json"]
+    content_type: Literal["application/json"]
+    sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    size_bytes: int = Field(ge=0, le=1_048_576)
+    created_at: str
+    provenance: dict[str, Any]
+
+
+class LabArtifactResponse(LabArtifactMetadata):
+    """Artifact metadata plus its validated JSON document."""
+
+    content: dict[str, Any]
