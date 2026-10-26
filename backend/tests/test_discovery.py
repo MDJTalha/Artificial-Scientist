@@ -28,7 +28,9 @@ def candidate(
         "alternative_explanations": ["Catalyst concentration changed."],
         "predictions": ["Measured rate increases in the predefined temperature range."],
         "falsification_criteria": ["The rate does not increase beyond measurement uncertainty."],
-        "discriminating_test": "Randomize temperature levels and measure rate with blinded analysis.",
+        "discriminating_test": (
+            "Randomize temperature levels and measure rate with blinded analysis."
+        ),
         "source_record_ids": sources or [],
         "claim_record_ids": claims or [],
     }
@@ -65,7 +67,10 @@ def test_candidate_lists_reject_blank_or_duplicate_items() -> None:
     with pytest.raises(ValidationError, match="must be unique"):
         DiscoveryAssessmentRequest(
             research_question="How does temperature affect reaction rate?",
-            candidates=[invalid, candidate("Hypothesis B", "An alternate mechanism changes the reaction rate.")],
+            candidates=[
+                invalid,
+                candidate("Hypothesis B", "An alternate mechanism changes the reaction rate."),
+            ],
         )
 
 
@@ -73,8 +78,14 @@ def test_near_duplicate_hypotheses_are_flagged() -> None:
     request = DiscoveryAssessmentRequest(
         research_question="What changes reaction rate under controlled conditions?",
         candidates=[
-            candidate("First hypothesis", "Temperature increases reaction rate under fixed pressure."),
-            candidate("Second hypothesis", "Temperature increases reaction rate under fixed pressure."),
+            candidate(
+                "First hypothesis",
+                "Temperature increases reaction rate under fixed pressure.",
+            ),
+            candidate(
+                "Second hypothesis",
+                "Temperature increases reaction rate under fixed pressure.",
+            ),
         ],
     )
     result = assess_candidates(request)
@@ -96,12 +107,17 @@ def test_api_persists_hypotheses_with_predictions_and_test(store: RecordStore) -
             response = client.post(
                 "/api/v1/discovery/assess",
                 json={
-                    "research_question": "How does temperature affect reaction rate under fixed pressure?",
+                    "research_question": (
+                        "How does temperature affect reaction rate under fixed pressure?"
+                    ),
                     "candidates": [
                         candidate(sources=[str(source.id)]),
                         candidate(
                             "Hypothesis B",
-                            "Increasing input temperature decreases reaction rate under fixed pressure.",
+                            (
+                                "Increasing input temperature decreases reaction rate "
+                                "under fixed pressure."
+                            ),
                             sources=[str(source.id)],
                         ),
                     ],
