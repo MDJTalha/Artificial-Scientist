@@ -1,5 +1,8 @@
 """Reference and adversarial tests for the controlled computational lab."""
 
+import json
+import sqlite3
+
 import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
@@ -170,3 +173,44 @@ def test_lab_api_exposes_durable_result_artifact_and_provenance(tmp_path) -> Non
         assert artifact["content"]["result_sha256"] == run["result_sha256"]
     finally:
         app.dependency_overrides.pop(get_lab_store, None)
+
+
+def test_lab_api_returns_generic_server_error_for_tampered_run_listing(tmp_path) -> None:
+    database = str(tmp_path / "tampered-lab-list.sqlite3")
+    store = LabRunStore(database)
+    app.dependency_overrides[get_lab_store] = lambda: store
+    client = TestClient(app)
+    try:
+        response = client.post(
+            "/api/v1/lab/runs",
+            json={
+                "title": "Integrity listing test",
+                "steps": [
+                    {
+                        "step_id": "stats",
+                        "operation": "statistics",
+                        "inputs": {"values": [1, 2, 3]},
+                    }
+                ],
+            },
+        )
+        assert response.status_code == 201
+        run_id = response.json()["run_id"]
+
+        with sqlite3.connect(database) as connection:
+            row = connection.execute(
+                "SELECT payload_json FROM lab_runs WHERE run_id = ?", (run_id,)
+            ).fetchone()
+            payload = json.loads(row[0])
+            payload["title"] = "Tampered title"
+            connection.execute(
+                "UPDATE lab_runs SET payload_json = ? WHERE run_id = ?",
+                (json.dumps(payload), run_id),
+            )
+
+        listing = client.get("/api/v1/lab/runs")
+        assert listing.status_code == 500
+        assert listing.json()["detail"] == "Stored lab run failed integrity validation."
+    finally:
+        app.dependency_overrides.pop(get_lab_store, None)
+
