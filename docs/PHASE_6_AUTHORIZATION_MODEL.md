@@ -29,7 +29,8 @@ The current lab router uses a single shared `X-Lab-API-Key` outside development.
 - [x] Enforce configured OIDC bearer validation on the lab router; when any OIDC setting is configured, partial configuration fails closed and the legacy shared API key cannot bypass OIDC.
 - [x] Propagate the validated identity into request context; add an explicit role/action matrix that denies unknown roles and actions.
 - [x] Resolve validated request identity to a stable principal ID and require active tenant membership and action permission on run, execution-status, JSON artifact, binary artifact, verification, and export routes.
-- [x] Add nullable tenant ownership columns to run and execution-attempt records; legacy rows remain unowned rather than being assigned arbitrarily.\n- [ ] Define, test, and review the operational migration/claim process for legacy records before production rollout.
+- [x] Add nullable tenant ownership columns to run and execution-attempt records; legacy rows remain unowned rather than being assigned arbitrarily.
+- [ ] Define, test, and review the operational migration/claim process for legacy records before production rollout.
 - [x] Add tenant filters to run lists/reads, execution-status reads, JSON artifact lists/reads, binary artifact lists/reads, and export/verification route storage calls.
 - [ ] Add transactional per-tenant quotas and tests for concurrent uploads and run creation.
 - [ ] Add security audit events without recording secrets or raw request payloads.
