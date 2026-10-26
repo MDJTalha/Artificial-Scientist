@@ -84,3 +84,58 @@ def test_lab_store_detects_tampering_outside_step_results(tmp_path) -> None:
 
     with pytest.raises(RuntimeError, match="hash does not match"):
         store.get(run.run_id)
+
+
+
+def test_run_result_artifact_is_durable_and_provenance_linked(tmp_path) -> None:
+    database = str(tmp_path / "lab-artifacts.sqlite3")
+    store = LabRunStore(database)
+    run = _sample_run()
+    store.save(run)
+
+    reopened = LabRunStore(database)
+    artifacts = reopened.list_artifacts(run.run_id)
+    assert len(artifacts) == 1
+    metadata = artifacts[0]
+    assert metadata.run_id == run.run_id
+    assert metadata.artifact_type == "run-result-json"
+    assert metadata.provenance["configuration_sha256"] == run.configuration_sha256
+    assert metadata.provenance["result_sha256"] == run.result_sha256
+    assert metadata.provenance["step_ids"] == ["summary"]
+
+    artifact = reopened.get_artifact(metadata.artifact_id)
+    assert artifact.sha256 == metadata.sha256
+    assert artifact.content["run_id"] == str(run.run_id)
+    assert artifact.content["steps"][0]["step_id"] == "summary"
+
+
+def test_artifact_integrity_detects_content_tampering(tmp_path) -> None:
+    database = str(tmp_path / "lab-artifacts.sqlite3")
+    store = LabRunStore(database)
+    run = _sample_run()
+    store.save(run)
+    artifact = store.list_artifacts(run.run_id)[0]
+
+    with sqlite3.connect(database) as connection:
+        connection.execute(
+            "UPDATE lab_artifacts SET content_json = ? WHERE artifact_id = ?",
+            (b'{"corrupted":true}', str(artifact.artifact_id)),
+        )
+
+    with pytest.raises(RuntimeError, match="artifact digest"):
+        store.get_artifact(artifact.artifact_id)
+
+
+def test_oversized_run_artifact_is_rejected_atomically(tmp_path) -> None:
+    database = str(tmp_path / "lab-artifacts.sqlite3")
+    store = LabRunStore(database)
+    run = _sample_run().model_copy(
+        update={"logs": ["x" * (1_048_577)]}
+    )
+
+    with pytest.raises(ValueError, match="1 MiB"):
+        store.save(run)
+
+    with sqlite3.connect(database) as connection:
+        count = connection.execute("SELECT COUNT(*) FROM lab_runs").fetchone()[0]
+    assert count == 0
