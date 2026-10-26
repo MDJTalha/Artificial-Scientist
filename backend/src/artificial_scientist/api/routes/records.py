@@ -34,7 +34,7 @@ def _translate_store_error(error: RecordStoreError) -> HTTPException:
     if isinstance(error, RecordConflict):
         return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error))
     if isinstance(error, InvalidRelationship):
-        return HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(error))
+        return HTTPException(status_code=422, detail=str(error))
     if isinstance(error, RecordNotFound):
         return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error))
     if isinstance(error, RecordIntegrityError):
