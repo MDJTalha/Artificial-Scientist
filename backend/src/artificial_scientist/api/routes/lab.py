@@ -82,6 +82,11 @@ def list_lab_run_artifacts(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Lab run not found."
         ) from error
+    except RuntimeError as error:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Stored lab artifact failed integrity validation.",
+        ) from error
 
 
 @router.get("/artifacts/{artifact_id}", response_model=LabArtifactResponse)
