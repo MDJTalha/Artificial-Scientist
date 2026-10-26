@@ -42,6 +42,12 @@ def _multiline_error_lab_worker() -> dict[str, object]:
     raise ValueError("line one\nline two")
 
 
+def _crash_lab_worker() -> dict[str, object]:
+    import os
+
+    os._exit(7)
+
+
 def test_lab_executes_allowlisted_steps_and_returns_trace_hashes() -> None:
     request = LabRunRequest(
         title="Reference derivative",
@@ -444,6 +450,13 @@ def test_isolated_lab_worker_rejects_invalid_deadlines(timeout_seconds: float) -
 
     with pytest.raises(LabExecutionError, match="finite positive number"):
         run_isolated(_slow_lab_worker, (), timeout_seconds=timeout_seconds)
+
+
+def test_isolated_worker_reports_unexpected_child_exit() -> None:
+    from artificial_scientist.lab.execution import LabExecutionError
+
+    with pytest.raises(LabExecutionError, match="exited without a result"):
+        run_isolated(_crash_lab_worker, (), timeout_seconds=2)
 
 
 def test_isolated_worker_normalizes_multiline_error_messages() -> None:
