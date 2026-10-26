@@ -459,7 +459,7 @@ def test_math_api_exposes_symbolic_numerical_statistics_and_units(tmp_path) -> N
             )
             assert plot.status_code == 200
             assert plot.headers["content-type"].startswith("image/png")
-            assert plot.content.startswith(b"\\x89PNG\\r\\n\\x1a\\n")
+            assert plot.content.startswith(b"\x89PNG\r\n\x1a\n")
             assert len(plot.content) < 2 * 1024 * 1024
 
             units = client.get("/api/v1/math/units")
