@@ -1,6 +1,6 @@
 # Phase 6 — Controlled Computational Laboratory
 
-**Status: initial implementation slice; phase is not complete.**  
+**Status: implementation in progress; phase is not complete.**  
 **Branch:** `phase-6-controlled-lab`, targeting `main`.
 
 ## Scope delivered in this slice
@@ -41,13 +41,24 @@ The configuration and result hashes support integrity comparison; the result dig
 
 ## Current limitations — do not treat Phase 6 as complete
 
-- Canonical JSON run-result artifacts are persisted as SQLite BLOBs with SHA-256 verification and provenance links to the run, configuration digest, result digest, optional plan ID, and step IDs. An internal, explicitly invoked, bounded retention purge now deletes expired runs and cascades their artifacts while preserving a tombstone with both digests, cutoff, reason, deletion time, and artifact count. It is not exposed through the unauthenticated API and is not automatically scheduled. General binary scientific attachments, automated retention scheduling, and complete cross-system lifecycle management remain unimplemented. A ZIP export endpoint now packages the run record and verified result artifacts with a SHA-256 manifest; the manifest is not digitally signed.
-- Each allowlisted lab step now runs in a separate spawned child process with a configurable hard wall-clock deadline (default 10 seconds, maximum 30 seconds). Cleanup requests termination, waits briefly, then escalates to a hard kill if the worker remains alive; regression tests cover the escalation path. On POSIX systems, the worker applies RLIMIT_CPU (25 seconds), RLIMIT_AS (2 GiB address space), RLIMIT_FSIZE (8 MiB per file), RLIMIT_NOFILE (64 descriptors), and RLIMIT_CORE (0 where available). These are kernel-enforced process resource limits, but not a complete sandbox: filesystem access, network access, syscalls, and kernel attack surface are not isolated. Windows lacks these standard-library POSIX limits.
-- The lab router now requires `X-Lab-API-Key` when `ARTIFICIAL_SCIENTIST_ENV` is not `development`. Configure `ARTIFICIAL_SCIENTIST_LAB_API_KEY` with a high-entropy secret of at least 32 characters; non-development environments fail closed with HTTP 503 if the key is missing or shorter than 32 characters and reject missing/incorrect presented keys with HTTP 401. Local development remains unauthenticated by design. This is a shared-key gate, not per-user identity, role-based authorization, rate limiting, or a substitute for TLS and network controls. Rotate the key through the deployment secret manager; never commit it to source control.
+- Canonical JSON run-result artifacts are persisted as SQLite BLOBs with SHA-256 verification and provenance links to the run, configuration digest, result digest, optional plan ID, and step IDs. An internal, explicitly invoked, bounded retention purge deletes expired runs and cascades their artifacts while preserving tombstones. An opt-in job entry point is available via `python -m artificial_scientist.lab.retention`; it requires `ARTIFICIAL_SCIENTIST_LAB_RETENTION_DAYS` and is intended to be invoked by an operator-managed scheduler. No scheduler is installed or started by the API. General binary scientific attachments and complete cross-system lifecycle management remain unimplemented. A ZIP export endpoint packages the run record and verified result artifacts with a SHA-256 manifest; the manifest is not digitally signed.
+- Each allowlisted lab step runs in a separate spawned child process with a configurable hard wall-clock deadline (default 10 seconds, maximum 30 seconds). Cleanup requests termination, waits briefly, then escalates to a hard kill if the worker remains alive; regression tests cover the escalation path. On POSIX systems, the worker applies RLIMIT_CPU (25 seconds), RLIMIT_AS (2 GiB address space), RLIMIT_FSIZE (8 MiB per file), RLIMIT_NOFILE (64 descriptors), and RLIMIT_CORE (0 where available). These are kernel-enforced process resource limits, but not a complete sandbox: filesystem access, network access, syscalls, and kernel attack surface are not isolated. Windows lacks these standard-library POSIX limits.
+- The lab router requires `X-Lab-API-Key` when `ARTIFICIAL_SCIENTIST_ENV` is not `development`. Configure `ARTIFICIAL_SCIENTIST_LAB_API_KEY` with a high-entropy secret of at least 32 characters; non-development environments fail closed with HTTP 503 if the key is missing or shorter than 32 characters and reject missing/incorrect presented keys with HTTP 401. Local development remains unauthenticated by design. This is a shared-key gate, not per-user identity, role-based authorization, rate limiting, or a substitute for TLS and network controls. Rotate the key through the deployment secret manager; never commit it to source control.
 - This is not a complete operating-system sandbox. Authentication and POSIX rlimits do not make arbitrary code safe; keep arbitrary generated code disabled and keep the service on trusted infrastructure until filesystem/network isolation and the complete execution boundary are independently reviewed.
 - A seed is recorded as metadata only; these deterministic math operations do not currently consume it.
-- Runs now persist their original validated configuration and a runtime manifest (Python implementation/version, platform, machine, and key scientific dependency versions). `POST /api/v1/lab/runs/{run_id}/verify` replays that configuration and compares configuration digest, exact environment manifest, and per-step outputs. Verification is an observed replay comparison, not proof of scientific validity or bit-for-bit reproducibility across platforms. Older records without replayable configuration return HTTP 409. Interruption recovery and cross-system durable audit linkage remain future acceptance work.
+- Runs persist their original validated configuration and a runtime manifest (Python implementation/version, platform, machine, and key scientific dependency versions). `POST /api/v1/lab/runs/{run_id}/verify` replays that configuration and compares configuration digest, exact environment manifest, and per-step outputs. Verification is an observed replay comparison, not proof of scientific validity or bit-for-bit reproducibility across platforms. Older records without replayable configuration return HTTP 409. Interruption recovery and cross-system durable audit linkage remain future acceptance work.
 - The lab currently stops at the first failed step and does not support arbitrary dependency graphs or parallel execution.
+
+## Retention job
+
+Retention is deliberately **opt-in** to avoid accidental data deletion.
+
+1. Set `ARTIFICIAL_SCIENTIST_DB_PATH` to the same SQLite database used by the deployment.
+2. Set `ARTIFICIAL_SCIENTIST_LAB_RETENTION_DAYS` to an explicit integer from 1 through 36500.
+3. From the installed backend environment, run `python -m artificial_scientist.lab.retention` from a deployment scheduler or controlled operator job.
+4. Restrict database access and review the retention policy before enabling it. Each purged run leaves a tombstone with its run ID, configuration/result digests, cutoff, deletion time, reason, and number of deleted artifacts.
+
+The entry point does not create a background thread or automatically schedule itself. Test it against a disposable database before using a production database.
 
 ## Acceptance criteria for full Phase 6
 
@@ -61,8 +72,10 @@ The configuration and result hashes support integrity comparison; the result dig
 - [x] Durable SQLite run storage, bounded listing/retrieval, and full-record integrity checks.
 - [x] Durable JSON result artifacts with byte-digest verification and run/plan/step provenance metadata.
 - [x] ZIP export package containing the run record, verified result artifacts, and a SHA-256 manifest, with regression coverage. The manifest is not digitally signed.
-- [ ] General binary artifact support, automated retention scheduling, and complete provenance linkage to experiment plans/records. The bounded internal purge primitive and audit tombstones are implemented, but no public deletion API or scheduler is enabled.
-- [x] Enforced per-step wall-clock timeout, termination-to-kill escalation, and regression tests for both timeout handling and cleanup escalation.
+- [ ] General binary artifact support and complete provenance linkage to experiment plans/records.
+- [x] Opt-in retention job entry point with bounded batches, validation, tombstone preservation, and regression tests.
+- [ ] Deployment scheduler configuration and operational verification of retention against the target database.
+- [x] Enforced per-step wall-clock timeout, termination-to-kill escalation, and regression tests for timeout handling and cleanup escalation.
 - [x] POSIX worker CPU/address-space/file-size/open-descriptor limits are applied and their configuration is regression-tested. These limits are not filesystem/network isolation.
 - [ ] Complete OS-level sandbox with filesystem/network isolation and independent security review.
 - [x] Runtime environment manifest and stored-configuration rerun/verification endpoint with output comparison tests.
