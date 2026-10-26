@@ -63,3 +63,17 @@ def test_failure_update_cannot_mutate_another_tenants_attempt(tmp_path) -> None:
     assert store.get_execution_status(run_id, tenant_id="tenant-a")["status"] == "running"
     store.fail_execution(run_id, tenant_id="tenant-a")
     assert store.get_execution_status(run_id, tenant_id="tenant-a")["status"] == "failed"
+
+def test_tenant_failure_update_cannot_mutate_unowned_legacy_attempt(tmp_path) -> None:
+    store = LabRunStore(str(tmp_path / "execution-legacy-failure.sqlite3"))
+    run_id = uuid4()
+    store.begin_execution(run_id, _request())
+
+    store.fail_execution(run_id, tenant_id="tenant-a")
+
+    # The legacy attempt remains unmodified; tenant-scoped mutation must not
+    # silently fall back to an unowned record.
+    assert store.get_execution_status(run_id)["status"] == "running"
+    with pytest.raises(LabExecutionNotFound):
+        store.get_execution_status(run_id, tenant_id="tenant-a")
+
