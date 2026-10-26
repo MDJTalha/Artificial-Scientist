@@ -19,7 +19,6 @@ from artificial_scientist.literature.providers import (
     CrossrefProvider,
     LiteratureProviderError,
     OpenAlexProvider,
-    ProviderName,
     ProviderWork,
     USER_AGENT,
 )
