@@ -199,9 +199,14 @@ def test_oidc_validator_rejects_malformed_or_unsafe_jwks_urls(jwks_url):
         )
 
 
-@pytest.mark.parametrize(("issuer", "audience"), [("   ", "scientific-api"), ("https://identity.example.test/", "  ")])
+@pytest.mark.parametrize(
+    ("issuer", "audience"),
+    [("   ", "scientific-api"), ("https://identity.example.test/", "  ")],
+)
 def test_oidc_validator_rejects_blank_trust_values(issuer, audience):
-    with pytest.raises(identity.IdentityConfigurationError, match="must all be configured"):
+    with pytest.raises(
+        identity.IdentityConfigurationError, match="must all be configured"
+    ):
         identity.validate_oidc_bearer_token(
             "token",
             issuer=issuer,
