@@ -1,7 +1,8 @@
 """Tests for the explicit legacy ownership claim workflow."""
 
-import pytest
 from uuid import uuid4
+
+import pytest
 
 from artificial_scientist.authorization import TenantDirectory
 from artificial_scientist.lab.engine import run_lab
