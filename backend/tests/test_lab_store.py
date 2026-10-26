@@ -142,3 +142,21 @@ def test_oversized_run_artifact_is_rejected_atomically(tmp_path) -> None:
     with sqlite3.connect(database) as connection:
         count = connection.execute("SELECT COUNT(*) FROM lab_runs").fetchone()[0]
     assert count == 0
+
+
+
+def test_artifact_listing_rejects_provenance_tampering(tmp_path) -> None:
+    database = str(tmp_path / "lab-artifact-provenance.sqlite3")
+    store = LabRunStore(database)
+    run = _sample_run()
+    store.save(run)
+    artifact = store.list_artifacts(run.run_id)[0]
+
+    with sqlite3.connect(database) as connection:
+        connection.execute(
+            "UPDATE lab_artifacts SET provenance_json = ? WHERE artifact_id = ?",
+            (json.dumps({"run_id": "forged"}), str(artifact.artifact_id)),
+        )
+
+    with pytest.raises(RuntimeError, match="provenance"):
+        store.list_artifacts(run.run_id)
