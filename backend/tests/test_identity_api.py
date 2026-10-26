@@ -463,6 +463,18 @@ def test_negative_content_length_is_rejected_before_scanning(monkeypatch, tmp_pa
         )
         assert response.status_code == 400
         assert response.json()["detail"] == "Invalid Content-Length header."
+
+        oversized_decimal = TestClient(app).post(
+            f"/api/v1/lab/runs/{run.run_id}/binary-artifacts?filename=probe.bin",
+            content=b"",
+            headers={
+                "Authorization": "Bearer signed-token",
+                "X-Tenant-ID": tenant_id,
+                "Content-Type": "application/octet-stream",
+                "Content-Length": "9" * 10_000,
+            },
+        )
+        assert oversized_decimal.status_code == 413
     finally:
         app.dependency_overrides.pop(get_lab_store, None)
 
