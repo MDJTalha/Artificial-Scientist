@@ -11,8 +11,8 @@ from pydantic import ValidationError
 
 from artificial_scientist.api.routes import lab as lab_routes
 from artificial_scientist.api.routes.lab import get_lab_store
-from artificial_scientist.lab.engine import run_lab
 from artificial_scientist.lab import execution as lab_execution
+from artificial_scientist.lab.engine import run_lab
 from artificial_scientist.lab.execution import LabExecutionTimeout, _stop_process, run_isolated
 from artificial_scientist.lab.integrity import result_digest
 from artificial_scientist.lab.models import LabRunRequest
@@ -496,7 +496,10 @@ def test_lab_api_requires_constant_time_key_outside_development(monkeypatch, tmp
     monkeypatch.setattr(
         lab_routes,
         "get_settings",
-        lambda: SimpleNamespace(environment="production", lab_api_key="test-secret-value-that-is-at-least-32-chars"),
+        lambda: SimpleNamespace(
+            environment="production",
+            lab_api_key="test-secret-value-that-is-at-least-32-chars",
+        ),
     )
     store = LabRunStore(str(tmp_path / "authenticated-lab.sqlite3"))
     app.dependency_overrides[get_lab_store] = lambda: store
@@ -507,7 +510,8 @@ def test_lab_api_requires_constant_time_key_outside_development(monkeypatch, tmp
             "/api/v1/lab/runs", headers={"X-Lab-API-Key": "wrong"}
         ).status_code == 401
         accepted = client.get(
-            "/api/v1/lab/runs", headers={"X-Lab-API-Key": "test-secret-value-that-is-at-least-32-chars"}
+            "/api/v1/lab/runs",
+            headers={"X-Lab-API-Key": "test-secret-value-that-is-at-least-32-chars"},
         )
         assert accepted.status_code == 200
     finally:
