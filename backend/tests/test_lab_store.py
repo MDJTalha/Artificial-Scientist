@@ -1,5 +1,6 @@
 """Persistence and integrity tests for controlled-lab runs."""
 
+import json
 import sqlite3
 
 import pytest
@@ -74,8 +75,6 @@ def test_lab_store_detects_tampering_outside_step_results(tmp_path) -> None:
         row = connection.execute(
             "SELECT payload_json FROM lab_runs WHERE run_id = ?", (str(run.run_id),)
         ).fetchone()
-        import json
-
         payload = json.loads(row[0])
         payload["title"] = "Altered title"
         connection.execute(
