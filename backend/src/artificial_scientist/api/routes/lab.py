@@ -561,6 +561,11 @@ async def upload_lab_binary_artifact(
             raise HTTPException(status_code=413, detail="Binary artifact exceeds the 10 MiB limit.")
         chunks.append(chunk)
     content = b"".join(chunks)
+    if not content:
+        raise HTTPException(
+            status_code=422,
+            detail="Binary artifacts must be between 1 byte and 10 MiB.",
+        )
     try:
         scan_status = await asyncio.to_thread(
             scan_binary_content,
