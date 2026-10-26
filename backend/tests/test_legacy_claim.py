@@ -6,7 +6,7 @@ from uuid import uuid4
 from artificial_scientist.authorization import TenantDirectory
 from artificial_scientist.lab.engine import run_lab
 from artificial_scientist.lab.models import LabRunRequest
-from artificial_scientist.lab.store import LabRunStore
+from artificial_scientist.lab.store import LabRunNotFound, LabRunStore
 from artificial_scientist.legacy_claim import LegacyClaimError, claim_legacy_runs
 
 
@@ -39,7 +39,8 @@ def test_legacy_claim_defaults_to_dry_run_then_updates_atomically(tmp_path):
     assert dry_run["mode"] == "dry-run"
     assert dry_run["claims_to_update"] == 1
     assert store.get(run_id).run_id == run_id
-    assert store.get(run_id, tenant_id=tenant_id) is None
+    with pytest.raises(LabRunNotFound):
+        store.get(run_id, tenant_id=tenant_id)
 
     applied = claim_legacy_runs(
         database,
@@ -91,4 +92,5 @@ def test_legacy_claim_apply_requires_existing_operator_principal(tmp_path):
             apply=True,
             operator_principal_id=None,
         )
-    assert store.get(run.run_id, tenant_id=tenant_id) is None
+    with pytest.raises(LabRunNotFound):
+        store.get(run.run_id, tenant_id=tenant_id)
