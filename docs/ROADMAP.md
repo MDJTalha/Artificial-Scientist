@@ -44,7 +44,7 @@ The project is organized into **15 phases, Phase 0 through Phase 14**. These are
 **Build:** reproducible experiment configuration, managed dependencies, execution limits, logs, artifact capture, and an isolation strategy.  
 **Exit criteria:** generated code cannot access unrestricted host resources; timeouts and resource limits tested; results can be traced to inputs and code. General agent-generated code is not enabled until the security boundary is reviewed.
 
-## Phase 7 — Hypothesis and discovery engine
+## Phase 6 — Controlled computational laboratory\n\n**Initial implementation:** `phase-6-controlled-lab` adds `POST /api/v1/lab/runs`, a bounded declarative runner for the existing symbolic, integration, root-finding, statistics, and unit-conversion operations. It validates typed inputs, caps runs at 20 steps and 64 KiB, stops after the first failed step, records per-step status/duration and diagnostic logs, and hashes canonicalized configuration/results. It does not execute arbitrary Python. Durable run/artifact storage, hard process timeouts, OS-level resource isolation, reproducible environment manifests, and fresh passing CI remain outstanding; therefore Phase 6 is **in progress, not complete**. See `docs/PHASE_6_CONTROLLED_LAB.md`.\n\n## Phase 7 — Hypothesis and discovery engine
 
 **Build:** research-question decomposition, competing hypotheses, prior-work checks, novelty screening, and falsification plans.  
 **Exit criteria:** each hypothesis records evidence, assumptions, alternatives, and a proposed discriminating test; novelty is expressed as a provisional assessment, never guaranteed by search alone.
@@ -93,7 +93,7 @@ The project is organized into **15 phases, Phase 0 through Phase 14**. These are
 
 - **Phase 4 — knowledge graph and vocabulary:** implementation tests passed on code commit `2e652fd211c0b32d4dd77bace69240223c3cbccb`; see the [passing CI run](https://github.com/MDJTalha/Artificial-Scientist/actions/runs/40265564598) and `docs/PHASE_4_KNOWLEDGE_GRAPH.md`. Pull Request #4 is draft and targets Phase 3; it is not merged.
 
-- **Phase 5 — mathematics and scientific tools:** core implementation CI passed on commit `bdf3dfffea45ed428fcb21667d282c035fc8d49d`; see the [passing run](https://github.com/MDJTalha/Artificial-Scientist/actions/runs/40266731194) and `docs/PHASE_5_MATH_TOOLS.md`. Draft Pull Request #5 targets Phase 4; it remains unmerged.
+- **Phase 5 — mathematics and scientific tools:** core implementation CI passed on commit `bdf3dfffea45ed428fcb21667d282c035fc8d49d`; see the [passing run](https://github.com/MDJTalha/Artificial-Scientist/actions/runs/40266731194) and `docs/PHASE_5_MATH_TOOLS.md`. Draft Pull Request #5 targets Phase 4; it remains unmerged.\n\n- **Phase 6 — controlled computational laboratory:** an initial declarative runner is implemented on `phase-6-controlled-lab`; CI and the security/durability exit criteria are not yet verified. It remains in progress.
 
 The status above reflects recorded repository evidence. It is not a declaration of scientific discovery capability.
 
