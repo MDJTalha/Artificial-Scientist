@@ -6,7 +6,7 @@ import hashlib
 import json
 import sqlite3
 from contextlib import closing
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from uuid import UUID, uuid4
 
@@ -18,7 +18,6 @@ from artificial_scientist.records.models import (
     ExperimentPlanRecord,
     ExperimentRunRecord,
     HypothesisRecord,
-    Provenance,
     RecordBase,
     RecordEnvelope,
     RecordType,
@@ -66,7 +65,7 @@ class UnsupportedDatabaseVersion(RecordStoreError):
 
 
 def _utc_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _canonical_payload(record: RecordBase) -> str:
@@ -243,7 +242,11 @@ class RecordStore:
             )
         elif isinstance(record, (ReviewRecord, ApprovalRequestRecord)):
             references.append(
-                (record.target_record_id, set(MODEL_BY_TYPE) - {"approval_request"}, "target_record_id")
+                (
+                    record.target_record_id,
+                    set(MODEL_BY_TYPE) - {"approval_request"},
+                    "target_record_id",
+                )
             )
 
         return references
@@ -297,7 +300,10 @@ class RecordStore:
                 connection.execute(
                     """
                     INSERT INTO audit_events
-                        (event_id, occurred_at, action, actor, record_id, record_type, content_sha256)
+                        (
+                            event_id, occurred_at, action, actor, record_id,
+                            record_type, content_sha256
+                        )
                     VALUES (?, ?, 'record.created', 'local-api-client', ?, ?, ?)
                     """,
                     (
