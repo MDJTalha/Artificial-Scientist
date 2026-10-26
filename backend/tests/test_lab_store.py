@@ -61,3 +61,27 @@ def test_lab_store_rejects_missing_run_and_detects_payload_tampering(tmp_path) -
 
     with pytest.raises(RuntimeError, match="hash does not match"):
         store.get(run.run_id)
+
+
+
+def test_lab_store_detects_tampering_outside_step_results(tmp_path) -> None:
+    database = str(tmp_path / "lab-runs.sqlite3")
+    store = LabRunStore(database)
+    run = _sample_run()
+    store.save(run)
+
+    with sqlite3.connect(database) as connection:
+        row = connection.execute(
+            "SELECT payload_json FROM lab_runs WHERE run_id = ?", (str(run.run_id),)
+        ).fetchone()
+        import json
+
+        payload = json.loads(row[0])
+        payload["title"] = "Altered title"
+        connection.execute(
+            "UPDATE lab_runs SET payload_json = ? WHERE run_id = ?",
+            (json.dumps(payload), str(run.run_id)),
+        )
+
+    with pytest.raises(RuntimeError, match="hash does not match"):
+        store.get(run.run_id)
