@@ -25,6 +25,7 @@ _MAX_BINARY_BYTES_PER_RUN = 50 * 1024 * 1024
 # Conservative initial tenant-wide caps; make these configurable after workload baselining.
 _MAX_BINARY_ARTIFACTS_PER_TENANT = 500
 _MAX_BINARY_BYTES_PER_TENANT = 250 * 1024 * 1024
+_MAX_RUNS_PER_TENANT = 1_000
 _EXECUTION_STALE_AFTER_SECONDS = 15 * 60
 
 
@@ -211,6 +212,22 @@ class LabRunStore:
         now = datetime.now(UTC).isoformat()
         with closing(self._connect()) as connection:
             with connection:
+                # Atomically reserve a tenant run slot before recording execution.
+                connection.execute("BEGIN IMMEDIATE")
+                if tenant_id is not None:
+                    usage = connection.execute(
+                        """
+                        SELECT COUNT(*) AS run_count
+                        FROM (
+                            SELECT run_id FROM lab_runs WHERE tenant_id = ?
+                            UNION
+                            SELECT run_id FROM lab_execution_attempts WHERE tenant_id = ?
+                        )
+                        """,
+                        (tenant_id, tenant_id),
+                    ).fetchone()
+                    if int(usage["run_count"]) >= _MAX_RUNS_PER_TENANT:
+                        raise ValueError("Tenant has reached its lab run quota.")
                 connection.execute(
                     """
                     INSERT INTO lab_execution_attempts (
