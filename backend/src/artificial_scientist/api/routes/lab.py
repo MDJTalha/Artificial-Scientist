@@ -46,7 +46,13 @@ def list_lab_runs(
     offset: int = Query(default=0, ge=0),
 ) -> dict[str, object]:
     """List persisted lab runs with bounded pagination."""
-    runs, total = store.list_runs(limit=limit, offset=offset)
+    try:
+        runs, total = store.list_runs(limit=limit, offset=offset)
+    except RuntimeError as error:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Stored lab run failed integrity validation.",
+        ) from error
     return {"items": runs, "total": total, "limit": limit, "offset": offset}
 
 
@@ -67,7 +73,6 @@ def get_lab_run(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Stored lab run failed integrity validation.",
         ) from error
-
 
 
 @router.get("/runs/{run_id}/artifacts", response_model=list[LabArtifactMetadata])
