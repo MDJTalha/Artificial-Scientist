@@ -432,6 +432,16 @@ def test_worker_cleanup_escalates_from_terminate_to_kill() -> None:
     assert process.join_calls == [2, 2]
 
 
+@pytest.mark.parametrize(
+    "timeout_seconds", [0, -1, float("nan"), float("inf"), -float("inf")]
+)
+def test_isolated_lab_worker_rejects_invalid_deadlines(timeout_seconds: float) -> None:
+    from artificial_scientist.lab.execution import LabExecutionError
+
+    with pytest.raises(LabExecutionError, match="finite positive number"):
+        run_isolated(_slow_lab_worker, (), timeout_seconds=timeout_seconds)
+
+
 def test_isolated_lab_worker_respects_deadline() -> None:
     import time
 
