@@ -75,3 +75,10 @@ Six equally weighted checks contribute to completeness: explicit assumptions, al
 ## CI acceptance
 
 Phase 7 code acceptance requires the latest branch SHA to pass frontend type-check/tests/build, Ruff, and the complete backend test suite on Python 3.12 and 3.13. A historical green run does not validate later commits. No PR is merged automatically.
+
+
+## Operational guardrails added during implementation
+
+Discovery POST requests are capped at 1 MiB before JSON parsing. The guard enforces both declared `Content-Length` and streamed body size, so chunked requests cannot bypass the limit. Requests above the limit receive HTTP 413 and are not passed to Pydantic or route handlers. Regression coverage verifies rejection of an oversized body.
+
+This limit is a resource-abuse guard, not authentication, rate limiting, or a substitute for an upstream proxy/server request limit. Deployments should also configure reverse-proxy body limits, connection/timeouts, per-principal rate limits, and monitoring. The general research-record endpoints remain outside tenant-scoped authorization; do not treat this phase as safe for untrusted multi-tenant production until that separate security gap is closed and independently reviewed.
