@@ -317,8 +317,10 @@ def run_symbolic(request: SymbolicRequest) -> SymbolicResponse:
     if request.operation in {"substitute", "evaluate"}:
         if not request.substitutions:
             raise MathToolError(f"{request.operation} requires at least one substitution.")
+        # Treat JSON decimal text as an exact rational for symbolic substitution,
+        # avoiding display noise such as y + 4.0 for the exact expression y + 4.
         symbol_substitutions = {
-            sp.Symbol(name): sp.Float(value, 17)
+            sp.Symbol(name): sp.Rational(str(value))
             for name, value in request.substitutions.items()
         }
         result = expression.subs(symbol_substitutions)
