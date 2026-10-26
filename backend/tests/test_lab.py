@@ -7,6 +7,7 @@ import json
 import sqlite3
 import zipfile
 from types import SimpleNamespace
+from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
@@ -20,7 +21,12 @@ from artificial_scientist.lab.engine import run_lab
 from artificial_scientist.lab.execution import LabExecutionTimeout, _stop_process, run_isolated
 from artificial_scientist.lab.integrity import result_digest
 from artificial_scientist.lab.models import LabRunRequest
-from artificial_scientist.lab.store import LabArtifactNotFound, LabRunNotFound, LabRunStore
+from artificial_scientist.lab.store import (
+    LabArtifactNotFound,
+    LabExecutionNotFound,
+    LabRunNotFound,
+    LabRunStore,
+)
 from artificial_scientist.main import LabRequestBodyLimitMiddleware, app
 
 
@@ -867,3 +873,54 @@ def test_binary_artifact_quotas_are_enforced_per_run(tmp_path, monkeypatch) -> N
         other_run.run_id, "fresh.bin", "application/octet-stream", b"12345"
     )
     assert independent["size_bytes"] == 5
+
+
+
+def test_interrupted_execution_attempts_are_recovered_and_auditable(tmp_path) -> None:
+    database = str(tmp_path / "execution-recovery.sqlite3")
+    store = LabRunStore(database)
+    request = LabRunRequest(
+        title="Recover interrupted execution",
+        steps=[
+            {
+                "step_id": "stats",
+                "operation": "statistics",
+                "inputs": {"values": [1, 2, 3]},
+            }
+        ],
+    )
+
+    interrupted_id = uuid4()
+    store.begin_execution(interrupted_id, request)
+    restarted_store = LabRunStore(database)
+    interrupted = restarted_store.get_execution_status(interrupted_id)
+    assert interrupted["status"] == "interrupted"
+    assert interrupted["finished_at"] is not None
+    assert "Process stopped" in interrupted["failure_reason"]
+
+    completed_id = uuid4()
+    store.begin_execution(completed_id, request)
+    run = run_lab(request, run_id=completed_id)
+    store.save(run)
+    completed = store.get_execution_status(completed_id)
+    assert completed["status"] == "completed"
+    assert completed["result_sha256"] == run.result_sha256
+
+    # Reconcile a stale status when the durable run record already exists.
+    with sqlite3.connect(database) as connection:
+        connection.execute(
+            """
+            UPDATE lab_execution_attempts
+            SET status = 'running', finished_at = NULL, result_sha256 = NULL
+            WHERE run_id = ?
+            """,
+            (str(completed_id),),
+        )
+        connection.commit()
+    reconciled_store = LabRunStore(database)
+    reconciled = reconciled_store.get_execution_status(completed_id)
+    assert reconciled["status"] == "completed"
+    assert reconciled["result_sha256"] == run.result_sha256
+
+    with pytest.raises(LabExecutionNotFound):
+        store.get_execution_status(uuid4())
