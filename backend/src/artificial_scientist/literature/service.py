@@ -7,7 +7,6 @@ import json
 from typing import Literal
 
 import httpx
-from pydantic import HttpUrl
 
 from artificial_scientist.config import Settings, get_settings
 from artificial_scientist.literature.models import (
@@ -173,7 +172,7 @@ class LiteratureService:
             )
         # A DOI URL is a stable landing URL; prefer it over a provider landing page.
         if incoming.doi:
-            existing.source_url = HttpUrl(f"https://doi.org/{incoming.doi}")
+            existing.source_url = incoming.source_url
 
     def search(self, request: LiteratureSearchRequest) -> LiteratureSearchResponse:
         """Search the selected providers, deduplicate works, and optionally persist metadata."""
@@ -231,7 +230,7 @@ class LiteratureService:
                     else:
                         self._merge_result(existing, candidate)
 
-        results = list(by_identity.values())[: request.limit * len(request.providers)]
+        results = list(by_identity.values())[: request.limit]
         successful_count = sum(1 for status in statuses if status.status == "ok")
         overall_status: SearchStatus
         if successful_count == len(statuses):
