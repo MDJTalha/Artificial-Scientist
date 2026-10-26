@@ -695,7 +695,9 @@ class RecordStore:
             schema_version=int(row["schema_version"]),
             created_at=datetime.fromisoformat(str(row["created_at"])),
             content_sha256=expected_hash,
-            payload=validated_record.model_dump(mode="json"),
+            # Preserve the exact validated JSON fields covered by the stored digest.
+            # This keeps older records stable when optional model fields are added later.
+            payload=json.loads(payload_json),
         )
 
     def get(self, record_id: UUID) -> RecordEnvelope:
