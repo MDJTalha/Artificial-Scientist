@@ -8,6 +8,7 @@ from artificial_scientist.api.routes.records import get_record_store
 from artificial_scientist.discovery import (
     DiscoveryAssessmentRequest,
     DiscoveryAssessmentResponse,
+    HypothesisCandidate,
     assess_candidates,
 )
 from artificial_scientist.records.models import HypothesisRecord, RecordEnvelope
@@ -23,7 +24,9 @@ from artificial_scientist.records.store import (
 router = APIRouter(prefix="/api/v1/discovery", tags=["hypothesis discovery"])
 
 
-def _validate_evidence_references(store: RecordStore, candidate: object) -> None:
+def _validate_evidence_references(
+    store: RecordStore, candidate: HypothesisCandidate
+) -> None:
     """Fail before writes if a referenced source or claim is missing or has wrong type."""
     for record_id in candidate.source_record_ids:
         try:
@@ -72,16 +75,16 @@ def assess_hypotheses(
     for candidate in request.candidates:
         _validate_evidence_references(store, candidate)
 
-    saved: list[RecordEnvelope] = []
-    try:
-        for candidate, assessment in zip(request.candidates, result.assessments, strict=True):
-            notes = request.novelty_screen_notes
-            if request.novelty_screen_status == "screened" and not notes:
-                notes = (
-                    "Caller marked a novelty screen as completed but supplied no search notes; "
-                    "treat this as unverified and repeat a documented literature search."
-                )
-            record = HypothesisRecord(
+    records: list[HypothesisRecord] = []
+    for candidate in request.candidates:
+        notes = request.novelty_screen_notes
+        if request.novelty_screen_status == "screened" and not notes:
+            notes = (
+                "Caller marked a novelty screen as completed but supplied no search notes; "
+                "treat this as unverified and repeat a documented literature search."
+            )
+        records.append(
+            HypothesisRecord(
                 title=candidate.title,
                 hypothesis=candidate.statement,
                 assumptions=candidate.assumptions,
@@ -105,8 +108,9 @@ def assess_hypotheses(
                     ),
                 },
             )
-            saved.append(store.create(record))
-            assessment.persisted_record_id = saved[-1].id
+        )
+    try:
+        saved = store.create_many(records)
     except (InvalidRelationship, RecordConflict) as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
     except RecordIntegrityError as error:
@@ -118,4 +122,6 @@ def assess_hypotheses(
             status_code=500, detail="Hypothesis records could not be persisted."
         ) from error
 
+    for assessment, envelope in zip(result.assessments, saved, strict=True):
+        assessment.persisted_record_id = envelope.id
     return result
