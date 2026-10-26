@@ -15,6 +15,7 @@ class Settings:
     database_path: str
     openalex_api_key: str | None
     crossref_contact_email: str | None
+    lab_api_key: str | None
 
 
 def get_settings() -> Settings:
@@ -39,4 +40,5 @@ def get_settings() -> Settings:
         ),
         openalex_api_key=os.getenv("OPENALEX_API_KEY") or None,
         crossref_contact_email=os.getenv("CROSSREF_CONTACT_EMAIL") or None,
+        lab_api_key=os.getenv("ARTIFICIAL_SCIENTIST_LAB_API_KEY") or None,
     )
