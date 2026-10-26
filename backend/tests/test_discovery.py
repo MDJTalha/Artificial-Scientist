@@ -74,6 +74,18 @@ def test_candidate_lists_reject_blank_or_duplicate_items() -> None:
         )
 
 
+def test_declared_novelty_screen_requires_search_notes() -> None:
+    with pytest.raises(ValidationError, match="novelty_screen_notes are required"):
+        DiscoveryAssessmentRequest(
+            research_question="How does temperature affect reaction rate?",
+            candidates=[
+                candidate("Hypothesis A", "Temperature increases reaction rate."),
+                candidate("Hypothesis B", "Temperature decreases reaction rate."),
+            ],
+            novelty_screen_status="screened",
+        )
+
+
 def test_near_duplicate_hypotheses_are_flagged() -> None:
     request = DiscoveryAssessmentRequest(
         research_question="What changes reaction rate under controlled conditions?",
