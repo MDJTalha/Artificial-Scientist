@@ -10,6 +10,8 @@ on:
       - phase-4-knowledge-graph
       - phase-5-mathematical-tools
       - phase-6-controlled-lab
+      - phase-6-execution-tenant-tests
+      - phase-7-hypothesis-discovery
   pull_request:
     branches:
       - main
@@ -19,6 +21,8 @@ on:
       - phase-4-knowledge-graph
       - phase-5-mathematical-tools
       - phase-6-controlled-lab
+      - phase-6-execution-tenant-tests
+      - phase-7-hypothesis-discovery
   workflow_dispatch:
 
 permissions:
