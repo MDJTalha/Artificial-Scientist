@@ -21,6 +21,7 @@ from artificial_scientist.literature.providers import (
     OpenAlexProvider,
     ProviderName,
     ProviderWork,
+    USER_AGENT,
 )
 from artificial_scientist.records.identity import source_identity_key
 from artificial_scientist.records.models import Provenance, SourceRecord
@@ -56,13 +57,7 @@ class LiteratureService:
             timeout=httpx.Timeout(8.0, connect=3.0, read=8.0, write=3.0, pool=3.0),
             limits=httpx.Limits(max_connections=4, max_keepalive_connections=2),
             follow_redirects=False,
-            headers={
-                "User-Agent": (
-                    "ArtificialScientist/0.1.0 "
-                    "(research project; https://github.com/MDJTalha/Artificial-Scientist)"
-                ),
-                "Accept": "application/json",
-            },
+            headers={"User-Agent": USER_AGENT, "Accept": "application/json"},
             transport=transport,
         )
 
@@ -182,6 +177,9 @@ class LiteratureService:
         }
         statuses: list[ProviderSearchStatus] = []
         by_identity: dict[str, LiteratureResult] = {}
+        provider_result_keys: dict[str, list[str]] = {
+            provider: [] for provider in request.providers
+        }
         retrieved_at = datetime.now(UTC)
 
         with self._client(self.transport) as client:
@@ -224,13 +222,28 @@ class LiteratureService:
                 for work in works:
                     candidate = self._work_to_result(work)
                     identity = self._identity_for_result(candidate)
+                    provider_result_keys[provider_name].append(identity)
                     existing = by_identity.get(identity)
                     if existing is None:
                         by_identity[identity] = candidate
                     else:
                         self._merge_result(existing, candidate)
 
-        results = list(by_identity.values())[: request.limit]
+        # Interleave provider rankings so one provider cannot occupy every result
+        # slot before the other provider's unique matches are considered.
+        ordered_keys: list[str] = []
+        seen_keys: set[str] = set()
+        for rank in range(request.limit):
+            for provider_name in request.providers:
+                keys = provider_result_keys[provider_name]
+                if rank < len(keys) and keys[rank] not in seen_keys:
+                    ordered_keys.append(keys[rank])
+                    seen_keys.add(keys[rank])
+                    if len(ordered_keys) >= request.limit:
+                        break
+            if len(ordered_keys) >= request.limit:
+                break
+        results = [by_identity[key] for key in ordered_keys]
         successful_count = sum(1 for status in statuses if status.status == "ok")
         overall_status: SearchStatus
         if successful_count == len(statuses):
