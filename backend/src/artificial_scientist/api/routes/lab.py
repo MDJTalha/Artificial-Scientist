@@ -161,13 +161,56 @@ def require_tenant_access(request: Request, action: str) -> str | None:
         )
     principal_id = stable_principal_id(principal.issuer, principal.subject)
     directory = TenantDirectory(settings.database_path)
+    # Record the authorization decision against the requested object when one is
+    # present. Never include request bodies, headers, credentials, or artifact bytes.
+    path_params = request.path_params
+    target_id = next(
+        (
+            str(path_params[key])
+            for key in ("run_id", "artifact_id")
+            if path_params.get(key) is not None
+        ),
+        tenant_id,
+    )
+    target_type = (
+        "binary_artifact"
+        if "binary-artifacts" in request.url.path
+        else "artifact"
+        if path_params.get("artifact_id") is not None
+        else "run"
+        if path_params.get("run_id") is not None
+        else "tenant"
+    )
+    correlation_id = request.headers.get("x-correlation-id", "").strip()
+    if not correlation_id or len(correlation_id) > 128:
+        correlation_id = str(uuid4())
     try:
         directory.authorize(principal_id, tenant_id, action)
     except (AuthorizationDenied, ValueError) as error:
+        directory.audit(
+            principal_id=principal_id,
+            tenant_id=tenant_id,
+            action=action,
+            target_type=target_type,
+            target_id=target_id,
+            outcome="denied",
+            correlation_id=correlation_id,
+            metadata={"method": request.method, "route": request.url.path},
+        )
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Requested tenant resource is not available.",
         ) from error
+    directory.audit(
+        principal_id=principal_id,
+        tenant_id=tenant_id,
+        action=action,
+        target_type=target_type,
+        target_id=target_id,
+        outcome="allowed",
+        correlation_id=correlation_id,
+        metadata={"method": request.method, "route": request.url.path},
+    )
     return tenant_id
 
 
