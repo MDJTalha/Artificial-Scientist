@@ -139,3 +139,34 @@ def test_audit_accepts_bounded_operational_metadata(tmp_path):
         "route": "/api/v1/lab/runs",
         "attempt": 2,
     }
+
+
+@pytest.mark.parametrize(
+    ("role", "allowed_actions"),
+    [
+        (
+            "tenant_admin",
+            {
+                "run:create", "run:list", "run:read", "run:verify", "run:export",
+                "artifact:read", "artifact:upload", "membership:manage",
+            },
+        ),
+        (
+            "researcher",
+            {
+                "run:create", "run:list", "run:read", "run:verify", "run:export",
+                "artifact:read", "artifact:upload",
+            },
+        ),
+        ("viewer", {"run:list", "run:read", "run:export", "artifact:read"}),
+        ("auditor", {"run:list", "run:read", "run:export", "artifact:read"}),
+    ],
+)
+def test_role_action_matrix_is_explicit(role, allowed_actions):
+    from artificial_scientist.authorization import _ALLOWED_ACTIONS
+
+    assert all(
+        role_allows(role, action) == (action in allowed_actions)
+        for action in _ALLOWED_ACTIONS
+    )
+    assert not role_allows(role, "unknown:action")
