@@ -96,9 +96,11 @@ def test_tenant_wide_binary_count_quota_is_enforced_across_runs(
             tenant_id="tenant-a",
         )
 
-    # A separate tenant has an independent quota.
+    # A separate tenant has an independent quota and its own run ownership.
+    run_c = _run()
+    store.save(run_c, tenant_id="tenant-b")
     store.save_binary_artifact(
-        run_b.run_id,
+        run_c.run_id,
         "other-tenant.bin",
         "application/octet-stream",
         b"third",
