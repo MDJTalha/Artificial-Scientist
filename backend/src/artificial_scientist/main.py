@@ -18,6 +18,7 @@ from artificial_scientist.config import get_settings
 
 settings = get_settings()
 LAB_RUN_BODY_LIMIT_BYTES = 64 * 1024
+DISCOVERY_BODY_LIMIT_BYTES = 1024 * 1024
 
 
 class LabSecurityAuditMiddleware:
@@ -119,21 +120,30 @@ class LabSecurityAuditMiddleware:
 
 
 class LabRequestBodyLimitMiddleware:
-    """Bound lab-run request bodies before JSON parsing and model validation."""
+    """Bound computational and discovery request bodies before JSON parsing."""
 
     def __init__(self, app: ASGIApp, max_body_bytes: int = LAB_RUN_BODY_LIMIT_BYTES) -> None:
         self.app = app
         self.max_body_bytes = max_body_bytes
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        path = scope.get("path", "")
         is_lab_run_post = (
             scope["type"] == "http"
             and scope.get("method") == "POST"
-            and scope.get("path") == "/api/v1/lab/runs"
+            and path == "/api/v1/lab/runs"
         )
-        if not is_lab_run_post:
+        is_discovery_post = (
+            scope["type"] == "http"
+            and scope.get("method") == "POST"
+            and path.startswith("/api/v1/discovery/")
+        )
+        if not (is_lab_run_post or is_discovery_post):
             await self.app(scope, receive, send)
             return
+        max_body_bytes = (
+            DISCOVERY_BODY_LIMIT_BYTES if is_discovery_post else self.max_body_bytes
+        )
 
         headers = {
             key.lower(): value
@@ -146,7 +156,7 @@ class LabRequestBodyLimitMiddleware:
             except ValueError:
                 await self._too_large(send)
                 return
-            if declared_length < 0 or declared_length > self.max_body_bytes:
+            if declared_length < 0 or declared_length > max_body_bytes:
                 await self._too_large(send)
                 return
 
@@ -159,7 +169,7 @@ class LabRequestBodyLimitMiddleware:
                 return
             chunk = message.get("body", b"")
             body_size += len(chunk)
-            if body_size > self.max_body_bytes:
+            if body_size > max_body_bytes:
                 await self._too_large(send)
                 return
             body_chunks.append(chunk)
@@ -183,7 +193,7 @@ class LabRequestBodyLimitMiddleware:
 
     @staticmethod
     async def _too_large(send: Send) -> None:
-        body = b'{"detail":"Lab run request body exceeds the 65536-byte limit."}'
+        body = b'{"detail":"Request body exceeds the endpoint size limit."}'
         await send(
             {
                 "type": "http.response.start",
