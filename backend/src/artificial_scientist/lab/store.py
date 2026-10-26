@@ -433,7 +433,10 @@ class LabRunStore:
         if len(content) != row["size_bytes"] or not 1 <= len(content) <= 10 * 1024 * 1024:
             raise RuntimeError("Stored binary artifact size validation failed.")
         provenance = json.loads(row["provenance_json"])
-        if provenance.get("run_id") != row["run_id"] or provenance.get("filename") != row["filename"]:
+        if (
+            provenance.get("run_id") != row["run_id"]
+            or provenance.get("filename") != row["filename"]
+        ):
             raise RuntimeError("Stored binary artifact provenance validation failed.")
         document: dict[str, Any] = {
             "artifact_id": row["artifact_id"],
