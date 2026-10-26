@@ -78,6 +78,14 @@ The project is organized into **15 phases, Phase 0 through Phase 14**. These are
 **Build:** additional domain agents, specialized datasets/tools, advanced computational discovery, and, only where justified, approved physical research integrations.  
 **Exit criteria:** each new domain has its own validation cases, tool constraints, risk assessment, and expert review path. Expansion is evidence-gated.
 
+## Current implementation status
+
+- **Phase 0 — foundation documents:** established in the Phase 0–1 draft pull request.
+- **Phase 1 — core application foundation:** CI passed on Python 3.12 and 3.13; frontend type-check, six unit tests, and production build passed on the recorded implementation commit.
+- **Phase 2 — research records and provenance:** implementation in progress on the `phase-2-research-records` branch. Do not mark complete until the current branch's CI run and relationship/integrity tests pass.
+
+The status above reflects recorded repository evidence. It is not a declaration of scientific discovery capability.
+
 ## Release gates
 
 Before every material milestone, publish an internal evidence report containing: scope completed; commit/version; commands run; test counts and outcomes; failures; known limitations; dependency or data constraints; security and scientific-integrity risks; and the next smallest justified step.
