@@ -183,9 +183,9 @@ def test_legacy_database_schema_migrates_without_assigning_tenant_ownership(tmp_
 def test_concurrent_run_saves_cannot_oversubscribe_tenant_json_artifact_quota(
     tmp_path, monkeypatch
 ) -> None:
-    import artificial_scientist.lab.store as store_module
-
     import sqlite3
+
+    import artificial_scientist.lab.store as store_module
 
     quota = 2
     workers = 6
