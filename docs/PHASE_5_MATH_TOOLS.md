@@ -1,6 +1,6 @@
 # Phase 5 — Mathematics and Scientific Tools
 
-**Status:** Implementation and CI acceptance in progress.  
+**Status:** Core implementation checks passed on commit `bdf3dfffea45ed428fcb21667d282c035fc8d49d`. See the [passing GitHub Actions run](https://github.com/MDJTalha/Artificial-Scientist/actions/runs/40266731194).  
 **Branch:** \`phase-5-mathematical-tools\`, stacked on \`phase-4-knowledge-graph\`.  
 **Objective:** provide useful symbolic, numerical, statistical, and dimensional-analysis functions with clear mathematical assumptions, bounded inputs, reference cases, and explicit failure behavior.
 
@@ -106,17 +106,27 @@ Deterministic tests include:
 
 ## Acceptance criteria
 
-- [ ] Ruff and all backend tests pass on Python 3.12 and 3.13.
-- [ ] Frontend type-check, all frontend tests, and production build pass.
-- [ ] Latest code and documentation-head push/pull-request CI runs are linked here.
-- [ ] Symbolic expressions never evaluate arbitrary Python text.
-- [ ] Numerical integration returns error estimate and an explicit convergence status.
-- [ ] Root finding requires and reports a finite bracket.
-- [ ] Statistics modes, quantile method, input bounds, and expected reference cases are documented.
-- [ ] Unit conversion accepts only allowlisted tokens and rejects incompatible dimensions.
-- [ ] Dimensional-expression validation distinguishes an invalid expression from an expected-unit mismatch.
-- [ ] The plot endpoint returns bounded PNG bytes without writing files or executing user code.
-- [ ] Known limitations remain explicit; no result is presented as a proof of scientific truth.
+- [x] Ruff and all backend tests passed on Python 3.12 and 3.13.
+- [x] Frontend type-check, all 6 frontend tests, and production build passed.
+- [x] The verified code-head push run is linked below. Documentation-head and pull-request CI will be recorded after their results are confirmed.
+- [x] Symbolic expressions never evaluate arbitrary Python text.
+- [x] Numerical integration returns an error estimate and an explicit convergence status.
+- [x] Root finding requires and reports a finite bracket.
+- [x] Statistics modes, quantile method, input bounds, and expected reference cases are documented.
+- [x] Unit conversion accepts only allowlisted tokens and rejects incompatible dimensions.
+- [x] Dimensional-expression validation distinguishes an invalid expression from an expected-unit mismatch.
+- [x] The plot endpoint returns bounded PNG bytes without writing files or executing user code.
+- [x] Known limitations remain explicit; no result is presented as a proof of scientific truth.
+
+## Verified CI result
+
+- [Passing code-commit GitHub Actions run](https://github.com/MDJTalha/Artificial-Scientist/actions/runs/40266731194) for `bdf3dfffea45ed428fcb21667d282c035fc8d49d`.
+- Backend: Ruff passed; 75 tests passed on Python 3.12 and 75 tests passed on Python 3.13.
+- Frontend: TypeScript type-check passed, 6 unit tests passed, and production build completed.
+- The suite includes mathematical reference cases, invalid-input/security tests, unit dimensionality cases, and PNG plotting output checks.
+- Tests establish code behavior for these cases; they do not certify every mathematical expression, numeric stability for every domain, or scientific validity.
+
+The core Phase 5 acceptance checks have passed. The change remains stacked on Phase 4 and awaits review/integration; no earlier pull request is merged.
 
 ## Not implemented in this phase
 
