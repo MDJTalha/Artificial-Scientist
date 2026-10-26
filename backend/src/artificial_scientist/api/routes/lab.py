@@ -1,11 +1,15 @@
 """API endpoints for the controlled computational laboratory."""
 
+import hashlib
 import hmac
+import io
+import json
+import zipfile
 from functools import lru_cache
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response, status
 
 from artificial_scientist.config import get_settings
 from artificial_scientist.lab.engine import run_lab
@@ -181,6 +185,60 @@ def verify_lab_run(
         differences=differences,
         recorded_environment=recorded.environment_manifest,
         current_environment=current_environment,
+    )
+
+
+@router.get("/runs/{run_id}/export")
+def export_lab_run(
+    run_id: UUID,
+    store: Annotated[LabRunStore, Depends(get_lab_store)],
+) -> Response:
+    """Export a run and its verified result artifact as a checksum-manifest ZIP."""
+    try:
+        run = store.get(run_id)
+        artifacts = store.list_artifacts(run_id)
+        artifact_documents = [
+            store.get_artifact(item.artifact_id).model_dump(mode="json")
+            for item in artifacts
+        ]
+    except LabRunNotFound as error:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Lab run not found."
+        ) from error
+    except RuntimeError as error:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Stored lab data failed integrity validation.",
+        ) from error
+
+    files = {
+        "run.json": json.dumps(
+            run.model_dump(mode="json"), sort_keys=True, separators=(",", ":"), allow_nan=False
+        ).encode("utf-8"),
+        "artifacts.json": json.dumps(
+            artifact_documents, sort_keys=True, separators=(",", ":"), allow_nan=False
+        ).encode("utf-8"),
+    }
+    manifest = {
+        "format": "asds-lab-export-v1",
+        "run_id": str(run_id),
+        "files": {
+            name: {"sha256": hashlib.sha256(content).hexdigest(), "size_bytes": len(content)}
+            for name, content in files.items()
+        },
+        "note": "Checksums detect accidental changes; this manifest is not digitally signed.",
+    }
+    files["manifest.json"] = json.dumps(
+        manifest, sort_keys=True, separators=(",", ":"), allow_nan=False
+    ).encode("utf-8")
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, mode="w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for name, content in files.items():
+            archive.writestr(name, content)
+    return Response(
+        content=buffer.getvalue(),
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="lab-run-{run_id}.zip"'},
     )
 
 
