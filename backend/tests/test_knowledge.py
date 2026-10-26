@@ -310,6 +310,28 @@ def test_knowledge_api_creates_searches_and_traverses_graph(
         app.dependency_overrides.clear()
 
 
+def test_graph_neighborhood_respects_requested_bounds(store: RecordStore) -> None:
+    root = store.create(concept("Root concept"))
+    for label in ("Neighbor one", "Neighbor two", "Neighbor three"):
+        neighbor = store.create(concept(label))
+        store.create(relation(root.id, neighbor.id))
+
+    app.dependency_overrides[get_record_store] = lambda: store
+    try:
+        with TestClient(app) as client:
+            response = client.get(
+                "/api/v1/knowledge/graph/neighborhood",
+                params={"concept_id": str(root.id), "depth": 3, "limit": 1},
+            )
+        assert response.status_code == 200
+        body = response.json()
+        assert len(body["nodes"]) <= 1
+        assert len(body["relationships"]) <= 2
+        assert body["truncated"] is True
+    finally:
+        app.dependency_overrides.clear()
+
+
 def test_knowledge_api_rejects_invalid_predicate_and_non_concept_id(
     store: RecordStore,
 ) -> None:
@@ -325,6 +347,13 @@ def test_knowledge_api_rejects_invalid_predicate_and_non_concept_id(
                 },
             )
             assert invalid.status_code == 422
+
+            valid_concept = store.create(concept("Predicate filter target"))
+            bad_filter = client.get(
+                f"/api/v1/knowledge/concepts/{valid_concept.id}/relationships",
+                params={"predicate": "not-a-controlled-predicate"},
+            )
+            assert bad_filter.status_code == 422
 
             ordinary = store.create(
                 SourceRecord(
