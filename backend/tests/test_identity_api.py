@@ -163,6 +163,15 @@ def test_tenant_scoped_run_api_hides_runs_from_other_tenants(monkeypatch, tmp_pa
         )
         store.save(run_a, tenant_id=tenant_a)
         store.save(run_b, tenant_id=tenant_b)
+        json_artifact_b = store.list_artifacts(run_b.run_id)[0]
+        binary_artifact_b = store.save_binary_artifact(
+            run_b.run_id,
+            "tenant-b.bin",
+            "application/octet-stream",
+            b"tenant B only",
+            scan_status="skipped_development",
+            tenant_id=tenant_b,
+        )
         client = TestClient(app)
         headers = {
             "Authorization": "Bearer signed-token",
@@ -173,8 +182,20 @@ def test_tenant_scoped_run_api_hides_runs_from_other_tenants(monkeypatch, tmp_pa
         assert response.json()["total"] == 1
         assert response.json()["items"][0]["title"] == "Visible tenant run"
 
-        hidden = client.get(f"/api/v1/lab/runs/{run_b.run_id}", headers=headers)
-        assert hidden.status_code == 404
+        denied_paths = [
+            ("GET", f"/api/v1/lab/runs/{run_b.run_id}"),
+            ("GET", f"/api/v1/lab/runs/{run_b.run_id}/execution-status"),
+            ("POST", f"/api/v1/lab/runs/{run_b.run_id}/verify"),
+            ("GET", f"/api/v1/lab/runs/{run_b.run_id}/export"),
+            ("GET", f"/api/v1/lab/runs/{run_b.run_id}/artifacts"),
+            ("GET", f"/api/v1/lab/artifacts/{json_artifact_b.artifact_id}"),
+            ("GET", f"/api/v1/lab/runs/{run_b.run_id}/binary-artifacts"),
+            ("GET", f"/api/v1/lab/binary-artifacts/{binary_artifact_b['artifact_id']}"),
+        ]
+        for method, path in denied_paths:
+            denied = client.request(method, path, headers=headers)
+            assert denied.status_code == 404, (method, path, denied.text)
+
         no_tenant = client.get(
             "/api/v1/lab/runs",
             headers={"Authorization": "Bearer signed-token"},
