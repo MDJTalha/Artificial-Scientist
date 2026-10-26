@@ -5,6 +5,8 @@ from types import SimpleNamespace
 from fastapi.testclient import TestClient
 
 from artificial_scientist.api.routes import lab as lab_routes
+from artificial_scientist.api.routes.lab import get_lab_store
+from artificial_scientist.lab.store import LabRunStore
 from artificial_scientist.main import app
 
 
@@ -35,7 +37,7 @@ def test_configured_oidc_cannot_be_bypassed_with_legacy_api_key(monkeypatch):
     ).status_code == 401
 
 
-def test_configured_oidc_accepts_only_validated_bearer_identity(monkeypatch):
+def test_configured_oidc_accepts_only_validated_bearer_identity(monkeypatch, tmp_path):
     monkeypatch.setattr(
         lab_routes,
         "get_settings",
@@ -54,13 +56,18 @@ def test_configured_oidc_accepts_only_validated_bearer_identity(monkeypatch):
         lambda token, **kwargs: validated.append((token, kwargs)),
     )
 
-    response = TestClient(app).get(
-        "/api/v1/lab/runs",
-        headers={"Authorization": "Bearer signed-token"},
-    )
-    assert response.status_code == 200
-    assert validated[0][0] == "signed-token"
-    assert validated[0][1]["issuer"] == "https://identity.example.test/"
+    store = LabRunStore(str(tmp_path / "oidc-api.sqlite3"))
+    app.dependency_overrides[get_lab_store] = lambda: store
+    try:
+        response = TestClient(app).get(
+            "/api/v1/lab/runs",
+            headers={"Authorization": "Bearer signed-token"},
+        )
+        assert response.status_code == 200
+        assert validated[0][0] == "signed-token"
+        assert validated[0][1]["issuer"] == "https://identity.example.test/"
+    finally:
+        app.dependency_overrides.pop(get_lab_store, None)
 
 
 def test_partial_oidc_configuration_fails_closed(monkeypatch):
