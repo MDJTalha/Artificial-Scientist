@@ -1,8 +1,11 @@
 """Reference and adversarial tests for the controlled computational lab."""
 
 import asyncio
+import hashlib
+import io
 import json
 import sqlite3
+import zipfile
 from types import SimpleNamespace
 
 import pytest
@@ -180,6 +183,49 @@ def test_lab_run_records_manifest_and_verification_replays_outputs(tmp_path) -> 
         assert result["environment_matches"] is True
         assert result["outputs_match"] is True
         assert result["differences"] == []
+    finally:
+        app.dependency_overrides.pop(get_lab_store, None)
+
+
+def test_lab_export_contains_run_artifact_and_checksum_manifest(tmp_path) -> None:
+    store = LabRunStore(str(tmp_path / "lab-export.sqlite3"))
+    app.dependency_overrides[get_lab_store] = lambda: store
+    client = TestClient(app)
+    try:
+        created = client.post(
+            "/api/v1/lab/runs",
+            json={
+                "title": "Export manifest test",
+                "steps": [
+                    {
+                        "step_id": "stats",
+                        "operation": "statistics",
+                        "inputs": {"values": [2, 4, 6]},
+                    }
+                ],
+            },
+        )
+        assert created.status_code == 201
+        run_id = created.json()["run_id"]
+
+        response = client.get(f"/api/v1/lab/runs/{run_id}/export")
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "application/zip"
+        with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
+            assert set(archive.namelist()) == {
+                "run.json",
+                "artifacts.json",
+                "manifest.json",
+            }
+            run_document = json.loads(archive.read("run.json"))
+            artifact_documents = json.loads(archive.read("artifacts.json"))
+            manifest = json.loads(archive.read("manifest.json"))
+            assert run_document["run_id"] == run_id
+            assert artifact_documents[0]["content"]["run_id"] == run_id
+            for name in ("run.json", "artifacts.json"):
+                payload = archive.read(name)
+                assert manifest["files"][name]["sha256"] == hashlib.sha256(payload).hexdigest()
+                assert manifest["files"][name]["size_bytes"] == len(payload)
     finally:
         app.dependency_overrides.pop(get_lab_store, None)
 
