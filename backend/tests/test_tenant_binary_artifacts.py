@@ -1,5 +1,8 @@
 """Cross-tenant denial tests for binary lab attachments."""
 
+from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier
+
 import pytest
 
 from artificial_scientist.lab.engine import run_lab
@@ -139,3 +142,45 @@ def test_tenant_wide_binary_byte_quota_is_enforced_across_runs(
             tenant_id="tenant-a",
         )
 
+
+
+
+def test_concurrent_binary_uploads_cannot_oversubscribe_tenant_count_quota(
+    tmp_path, monkeypatch
+) -> None:
+    import artificial_scientist.lab.store as store_module
+
+    quota = 2
+    workers = 6
+    monkeypatch.setattr(store_module, "_MAX_BINARY_ARTIFACTS_PER_TENANT", quota)
+    store = LabRunStore(str(tmp_path / "binary-quota-concurrency.sqlite3"))
+    runs = [_run() for _ in range(workers)]
+    for run in runs:
+        store.save(run, tenant_id="tenant-concurrent")
+    barrier = Barrier(workers)
+
+    def attach(index: int) -> bool:
+        barrier.wait(timeout=5)
+        try:
+            store.save_binary_artifact(
+                runs[index].run_id,
+                f"parallel-{index}.bin",
+                "application/octet-stream",
+                f"payload-{index}".encode(),
+                scan_status="skipped_development",
+                tenant_id="tenant-concurrent",
+            )
+        except ValueError as exc:
+            if "Tenant has reached its binary artifact count quota" not in str(exc):
+                raise
+            return False
+        return True
+
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        outcomes = list(executor.map(attach, range(workers)))
+
+    assert sum(outcomes) == quota
+    persisted = store.list_binary_artifacts(runs[0].run_id, tenant_id="tenant-concurrent")
+    # The per-run list is only a smoke check; the tenant quota outcome above
+    # verifies the count across all six independently owned runs.
+    assert len(persisted) <= 1
