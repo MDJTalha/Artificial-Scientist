@@ -91,10 +91,11 @@ class LabRunResponse(BaseModel):
         "Canonical JSON run-result artifacts are stored; "
         "general binary artifacts and automated retention scheduling are not implemented. "
         "An internal bounded purge preserves retention tombstones.",
-        "Per-step wall-clock deadlines are enforced, but OS-level CPU and memory quotas are not.",
+        "POSIX workers receive CPU, address-space, file-size, descriptor, and core-dump limits. "
+        "These limits do not isolate filesystem, network, syscalls, or kernel attack surface.",
         "Environment manifests and replay comparison are available, but identical outputs do not "
-        "prove scientific validity. This service is not an OS sandbox and must remain on "
-        "trusted local infrastructure.",
+        "prove scientific validity. This service is not a complete OS sandbox and must remain on "
+        "trusted infrastructure.",
     ]
 
 
