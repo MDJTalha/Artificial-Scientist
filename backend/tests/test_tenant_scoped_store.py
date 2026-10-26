@@ -64,3 +64,50 @@ def test_tenant_scoped_lists_do_not_include_unowned_legacy_runs(tmp_path) -> Non
 
     with pytest.raises(LabRunNotFound):
         store.get(legacy_run.run_id, tenant_id="tenant-a")
+
+
+
+def test_tenant_wide_json_artifact_count_quota_is_enforced_across_runs(
+    tmp_path, monkeypatch
+) -> None:
+    import artificial_scientist.lab.store as store_module
+
+    store = LabRunStore(str(tmp_path / "tenant-json-count-quota.sqlite3"))
+    monkeypatch.setattr(store_module, "_MAX_JSON_ARTIFACTS_PER_TENANT", 1)
+
+    store.save(_run("Tenant A first"), tenant_id="tenant-a")
+    with pytest.raises(ValueError, match="JSON artifact count quota"):
+        store.save(_run("Tenant A second"), tenant_id="tenant-a")
+
+    # Quotas are isolated: a different tenant can still use its own budget.
+    store.save(_run("Tenant B first"), tenant_id="tenant-b")
+
+
+def test_tenant_wide_json_artifact_byte_quota_is_enforced(
+    tmp_path, monkeypatch
+) -> None:
+    import sqlite3
+
+    import artificial_scientist.lab.store as store_module
+
+    database = str(tmp_path / "tenant-json-byte-quota.sqlite3")
+    store = LabRunStore(database)
+    first = _run("Tenant A first")
+    store.save(first, tenant_id="tenant-a")
+
+    with sqlite3.connect(database) as connection:
+        used_bytes = connection.execute(
+            """
+            SELECT COALESCE(SUM(artifacts.size_bytes), 0)
+            FROM lab_artifacts AS artifacts
+            JOIN lab_runs AS runs ON runs.run_id = artifacts.run_id
+            WHERE runs.tenant_id = ?
+            """,
+            ("tenant-a",),
+        ).fetchone()[0]
+    monkeypatch.setattr(store_module, "_MAX_JSON_BYTES_PER_TENANT", used_bytes)
+
+    with pytest.raises(ValueError, match="JSON artifact storage quota"):
+        store.save(_run("Tenant A second"), tenant_id="tenant-a")
+
+    store.save(_run("Tenant B first"), tenant_id="tenant-b")
