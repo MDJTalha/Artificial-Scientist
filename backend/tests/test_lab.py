@@ -1043,6 +1043,34 @@ def test_clamav_scanner_sends_instream_and_accepts_clean_result(monkeypatch) -> 
     assert sent[2] == b"\0\0\0\0"
 
 
+
+def test_clamav_scanner_rejects_incomplete_success_response(monkeypatch) -> None:
+    class TruncatedConnection:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def settimeout(self, _timeout):
+            return None
+
+        def sendall(self, _data):
+            return None
+
+        def recv(self, _size):
+            return b"stream: OK"
+
+    monkeypatch.setenv("ARTIFICIAL_SCIENTIST_CLAMAV_HOST", "scanner.internal")
+    monkeypatch.setattr(
+        lab_scanning.socket,
+        "create_connection",
+        lambda *_args, **_kwargs: TruncatedConnection(),
+    )
+    with pytest.raises(lab_scanning.ScannerUnavailable, match="incomplete response"):
+        lab_scanning.scan_binary_content(b"test sample", environment="production")
+
+
 def test_clamav_scanner_rejects_detected_malware(monkeypatch) -> None:
     class InfectedConnection:
         def __enter__(self):
