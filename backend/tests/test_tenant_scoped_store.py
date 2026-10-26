@@ -66,7 +66,6 @@ def test_tenant_scoped_lists_do_not_include_unowned_legacy_runs(tmp_path) -> Non
         store.get(legacy_run.run_id, tenant_id="tenant-a")
 
 
-
 def test_tenant_wide_json_artifact_count_quota_is_enforced_across_runs(
     tmp_path, monkeypatch
 ) -> None:
