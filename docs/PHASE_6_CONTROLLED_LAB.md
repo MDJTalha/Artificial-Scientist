@@ -8,7 +8,7 @@
 The first lab API is a declarative runner over existing allowlisted math tools. It does not accept or execute Python source code.
 
 - `POST /api/v1/lab/runs` accepts a titled run with 1–20 declarative steps and persists the result in SQLite.
-- `GET /api/v1/lab/runs` lists stored runs with bounded pagination; `GET /api/v1/lab/runs/{run_id}` retrieves one run. Stored run records are checked against a canonical digest covering all persisted response fields except the digest itself.
+- `GET /api/v1/lab/runs` lists stored runs with bounded pagination; `GET /api/v1/lab/runs/{run_id}` retrieves one run. Stored run records are checked against a canonical digest covering all persisted response fields except the digest itself. Each successful run is atomically stored with a JSON result artifact and provenance metadata.
 - Allowed operations are `symbolic`, `integrate`, `root`, `statistics`, and `unit_convert`.
 - Every step is validated using the same Pydantic contracts as the existing math endpoints.
 - Duplicate step IDs, unknown operations, extra fields in typed math requests, non-finite JSON values, oversized step inputs, and oversized run configurations are rejected.
@@ -41,11 +41,11 @@ The configuration and result hashes support integrity comparison; the result dig
 
 ## Current limitations — do not treat Phase 6 as complete
 
-- Run records are persisted in SQLite; binary artifact blob storage and artifact lifecycle management are **not yet implemented**.
+- Canonical JSON run-result artifacts are persisted as SQLite BLOBs with SHA-256 verification and provenance links to the run, configuration digest, result digest, optional plan ID, and step IDs. General binary scientific attachments, retention/deletion policy, export packages, and artifact lifecycle management remain unimplemented.
 - Duration is measured, but no hard process-level wall-clock timeout or OS-level CPU/memory quota is enforced.
 - This is not an operating-system sandbox. The endpoint must remain on trusted local infrastructure; the application currently has no authentication.
 - A seed is recorded as metadata only; these deterministic math operations do not currently consume it.
-- Artifact storage, environment/dependency manifests, replay across versions, interruption recovery, and durable audit linkage remain future acceptance work.
+- Environment/dependency manifests, replay across versions, interruption recovery, and cross-system durable audit linkage remain future acceptance work.
 - The lab currently stops at the first failed step and does not support arbitrary dependency graphs or parallel execution.
 
 ## Acceptance criteria for full Phase 6
@@ -58,7 +58,7 @@ The configuration and result hashes support integrity comparison; the result dig
 - [x] API and adversarial-input tests added.
 - [ ] CI passes on the final Phase 6 head (must be checked from a fresh GitHub Actions run).
 - [x] Durable SQLite run storage, bounded listing/retrieval, and full-record integrity checks.
-- [ ] Durable artifact blob storage and full provenance linkage to experiment plans/records.
+- [x] Durable JSON result artifacts with byte-digest verification and run/plan/step provenance metadata.\n- [ ] General binary artifact support, lifecycle policy, and complete provenance linkage to experiment plans/records.
 - [ ] Enforced timeout and process/resource isolation tests.
 - [ ] Reproducible environment manifest and rerun/verification workflow.
 - [ ] Security review of the execution boundary before enabling generated code or untrusted users.
