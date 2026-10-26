@@ -25,7 +25,6 @@ from artificial_scientist.math_tools.models import (
     DimensionCheckResponse,
     NumericIntegrationRequest,
     NumericIntegrationResponse,
-    NumericRequest,
     RootRequest,
     RootResponse,
     StatisticsRequest,
@@ -232,9 +231,13 @@ def _parse_symbolic(expression: str, allowed_names: set[str]) -> sp.Expr:
             return operation(build(node.left), build(node.right))
         if isinstance(node, ast.Call):
             if not isinstance(node.func, ast.Name) or node.func.id not in SAFE_FUNCTIONS:
-                raise MathToolError("Only allowlisted single-variable math functions are supported.")
+                raise MathToolError(
+                    "Only allowlisted single-variable math functions are supported."
+                )
             if node.keywords or len(node.args) != 1:
-                raise MathToolError("Math functions require exactly one positional argument.")
+                raise MathToolError(
+                    "Math functions require exactly one positional argument."
+                )
             return SAFE_FUNCTIONS[node.func.id](build(node.args[0]))
         raise MathToolError(f"Expression component '{type(node).__name__}' is not supported.")
 
@@ -606,7 +609,9 @@ def check_dimensions(request: DimensionCheckRequest) -> DimensionCheckResponse:
     try:
         tree = _parse_tree(request.expression)
         if any(isinstance(node, ast.Call) for node in ast.walk(tree)):
-            raise MathToolError("Unit expressions allow arithmetic only; function calls are not supported.")
+            raise MathToolError(
+                "Unit expressions allow arithmetic only; function calls are not supported."
+            )
         result = _evaluate_quantity_ast(tree, bindings)
     except DimensionalityError:
         return DimensionCheckResponse(
