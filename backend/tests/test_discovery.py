@@ -352,3 +352,15 @@ def test_prior_work_screen_uses_metadata_search_without_persisting() -> None:
         assert all(item.limit == 5 for item in fake_service.requests)
     finally:
         app.dependency_overrides.pop(get_literature_service, None)
+
+
+
+def test_discovery_request_body_is_bounded_before_json_parsing() -> None:
+    client = TestClient(app)
+    response = client.post(
+        "/api/v1/discovery/decompose",
+        content=b" " * (1024 * 1024 + 1),
+        headers={"content-type": "application/json"},
+    )
+    assert response.status_code == 413
+    assert response.json()["detail"] == "Request body exceeds the endpoint size limit."
