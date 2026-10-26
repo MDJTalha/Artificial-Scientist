@@ -11,7 +11,7 @@ The first lab API is a declarative runner over existing allowlisted math tools. 
 - `GET /api/v1/lab/runs` lists stored runs with bounded pagination; `GET /api/v1/lab/runs/{run_id}` retrieves one run. `GET /api/v1/lab/runs/{run_id}/artifacts` lists artifact metadata, and `GET /api/v1/lab/artifacts/{artifact_id}` retrieves an artifact after digest and provenance checks. Stored run records are checked against a canonical digest covering all persisted response fields except the digest itself. Each successful run is atomically stored with a JSON result artifact and provenance metadata.
 - Allowed operations are `symbolic`, `integrate`, `root`, `statistics`, and `unit_convert`.
 - Every step is validated using the same Pydantic contracts as the existing math endpoints.
-- Duplicate step IDs, unknown operations, extra fields in typed math requests, non-finite JSON values, oversized step inputs, and oversized run configurations are rejected.
+- Duplicate step IDs, unknown operations, extra fields in typed math requests, non-finite JSON values, oversized step inputs, and oversized run configurations are rejected. An ASGI middleware also rejects lab-run request bodies over 64 KiB with HTTP 413 before JSON parsing, including requests without a trustworthy `Content-Length` header.
 - A failed step stops subsequent work; later steps are explicitly marked skipped.
 - Each response contains a run ID, UTC timestamps, per-step duration/status, bounded diagnostic logs, SHA-256 hashes of canonicalized configuration and the complete run record, and optional plan/seed metadata.
 - The runner does not expose filesystem, network, shell, import, or arbitrary-code capabilities to expressions.
@@ -53,7 +53,7 @@ The configuration and result hashes support integrity comparison; the result dig
 
 - [x] Strict declarative input schema and finite configuration size.
 - [x] Explicit allowlist of supported operation types; no arbitrary code execution.
-- [x] Bounded step count and bounded step input size.
+- [x] Bounded step count, bounded step input size, and an ASGI-level 64 KiB request-body cap with oversized-body regression test.
 - [x] Per-step status, logs, duration measurement, and configuration/result SHA-256 digests.
 - [x] Fail-fast behavior with later steps marked skipped.
 - [x] API and adversarial-input tests added.
