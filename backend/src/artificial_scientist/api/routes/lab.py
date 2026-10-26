@@ -536,13 +536,15 @@ async def upload_lab_binary_artifact(
 
     content_length = request.headers.get("content-length")
     if content_length is not None:
-        try:
-            if int(content_length) > _MAX_BINARY_ARTIFACT_BYTES:
-                raise HTTPException(
-                    status_code=413, detail="Binary artifact exceeds the 10 MiB limit."
-                )
-        except ValueError as error:
-            raise HTTPException(status_code=400, detail="Invalid Content-Length header.") from error
+        # HTTP Content-Length is a non-negative decimal byte count. Reject signs,
+        # whitespace, Unicode digits, and other non-canonical forms instead of
+        # trusting Python's more permissive int() parser.
+        if not content_length.isascii() or not content_length.isdecimal():
+            raise HTTPException(status_code=400, detail="Invalid Content-Length header.")
+        if int(content_length) > _MAX_BINARY_ARTIFACT_BYTES:
+            raise HTTPException(
+                status_code=413, detail="Binary artifact exceeds the 10 MiB limit."
+            )
     chunks: list[bytes] = []
     total = 0
     async for chunk in request.stream():
