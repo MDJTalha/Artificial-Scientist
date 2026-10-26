@@ -2,11 +2,13 @@
 
 import json
 import sqlite3
+from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
+from artificial_scientist.api.routes import lab as lab_routes
 from artificial_scientist.api.routes.lab import get_lab_store
 from artificial_scientist.lab.engine import run_lab
 from artificial_scientist.lab.execution import LabExecutionTimeout, run_isolated
@@ -420,3 +422,37 @@ def test_retention_purge_requires_timezone_and_bounded_limit(tmp_path) -> None:
         store.purge_runs_before("2021-01-01T00:00:00")
     with pytest.raises(ValueError, match="between 1 and 100"):
         store.purge_runs_before("2021-01-01T00:00:00+00:00", limit=101)
+
+
+
+def test_lab_api_requires_constant_time_key_outside_development(monkeypatch, tmp_path) -> None:
+    monkeypatch.setattr(
+        lab_routes,
+        "get_settings",
+        lambda: SimpleNamespace(environment="production", lab_api_key="test-secret"),
+    )
+    store = LabRunStore(str(tmp_path / "authenticated-lab.sqlite3"))
+    app.dependency_overrides[get_lab_store] = lambda: store
+    client = TestClient(app)
+    try:
+        assert client.get("/api/v1/lab/runs").status_code == 401
+        assert client.get(
+            "/api/v1/lab/runs", headers={"X-Lab-API-Key": "wrong"}
+        ).status_code == 401
+        accepted = client.get(
+            "/api/v1/lab/runs", headers={"X-Lab-API-Key": "test-secret"}
+        )
+        assert accepted.status_code == 200
+    finally:
+        app.dependency_overrides.pop(get_lab_store, None)
+
+
+def test_lab_api_fails_closed_when_production_key_is_missing(monkeypatch) -> None:
+    monkeypatch.setattr(
+        lab_routes,
+        "get_settings",
+        lambda: SimpleNamespace(environment="production", lab_api_key=None),
+    )
+    response = TestClient(app).get("/api/v1/lab/runs")
+    assert response.status_code == 503
+    assert response.json()["detail"] == "Lab API authentication is not configured."
