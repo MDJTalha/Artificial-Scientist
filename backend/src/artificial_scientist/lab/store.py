@@ -361,6 +361,8 @@ class LabRunStore:
         }
         with closing(self._connect()) as connection:
             with connection:
+                # Serialize tenant budget check + run/artifact writes.
+                connection.execute("BEGIN IMMEDIATE")
                 if tenant_id is not None:
                     tenant_usage = connection.execute(
                         """
