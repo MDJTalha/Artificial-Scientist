@@ -38,6 +38,10 @@ def _slow_lab_worker() -> dict[str, object]:
     return {"completed": True}
 
 
+def _multiline_error_lab_worker() -> dict[str, object]:
+    raise ValueError("line one\\nline two")
+
+
 def test_lab_executes_allowlisted_steps_and_returns_trace_hashes() -> None:
     request = LabRunRequest(
         title="Reference derivative",
@@ -440,6 +444,16 @@ def test_isolated_lab_worker_rejects_invalid_deadlines(timeout_seconds: float) -
 
     with pytest.raises(LabExecutionError, match="finite positive number"):
         run_isolated(_slow_lab_worker, (), timeout_seconds=timeout_seconds)
+
+
+def test_isolated_worker_normalizes_multiline_error_messages() -> None:
+    from artificial_scientist.lab.execution import LabExecutionError
+
+    with pytest.raises(LabExecutionError) as error:
+        run_isolated(_multiline_error_lab_worker, (), timeout_seconds=2)
+
+    assert "line one line two" in str(error.value)
+    assert "\\n" not in str(error.value)
 
 
 def test_isolated_lab_worker_respects_deadline() -> None:
