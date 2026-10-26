@@ -155,6 +155,28 @@ class RootRequest(NumericRequest):
         return self
 
 
+class PlotRequest(NumericRequest):
+    """A bounded one-dimensional scalar function plot; no user code is evaluated."""
+
+    lower: float
+    upper: float
+    points: int = Field(default=400, ge=50, le=1000)
+    title: str = Field(default="Mathematical function", max_length=120)
+    x_label: str = Field(default="x", max_length=80)
+    y_label: str = Field(default="f(x)", max_length=80)
+
+    @field_validator("lower", "upper")
+    @classmethod
+    def validate_plot_bounds(cls, value: float) -> float:
+        return _finite_number(value)
+
+    @model_validator(mode="after")
+    def ordered_plot_bounds(self) -> PlotRequest:
+        if self.lower >= self.upper:
+            raise ValueError("lower must be less than upper")
+        return self
+
+
 class RootResponse(BaseModel):
     root: float
     function_value: float
