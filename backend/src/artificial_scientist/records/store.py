@@ -602,7 +602,7 @@ class RecordStore:
         ]
         envelopes: list[RecordEnvelope] = []
         try:
-            with self._connect() as connection:
+            with closing(self._connect()) as connection:
                 connection.execute("BEGIN IMMEDIATE")
                 for record, payload_json, created_at in prepared:
                     record_id = str(record.id)
