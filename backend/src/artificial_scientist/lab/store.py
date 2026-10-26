@@ -230,6 +230,7 @@ class LabRunStore:
                             SELECT attempts.run_id
                             FROM lab_execution_attempts AS attempts
                             WHERE attempts.tenant_id = ?
+                              AND attempts.status = 'running'
                               AND NOT EXISTS (
                                   SELECT 1 FROM lab_run_retention_events AS retention
                                   WHERE retention.run_id = attempts.run_id
