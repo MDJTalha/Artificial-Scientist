@@ -5,9 +5,9 @@ from types import SimpleNamespace
 from fastapi.testclient import TestClient
 
 from artificial_scientist.api.routes import lab as lab_routes
-from artificial_scientist.authorization import TenantDirectory, stable_principal_id
-from artificial_scientist.identity import AuthenticatedPrincipal
 from artificial_scientist.api.routes.lab import get_lab_store
+from artificial_scientist.authorization import TenantDirectory
+from artificial_scientist.identity import AuthenticatedPrincipal
 from artificial_scientist.lab.store import LabRunStore
 from artificial_scientist.main import app
 
