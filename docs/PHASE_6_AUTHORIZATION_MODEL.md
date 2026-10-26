@@ -36,7 +36,7 @@ The current lab router uses a single shared `X-Lab-API-Key` outside development.
 - [x] Add a tenant-wide lab-run count cap with a serialized reservation transaction and regression coverage.
 - [x] Add transactionally enforced per-tenant JSON artifact count and byte budgets with regression tests.
 - [x] Add concurrency stress tests for binary uploads and run creation; CI passes on the current working branch.
-- [x] Persist tenant-scoped lab request outcomes (allowed, denied, failed) with principal, tenant, action, object target, correlation ID, route, method, and HTTP status; audit metadata excludes credentials and request payloads. Audit persistence failure blocks the response.
+- [x] Persist tenant-scoped lab request outcomes (allowed, denied, failed) with principal, tenant, action, object target, correlation ID, route, method, and HTTP status; audit metadata excludes credentials and request payloads. Authentication failures occurring before tenant resolution are recorded as anonymous request events. Audit persistence failure blocks the response.
 - [ ] Complete negative cross-tenant tests across every object endpoint, including UUID substitution for export, verification, execution status, uploads, and downloads. Current coverage includes store-level run/artifact/binary isolation, execution status, and API-level denial for read/export/verification/download paths; a regression test now checks that cross-tenant binary uploads are rejected before scanning.
 - [ ] Verify behavior in CI and conduct an independent security review before exposing untrusted or multi-tenant traffic.
 
