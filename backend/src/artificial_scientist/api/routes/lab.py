@@ -42,9 +42,9 @@ from artificial_scientist.lab.store import (
 
 
 def require_lab_access(
+    request: Request,
     x_lab_api_key: str | None = Header(default=None),
     authorization: str | None = Header(default=None),
-    request: Request = None,
 ) -> None:
     """Require configured OIDC identity or the legacy deployment-level API key."""
     settings = get_settings()
