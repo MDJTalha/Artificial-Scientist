@@ -1110,3 +1110,30 @@ def test_clamav_scanner_rejects_detected_malware(monkeypatch) -> None:
     )
     with pytest.raises(lab_scanning.MalwareDetected):
         lab_scanning.scan_binary_content(b"test sample", environment="production")
+
+
+def test_clamav_scanner_rejects_invalid_utf8_response(monkeypatch) -> None:
+    class InvalidEncodingConnection:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def settimeout(self, _timeout):
+            return None
+
+        def sendall(self, _data):
+            return None
+
+        def recv(self, _size):
+            return b"stream: \\xff OK\\0"
+
+    monkeypatch.setenv("ARTIFICIAL_SCIENTIST_CLAMAV_HOST", "scanner.internal")
+    monkeypatch.setattr(
+        lab_scanning.socket,
+        "create_connection",
+        lambda *_args, **_kwargs: InvalidEncodingConnection(),
+    )
+    with pytest.raises(lab_scanning.ScannerUnavailable, match="invalid response"):
+        lab_scanning.scan_binary_content(b"test sample", environment="production")
