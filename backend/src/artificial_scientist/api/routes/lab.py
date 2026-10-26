@@ -1,7 +1,7 @@
 """API endpoints for the controlled computational laboratory."""
 
-from functools import lru_cache
 import hmac
+from functools import lru_cache
 from typing import Annotated
 from uuid import UUID
 
