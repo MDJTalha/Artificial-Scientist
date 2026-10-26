@@ -10,7 +10,13 @@ from fastapi.testclient import TestClient
 from artificial_scientist.api.routes.records import get_record_store
 from artificial_scientist.main import app
 from artificial_scientist.records.models import ResearchTaskRecord
-from artificial_scientist.records.store import RecordIntegrityError, RecordStore
+from artificial_scientist.records.store import (
+    RecordIntegrityError,
+    RecordNotFound,
+    RecordStore,
+    RecordStoreError,
+    UnsupportedDatabaseVersion,
+)
 
 
 @pytest.fixture
@@ -261,3 +267,82 @@ def test_database_triggers_reject_direct_mutation(store: RecordStore) -> None:
             connection.execute(
                 "DELETE FROM research_records WHERE id = ?", (str(created.id),)
             )
+
+
+def test_record_schema_rejects_unrecognized_fields(client: TestClient) -> None:
+    response = client.post(
+        "/api/v1/records",
+        json={
+            "record_type": "research_task",
+            "title": "Reject unknown fields",
+            "research_question": "Does strict validation reject an unrecognized field?",
+            "objective": "Prevent silently accepted schema drift.",
+            "claimed_verified": True,
+        },
+    )
+    assert response.status_code == 422
+
+
+def test_future_database_schema_is_rejected(tmp_path) -> None:
+    database_path = tmp_path / "future-schema.sqlite3"
+    RecordStore(database_path)
+    with sqlite3.connect(database_path) as connection:
+        connection.execute("PRAGMA user_version = 99")
+
+    with pytest.raises(UnsupportedDatabaseVersion, match="newer than supported"):
+        RecordStore(database_path)
+
+
+def test_audit_events_are_append_only(store: RecordStore) -> None:
+    store.create(
+        ResearchTaskRecord(
+            title="Audit immutability",
+            research_question="Can an audit event be overwritten or deleted?",
+            objective="Verify append-only audit protections.",
+        )
+    )
+    with sqlite3.connect(store.path) as connection:
+        event = connection.execute(
+            "SELECT event_id FROM audit_events LIMIT 1"
+        ).fetchone()
+        assert event is not None
+        with pytest.raises(sqlite3.IntegrityError, match="append-only"):
+            connection.execute(
+                "UPDATE audit_events SET action = action WHERE event_id = ?",
+                (event[0],),
+            )
+        with pytest.raises(sqlite3.IntegrityError, match="append-only"):
+            connection.execute(
+                "DELETE FROM audit_events WHERE event_id = ?", (event[0],)
+            )
+
+
+def test_record_and_audit_writes_roll_back_together(store: RecordStore) -> None:
+    with sqlite3.connect(store.path) as connection:
+        connection.execute(
+            """
+            CREATE TRIGGER reject_test_audit_event
+            BEFORE INSERT ON audit_events
+            BEGIN
+                SELECT RAISE(ABORT, 'injected audit-write failure');
+            END
+            """
+        )
+
+    record = ResearchTaskRecord(
+        title="Atomic creation",
+        research_question="Does a failed audit write also roll back the record?",
+        objective="Ensure record and audit events commit in one transaction.",
+    )
+    with pytest.raises(RecordStoreError, match="persist the record"):
+        store.create(record)
+
+    with pytest.raises(RecordNotFound):
+        store.get(record.id)
+
+    records, record_count = store.list_records()
+    audit_events, event_count = store.list_audit_events()
+    assert records == []
+    assert audit_events == []
+    assert record_count == 0
+    assert event_count == 0
