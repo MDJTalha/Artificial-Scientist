@@ -451,6 +451,18 @@ async def upload_lab_binary_artifact(
 ) -> dict[str, object]:
     """Upload a bounded binary attachment using the request body as its bytes."""
     tenant_id = require_tenant_access(request, "artifact:upload")
+    # Check run ownership before consuming or scanning an attacker-controlled body.
+    # Otherwise a tenant could make the service spend upload/scanner resources against
+    # another tenant's run even though persistence eventually rejects the attachment.
+    try:
+        store.get(run_id, tenant_id=tenant_id)
+    except LabRunNotFound as error:
+        raise HTTPException(status_code=404, detail="Lab run not found.") from error
+    except RuntimeError as error:
+        raise HTTPException(
+            status_code=500, detail="Stored lab data failed integrity validation."
+        ) from error
+
     content_length = request.headers.get("content-length")
     if content_length is not None:
         try:
