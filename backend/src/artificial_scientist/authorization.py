@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 import sqlite3
 from contextlib import closing
@@ -15,7 +16,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
-from uuid import NAMESPACE_URL, uuid5
+from uuid import NAMESPACE_URL, uuid4, uuid5
 
 _SUBJECT_MAX = 255
 _TENANT_NAME_MAX = 120
@@ -232,14 +233,44 @@ class TenantDirectory:
         if not re.fullmatch(r"[a-z][a-z0-9_-]{0,39}", target_type):
             raise ValueError("Audit target type must be a bounded identifier.")
         safe_metadata = metadata or {}
-        encoded = json.dumps(safe_metadata, sort_keys=True, separators=(",", ":"), allow_nan=False)
+        if not isinstance(safe_metadata, dict):
+            raise ValueError("Audit metadata must be a JSON object.")
+        forbidden_key_fragments = (
+            "password", "secret", "token", "authorization", "credential",
+            "cookie", "payload", "request_body", "content",
+        )
+
+        def validate_metadata(value: Any, depth: int = 0) -> None:
+            if depth > 5:
+                raise ValueError("Audit metadata nesting exceeds five levels.")
+            if isinstance(value, dict):
+                for key, item in value.items():
+                    if not isinstance(key, str) or len(key) > 80:
+                        raise ValueError("Audit metadata keys must be bounded strings.")
+                    normalized_key = key.lower().replace("-", "_")
+                    if any(fragment in normalized_key for fragment in forbidden_key_fragments):
+                        raise ValueError("Audit metadata must not contain credentials or payloads.")
+                    validate_metadata(item, depth + 1)
+            elif isinstance(value, list):
+                if len(value) > 100:
+                    raise ValueError("Audit metadata lists are limited to 100 items.")
+                for item in value:
+                    validate_metadata(item, depth + 1)
+            elif value is None or isinstance(value, (str, int, float, bool)):
+                if isinstance(value, str) and len(value) > 1000:
+                    raise ValueError("Audit metadata strings are limited to 1000 characters.")
+                if isinstance(value, float) and not math.isfinite(value):
+                    raise ValueError("Audit metadata numbers must be finite.")
+            else:
+                raise ValueError("Audit metadata must contain only JSON-compatible values.")
+
+        validate_metadata(safe_metadata)
+        encoded = json.dumps(
+            safe_metadata, sort_keys=True, separators=(",", ":"), allow_nan=False
+        )
         if len(encoded.encode("utf-8")) > 4096:
             raise ValueError("Audit metadata exceeds 4 KiB.")
-        event_material = (
-            f"asds:audit:{datetime.now(UTC).isoformat()}:"
-            f"{principal_id}:{action}:{target_id}"
-        )
-        event_id = str(uuid5(NAMESPACE_URL, event_material))
+        event_id = str(uuid4())
         with closing(self._connect()) as connection:
             with connection:
                 connection.execute(
