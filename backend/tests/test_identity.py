@@ -177,3 +177,34 @@ def test_oidc_validator_rejects_invalid_identity_claim_shapes(monkeypatch, claim
             audience="scientific-api",
             jwks_url="https://identity.example.test/jwks.json",
         )
+
+@pytest.mark.parametrize(
+    "jwks_url",
+    [
+        "https://",
+        "https://user:password@identity.example.test/jwks.json",
+        "https://identity.example.test/jwks.json#fragment",
+        "https://identity.example.test:invalid/jwks.json",
+        "https://identity.example.test:65536/jwks.json",
+        "https://identity.example.test /jwks.json",
+    ],
+)
+def test_oidc_validator_rejects_malformed_or_unsafe_jwks_urls(jwks_url):
+    with pytest.raises(identity.IdentityConfigurationError, match="JWKS URL"):
+        identity.validate_oidc_bearer_token(
+            "token",
+            issuer="https://identity.example.test/",
+            audience="scientific-api",
+            jwks_url=jwks_url,
+        )
+
+
+@pytest.mark.parametrize(("issuer", "audience"), [("   ", "scientific-api"), ("https://identity.example.test/", "  ")])
+def test_oidc_validator_rejects_blank_trust_values(issuer, audience):
+    with pytest.raises(identity.IdentityConfigurationError, match="must all be configured"):
+        identity.validate_oidc_bearer_token(
+            "token",
+            issuer=issuer,
+            audience=audience,
+            jwks_url="https://identity.example.test/jwks.json",
+        )
