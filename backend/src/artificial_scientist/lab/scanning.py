@@ -57,9 +57,14 @@ def scan_binary_content(content: bytes, *, environment: str) -> str:
     except OSError as error:
         raise ScannerUnavailable("Malware scanner is unavailable.") from error
 
-    result = bytes(response).decode("utf-8", errors="replace").strip().rstrip("\0")
-    if result.endswith("OK"):
+    raw_response = bytes(response)
+    # A complete NUL-terminated response is required; a truncated response that
+    # happens to end in "OK" must never be treated as a successful scan.
+    if not raw_response.endswith(b"\0"):
+        raise ScannerUnavailable("Malware scanner returned an incomplete response.")
+    result = raw_response[:-1].decode("utf-8", errors="strict").strip()
+    if result.endswith(": OK"):
         return "clean"
-    if " FOUND" in result:
+    if result.endswith(" FOUND"):
         raise MalwareDetected("Uploaded attachment was rejected by malware scanning.")
     raise ScannerUnavailable("Malware scanner returned an invalid response.")
