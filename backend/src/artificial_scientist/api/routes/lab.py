@@ -164,6 +164,36 @@ def require_tenant_access(request: Request, action: str) -> str | None:
             detail="Authenticated tenant membership is required.",
         )
     principal_id = stable_principal_id(principal.issuer, principal.subject)
+    correlation_id = request.headers.get("x-correlation-id", "").strip()
+    if not correlation_id or len(correlation_id) > 128:
+        correlation_id = str(uuid4())
+
+    # Tenant IDs are generated UUIDs. Reject malformed or unbounded selectors before
+    # opening the directory or writing an audit row containing attacker-controlled data.
+    # The rejection itself is still audited, but as an unscoped request with no tenant ID.
+    try:
+        parsed_tenant_id = UUID(tenant_id)
+        valid_tenant_id = str(parsed_tenant_id) == tenant_id.lower()
+    except (ValueError, AttributeError):
+        valid_tenant_id = False
+    if not valid_tenant_id:
+        request.state.authorization_audit = {
+            "principal_id": principal_id,
+            "tenant_id": None,
+            "database_path": settings.database_path,
+            "action": action,
+            "target_type": "request",
+            "target_id": None,
+            "correlation_id": correlation_id,
+            "method": request.method,
+            "route": request.url.path,
+        }
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Requested tenant resource is not available.",
+        )
+
+    tenant_id = str(parsed_tenant_id)
     directory = TenantDirectory(settings.database_path)
     path_params = request.path_params
     target_id = next(
@@ -183,9 +213,6 @@ def require_tenant_access(request: Request, action: str) -> str | None:
         if path_params.get("run_id") is not None
         else "tenant"
     )
-    correlation_id = request.headers.get("x-correlation-id", "").strip()
-    if not correlation_id or len(correlation_id) > 128:
-        correlation_id = str(uuid4())
     request.state.authorization_audit = {
         "principal_id": principal_id,
         "tenant_id": tenant_id,
