@@ -187,7 +187,8 @@ def test_tenant_ownership_schema_migrates_legacy_records_without_assignment(tmp_
                 request_json TEXT NOT NULL
             );
             INSERT INTO lab_runs VALUES (
-                'legacy-run', 'completed', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+                'legacy-run', 'completed',
+                'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
                 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
                 '2026-01-01T00:00:00+00:00', '{}'
             );
