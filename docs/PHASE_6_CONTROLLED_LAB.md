@@ -73,7 +73,7 @@ The entry point does not create a background thread or automatically schedule it
 - [x] Durable SQLite run storage, bounded listing/retrieval, and full-record integrity checks.
 - [x] Durable JSON result artifacts with byte-digest verification and run/plan/step provenance metadata.
 - [x] ZIP export package containing the run record, verified result artifacts, and a SHA-256 manifest, with regression coverage. The manifest is not digitally signed.
-- [x] General binary artifact upload/download and digest/provenance checks, with a 10 MiB limit and regression coverage. Cross-system plan/record linkage, object-store support, per-user/tenant quotas, and content scanning remain outstanding. Retention redacts stored execution request payloads while preserving digest-backed attempt metadata.
+- [x] General binary artifact upload/download and digest/provenance checks, with a 10 MiB limit and regression coverage. Per-run quotas are enforced (100 attachments / 50 MiB). Optional ClamAV TCP INSTREAM scanning is integrated; non-development uploads fail closed unless a scanner is configured and reports clean. Production still requires an operated ClamAV service and deployment verification. Cross-system plan/record linkage, object-store support, and per-user/tenant quotas remain outstanding. Retention redacts stored execution request payloads while preserving digest-backed attempt metadata.
 - [x] Opt-in retention job entry point with bounded batches, validation, tombstone preservation, and regression tests.
 - [ ] Deployment scheduler configuration and operational verification of retention against the target database.
 - [x] Enforced per-step wall-clock timeout, termination-to-kill escalation, and regression tests for timeout handling and cleanup escalation.
@@ -84,3 +84,10 @@ The entry point does not create a background thread or automatically schedule it
 - [ ] Security review of the execution boundary before enabling generated code or untrusted users.
 
 Phase 6 remains in progress until all required security, durability, reproducibility, and CI gates are evidenced. No arbitrary generated code should be enabled before a separately reviewed isolation boundary exists.
+
+
+## Binary attachment malware scanning
+
+The upload API uses ClamAV's TCP INSTREAM protocol when `ARTIFICIAL_SCIENTIST_CLAMAV_HOST` is configured. Optional settings are `ARTIFICIAL_SCIENTIST_CLAMAV_PORT` (default `3310`) and `ARTIFICIAL_SCIENTIST_CLAMAV_TIMEOUT_SECONDS` (default `5`, allowed range 0.1–30 seconds). A clean result is required before storing an attachment. An infection returns HTTP 422; a missing or unhealthy scanner returns HTTP 503 and the attachment is not stored. In development only, if no scanner host is configured, uploads are allowed with response field `scan_status: skipped_development`; configured scanners are still used in development.
+
+Deployments must run and maintain a supported ClamAV service, restrict access to its TCP endpoint, keep signatures updated, and verify the production configuration. The integration does not replace file-format validation, per-tenant quotas, object-store isolation, or security review.
