@@ -209,7 +209,13 @@ class LabRunStore:
                 "SELECT * FROM lab_artifacts WHERE run_id = ? ORDER BY created_at, artifact_id",
                 (str(run_id),),
             ).fetchall()
-        return [self._artifact_metadata(row) for row in rows]
+        artifacts: list[LabArtifactMetadata] = []
+        for row in rows:
+            artifact = self.get_artifact(UUID(row["artifact_id"]))
+            artifacts.append(
+                LabArtifactMetadata.model_validate(artifact.model_dump(exclude={"content"}))
+            )
+        return artifacts
 
     def get_artifact(self, artifact_id: UUID) -> LabArtifactResponse:
         with closing(self._connect()) as connection:
