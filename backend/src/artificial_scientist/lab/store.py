@@ -241,12 +241,19 @@ class LabRunStore:
                 purged: list[str] = []
                 for row in rows:
                     run_id = row["run_id"]
-                    artifact_count = int(
+                    json_artifact_count = int(
                         connection.execute(
                             "SELECT COUNT(*) FROM lab_artifacts WHERE run_id = ?",
                             (run_id,),
                         ).fetchone()[0]
                     )
+                    binary_artifact_count = int(
+                        connection.execute(
+                            "SELECT COUNT(*) FROM lab_binary_artifacts WHERE run_id = ?",
+                            (run_id,),
+                        ).fetchone()[0]
+                    )
+                    artifact_count = json_artifact_count + binary_artifact_count
                     connection.execute(
                         """
                         INSERT INTO lab_run_retention_events (
