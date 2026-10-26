@@ -1,7 +1,10 @@
 """FastAPI application entry point."""
 
+from collections.abc import Awaitable, Callable
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from artificial_scientist.api.routes.health import router as health_router
 from artificial_scientist.api.routes.knowledge import router as knowledge_router
@@ -12,6 +15,87 @@ from artificial_scientist.api.routes.records import router as records_router
 from artificial_scientist.config import get_settings
 
 settings = get_settings()
+LAB_RUN_BODY_LIMIT_BYTES = 64 * 1024
+
+
+class LabRequestBodyLimitMiddleware:
+    """Bound lab-run request bodies before JSON parsing and model validation."""
+
+    def __init__(self, app: ASGIApp, max_body_bytes: int = LAB_RUN_BODY_LIMIT_BYTES) -> None:
+        self.app = app
+        self.max_body_bytes = max_body_bytes
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        is_lab_run_post = (
+            scope["type"] == "http"
+            and scope.get("method") == "POST"
+            and scope.get("path") == "/api/v1/lab/runs"
+        )
+        if not is_lab_run_post:
+            await self.app(scope, receive, send)
+            return
+
+        headers = {
+            key.lower(): value
+            for key, value in scope.get("headers", [])
+        }
+        content_length = headers.get(b"content-length")
+        if content_length is not None:
+            try:
+                declared_length = int(content_length)
+            except ValueError:
+                await self._too_large(send)
+                return
+            if declared_length < 0 or declared_length > self.max_body_bytes:
+                await self._too_large(send)
+                return
+
+        body_chunks: list[bytes] = []
+        body_size = 0
+        more_body = True
+        while more_body:
+            message = await receive()
+            if message["type"] == "http.disconnect":
+                return
+            chunk = message.get("body", b"")
+            body_size += len(chunk)
+            if body_size > self.max_body_bytes:
+                await self._too_large(send)
+                return
+            body_chunks.append(chunk)
+            more_body = message.get("more_body", False)
+
+        chunk_index = 0
+
+        async def replay_body() -> Message:
+            nonlocal chunk_index
+            if chunk_index < len(body_chunks):
+                chunk = body_chunks[chunk_index]
+                chunk_index += 1
+                return {
+                    "type": "http.request",
+                    "body": chunk,
+                    "more_body": chunk_index < len(body_chunks),
+                }
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+        await self.app(scope, replay_body, send)
+
+    @staticmethod
+    async def _too_large(send: Send) -> None:
+        body = b'{"detail":"Lab run request body exceeds the 65536-byte limit."}'
+        await send(
+            {
+                "type": "http.response.start",
+                "status": 413,
+                "headers": [
+                    (b"content-type", b"application/json"),
+                    (b"content-length", str(len(body)).encode("ascii")),
+                ],
+            }
+        )
+        await send({"type": "http.response.body", "body": body})
+
 
 app = FastAPI(
     title=settings.app_name,
@@ -21,6 +105,7 @@ app = FastAPI(
         "autonomous discovery capabilities are not implemented yet."
     ),
 )
+app.add_middleware(LabRequestBodyLimitMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
