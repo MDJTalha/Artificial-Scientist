@@ -75,7 +75,7 @@ def test_audit_rejects_oversized_metadata_and_invalid_outcome(tmp_path):
             target_id="run-1",
             outcome="success",
         )
-    with pytest.raises(ValueError, match="4 KiB"):
+    with pytest.raises(ValueError, match="1000 characters"):
         directory.audit(
             principal_id=None,
             tenant_id=None,
