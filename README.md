@@ -8,11 +8,11 @@ This is **not a commercial SaaS product**. Its guiding objective is to contribut
 
 ## Current status
 
-**Phase 0–2 foundations have passing CI. Phase 3 — Scholarly Literature Retrieval is implemented with passing CI checks and is available as draft Pull Request #3 for review.**
+**Phases 0–3 have recorded passing CI checks. Phase 4 — Scientific Knowledge Graph & Vocabulary is being implemented on `phase-4-knowledge-graph`; its acceptance is pending the current CI run. All phase pull requests remain unmerged by design.**
 
 The foundation includes a FastAPI backend, health/readiness endpoints, a React + TypeScript overview dashboard that checks the actual local API, typed research records, SQLite provenance storage, and GitHub Actions verification.
 
-Phase 3 adds OpenAlex and Crossref metadata search adapters, source normalization, DOI-based deduplication, and optional persistent source records. The Phase 3 CI run passed 33 backend tests on Python 3.12, 33 on Python 3.13, and all 6 frontend tests, type-checks, and production build. Full-text ingestion, claim verification, autonomous hypothesis generation, scientific computation, and agent orchestration **are not implemented yet**. Planned capabilities are not presented as active features.
+Phase 3 adds OpenAlex and Crossref metadata search adapters, source normalization, DOI-based deduplication, and optional persistent source records. Phase 4 adds typed scientific concepts, a controlled vocabulary, evidence-linked relationship assertions, server-side concept search, and bounded graph-neighborhood traversal. Latest Phase 4 CI has not yet been reviewed. Full-text ingestion, claim verification, autonomous hypothesis generation, scientific computation, and agent orchestration **are not implemented yet**. Planned capabilities are not presented as active features.
 
 ## Scientific principles
 
@@ -123,6 +123,7 @@ Passing these checks verifies the current application foundation only; it does n
 - [docs/PHASE_2_RECORDS.md](docs/PHASE_2_RECORDS.md) — Phase 2 record schema, persistence, API examples, verified CI results, and limitations
 - [backend/README.md](backend/README.md) — backend setup and endpoint reference
 - [docs/PHASE_3_LITERATURE.md](docs/PHASE_3_LITERATURE.md) — scholarly search API, provenance, rate limits, and acceptance criteria
+- [docs/PHASE_4_KNOWLEDGE_GRAPH.md](docs/PHASE_4_KNOWLEDGE_GRAPH.md) — concept schemas, controlled relations, graph API, and acceptance criteria
 
 ## Development approach
 
