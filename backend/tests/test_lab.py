@@ -979,7 +979,8 @@ def test_interrupted_execution_attempts_are_recovered_and_auditable(tmp_path) ->
         connection.execute(
             """
             UPDATE lab_execution_attempts
-            SET status = 'running', finished_at = NULL, result_sha256 = NULL
+            SET status = 'running', updated_at = '2020-01-01T00:00:00+00:00',
+                finished_at = NULL, result_sha256 = NULL
             WHERE run_id = ?
             """,
             (str(completed_id),),
