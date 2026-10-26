@@ -63,12 +63,34 @@ class LabRunStore:
                     configuration_sha256 TEXT NOT NULL CHECK (length(configuration_sha256) = 64),
                     result_sha256 TEXT NOT NULL CHECK (length(result_sha256) = 64),
                     created_at TEXT NOT NULL,
-                    payload_json TEXT NOT NULL
+                    payload_json TEXT NOT NULL,
+                    tenant_id TEXT
                 )
                 """
             )
+            # Nullable ownership preserves legacy records without silently assigning them
+            # to a tenant. Tenant-scoped access must explicitly exclude NULL ownership.
+            run_columns = {
+                row["name"] for row in connection.execute("PRAGMA table_info(lab_runs)")
+            }
+            if "tenant_id" not in run_columns:
+                connection.execute("ALTER TABLE lab_runs ADD COLUMN tenant_id TEXT")
+            attempt_columns = {
+                row["name"]
+                for row in connection.execute("PRAGMA table_info(lab_execution_attempts)")
+            }
+            if "tenant_id" not in attempt_columns:
+                connection.execute("ALTER TABLE lab_execution_attempts ADD COLUMN tenant_id TEXT")
             connection.execute(
                 "CREATE INDEX IF NOT EXISTS idx_lab_runs_created_at ON lab_runs(created_at DESC)"
+            )
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_lab_runs_tenant_created "
+                "ON lab_runs(tenant_id, created_at DESC)"
+            )
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_lab_attempts_tenant_status "
+                "ON lab_execution_attempts(tenant_id, status, updated_at)"
             )
             connection.execute(
                 """
@@ -83,7 +105,8 @@ class LabRunStore:
                     finished_at TEXT,
                     failure_reason TEXT,
                     result_sha256 TEXT,
-                    request_json TEXT NOT NULL
+                    request_json TEXT NOT NULL,
+                    tenant_id TEXT
                 )
                 """
             )
