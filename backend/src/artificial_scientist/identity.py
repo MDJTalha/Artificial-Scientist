@@ -69,10 +69,14 @@ def validate_oidc_bearer_token(
     subject = claims.get("sub")
     claim_issuer = claims.get("iss")
     claim_audience = claims.get("aud")
-    if not isinstance(subject, str) or not subject.strip():
-        raise InvalidIdentityError("Bearer token subject is missing.")
-    if not isinstance(claim_issuer, str) or not claim_issuer:
-        raise InvalidIdentityError("Bearer token issuer is missing.")
+    if not isinstance(subject, str) or not subject.strip() or len(subject) > 255:
+        raise InvalidIdentityError("Bearer token subject is missing or invalid.")
+    if (
+        not isinstance(claim_issuer, str)
+        or not claim_issuer.strip()
+        or len(claim_issuer) > 512
+    ):
+        raise InvalidIdentityError("Bearer token issuer is missing or invalid.")
     if isinstance(claim_audience, list):
         if audience not in claim_audience:
             raise InvalidIdentityError("Bearer token audience is invalid.")
