@@ -43,6 +43,10 @@ class LabExecutionNotFound(LookupError):
     """Raised when a requested execution-attempt ID is not present in the lab store."""
 
 
+class LabQuotaExceeded(ValueError):
+    """Raised when a tenant has exhausted a configured lab resource quota."""
+
+
 class LabRunStore:
     """Persist run records and their content-addressed, provenance-linked artifacts."""
 
@@ -223,13 +227,19 @@ class LabRunStore:
                         FROM (
                             SELECT run_id FROM lab_runs WHERE tenant_id = ?
                             UNION
-                            SELECT run_id FROM lab_execution_attempts WHERE tenant_id = ?
+                            SELECT attempts.run_id
+                            FROM lab_execution_attempts AS attempts
+                            WHERE attempts.tenant_id = ?
+                              AND NOT EXISTS (
+                                  SELECT 1 FROM lab_run_retention_events AS retention
+                                  WHERE retention.run_id = attempts.run_id
+                              )
                         )
                         """,
                         (tenant_id, tenant_id),
                     ).fetchone()
                     if int(usage["run_count"]) >= _MAX_RUNS_PER_TENANT:
-                        raise ValueError("Tenant has reached its lab run quota.")
+                        raise LabQuotaExceeded("Tenant has reached its lab run quota.")
                 connection.execute(
                     """
                     INSERT INTO lab_execution_attempts (
