@@ -43,6 +43,7 @@ If Python 3.12 is not installed, use an installed supported Python version (3.12
 - POST /api/v1/math/numeric/integrate — definite numerical integration with error estimate and convergence status
 - POST /api/v1/math/numeric/root — bracketed real root finding using Brent's method
 - POST /api/v1/math/statistics — descriptive statistics and quartiles for bounded numeric samples
+- POST /api/v1/math/plot — render a bounded real-valued function into an in-memory PNG image
 - GET /api/v1/math/units — list supported unit tokens
 - POST /api/v1/math/units/convert — convert compatible allowlisted units
 - POST /api/v1/math/units/check — check dimensional compatibility of arithmetic expressions
