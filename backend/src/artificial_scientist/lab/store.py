@@ -6,7 +6,7 @@ import hashlib
 import json
 import sqlite3
 from contextlib import closing
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 from uuid import NAMESPACE_URL, UUID, uuid5
@@ -22,6 +22,7 @@ from artificial_scientist.lab.models import (
 _MAX_ARTIFACT_BYTES = 1_048_576
 _MAX_BINARY_ARTIFACTS_PER_RUN = 100
 _MAX_BINARY_BYTES_PER_RUN = 50 * 1024 * 1024
+_EXECUTION_STALE_AFTER_SECONDS = 15 * 60
 
 
 class LabRunNotFound(LookupError):
@@ -230,12 +231,20 @@ class LabRunStore:
 
     def recover_interrupted_executions(self) -> int:
         """Reconcile stale running attempts with durable run records after restart."""
-        now = datetime.now(UTC).isoformat()
+        now_datetime = datetime.now(UTC)
+        now = now_datetime.isoformat()
+        stale_before = (
+            now_datetime - timedelta(seconds=_EXECUTION_STALE_AFTER_SECONDS)
+        ).isoformat()
         recovered = 0
         with closing(self._connect()) as connection:
             with connection:
                 rows = connection.execute(
-                    "SELECT run_id FROM lab_execution_attempts WHERE status = 'running'"
+                    """
+                    SELECT run_id FROM lab_execution_attempts
+                    WHERE status = 'running' AND updated_at < ?
+                    """,
+                    (stale_before,),
                 ).fetchall()
                 for row in rows:
                     run = connection.execute(
