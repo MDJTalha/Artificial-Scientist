@@ -179,3 +179,24 @@ def test_api_rejects_source_reference_with_wrong_record_type(store: RecordStore)
         assert total == 1
     finally:
         app.dependency_overrides.pop(get_record_store, None)
+
+
+
+def test_batch_record_creation_rolls_back_every_record_on_reference_failure(
+    store: RecordStore,
+) -> None:
+    first = HypothesisRecord(
+        title="Valid hypothesis",
+        hypothesis="A testable scientific hypothesis with enough detail.",
+        falsification_criteria=["The predicted effect is absent."],
+    )
+    second = HypothesisRecord(
+        title="Invalid hypothesis",
+        hypothesis="A second testable scientific hypothesis with enough detail.",
+        falsification_criteria=["The predicted effect is absent."],
+        source_record_ids=[uuid4()],
+    )
+    with pytest.raises(Exception, match="does not exist"):
+        store.create_many([first, second])
+    _, total = store.list_records()
+    assert total == 0
