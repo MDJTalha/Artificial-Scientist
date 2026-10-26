@@ -27,7 +27,6 @@ from artificial_scientist.records.identity import normalize_doi
 from artificial_scientist.records.models import SourceRecord
 from artificial_scientist.records.store import RecordStore
 
-
 DOI = "10.1234/science.example.2025.01"
 QUERY = "numerical methods for differential equations"
 
