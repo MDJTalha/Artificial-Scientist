@@ -17,8 +17,14 @@ def build_parser() -> argparse.ArgumentParser:
         description="Provision a tenant and explicitly grant a principal membership."
     )
     parser.add_argument("--issuer", required=True, help="Exact trusted OIDC issuer URL.")
-    parser.add_argument("--subject", required=True, help="Exact subject claim from the validated identity.")
-    parser.add_argument("--tenant-key", required=True, help="Operator-controlled stable tenant key.")
+    parser.add_argument(
+        "--subject",
+        required=True,
+        help="Exact subject claim from the validated identity.",
+    )
+    parser.add_argument(
+        "--tenant-key", required=True, help="Operator-controlled stable tenant key."
+    )
     parser.add_argument("--tenant-name", required=True, help="Human-readable tenant name.")
     parser.add_argument(
         "--role",
