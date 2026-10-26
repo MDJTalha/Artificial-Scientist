@@ -372,6 +372,7 @@ async def upload_lab_binary_artifact(
             .split(";", 1)[0]
             .strip(),
             content,
+            scan_status=scan_status,
         )
         return {**artifact, "scan_status": scan_status}
     except LabRunNotFound as error:
