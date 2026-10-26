@@ -16,6 +16,7 @@ from pydantic import ValidationError
 from artificial_scientist.api.routes import lab as lab_routes
 from artificial_scientist.api.routes.lab import get_lab_store
 from artificial_scientist.lab import execution as lab_execution
+from artificial_scientist.lab import scanning as lab_scanning
 from artificial_scientist.lab import store as lab_store_module
 from artificial_scientist.lab.engine import run_lab
 from artificial_scientist.lab.execution import LabExecutionTimeout, _stop_process, run_isolated
@@ -993,3 +994,73 @@ def test_interrupted_execution_attempts_are_recovered_and_auditable(tmp_path) ->
 
     with pytest.raises(LabExecutionNotFound):
         store.get_execution_status(uuid4())
+
+
+
+def test_clamav_scanner_fails_closed_outside_development(monkeypatch) -> None:
+    monkeypatch.delenv("ARTIFICIAL_SCIENTIST_CLAMAV_HOST", raising=False)
+    with pytest.raises(lab_scanning.ScannerUnavailable):
+        lab_scanning.scan_binary_content(b"evidence", environment="production")
+    assert (
+        lab_scanning.scan_binary_content(b"evidence", environment="development")
+        == "skipped_development"
+    )
+
+
+def test_clamav_scanner_sends_instream_and_accepts_clean_result(monkeypatch) -> None:
+    sent: list[bytes] = []
+
+    class FakeConnection:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def settimeout(self, _timeout):
+            return None
+
+        def sendall(self, data):
+            sent.append(data)
+
+        def recv(self, _size):
+            return b"stream: OK\\0"
+
+    monkeypatch.setenv("ARTIFICIAL_SCIENTIST_CLAMAV_HOST", "scanner.internal")
+    monkeypatch.setenv("ARTIFICIAL_SCIENTIST_CLAMAV_PORT", "3310")
+    monkeypatch.setattr(
+        lab_scanning.socket,
+        "create_connection",
+        lambda *_args, **_kwargs: FakeConnection(),
+    )
+    assert lab_scanning.scan_binary_content(b"clean sample", environment="production") == "clean"
+    assert sent[0] == b"zINSTREAM\\0"
+    assert sent[1] == len(b"clean sample").to_bytes(4, "big") + b"clean sample"
+    assert sent[2] == b"\\0\\0\\0\\0"
+
+
+def test_clamav_scanner_rejects_detected_malware(monkeypatch) -> None:
+    class InfectedConnection:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def settimeout(self, _timeout):
+            return None
+
+        def sendall(self, _data):
+            return None
+
+        def recv(self, _size):
+            return b"stream: Eicar-Test-Signature FOUND\\0"
+
+    monkeypatch.setenv("ARTIFICIAL_SCIENTIST_CLAMAV_HOST", "scanner.internal")
+    monkeypatch.setattr(
+        lab_scanning.socket,
+        "create_connection",
+        lambda *_args, **_kwargs: InfectedConnection(),
+    )
+    with pytest.raises(lab_scanning.MalwareDetected):
+        lab_scanning.scan_binary_content(b"test sample", environment="production")
