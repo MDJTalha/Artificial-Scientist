@@ -58,7 +58,7 @@ class LabRunStore:
             ensure_ascii=False,
             allow_nan=False,
         )
-        with self._connect() as connection:
+        with closing(self._connect()) as connection:
             connection.execute(
                 """
                 INSERT INTO lab_runs (
@@ -97,7 +97,7 @@ class LabRunStore:
             raise RuntimeError("Stored lab run result hash does not match its payload.")
 
     def get(self, run_id: UUID) -> LabRunResponse:
-        with self._connect() as connection:
+        with closing(self._connect()) as connection:
             row = connection.execute(
                 "SELECT payload_json FROM lab_runs WHERE run_id = ?",
                 (str(run_id),),
@@ -113,7 +113,7 @@ class LabRunStore:
         return run
 
     def list_runs(self, limit: int = 20, offset: int = 0) -> tuple[list[LabRunResponse], int]:
-        with self._connect() as connection:
+        with closing(self._connect()) as connection:
             total = int(connection.execute("SELECT COUNT(*) FROM lab_runs").fetchone()[0])
             rows = connection.execute(
                 "SELECT payload_json FROM lab_runs ORDER BY created_at DESC, run_id LIMIT ? OFFSET ?",
