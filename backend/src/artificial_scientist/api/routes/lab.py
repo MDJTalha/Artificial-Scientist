@@ -13,6 +13,11 @@ from uuid import UUID, uuid4
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response, status
 
 from artificial_scientist.config import get_settings
+from artificial_scientist.identity import (
+    IdentityConfigurationError,
+    InvalidIdentityError,
+    validate_oidc_bearer_token,
+)
 from artificial_scientist.lab.engine import run_lab
 from artificial_scientist.lab.manifest import capture_environment_manifest
 from artificial_scientist.lab.models import (
@@ -35,10 +40,57 @@ from artificial_scientist.lab.store import (
 )
 
 
-def require_lab_access(x_lab_api_key: str | None = Header(default=None)) -> None:
-    """Require a configured shared API key outside local development."""
+def require_lab_access(
+    x_lab_api_key: str | None = Header(default=None),
+    authorization: str | None = Header(default=None),
+) -> None:
+    """Require configured OIDC identity or the legacy deployment-level API key."""
     settings = get_settings()
     if settings.environment.lower() == "development":
+        return
+
+    oidc_values = (
+        getattr(settings, "oidc_issuer", None),
+        getattr(settings, "oidc_audience", None),
+        getattr(settings, "oidc_jwks_url", None),
+    )
+    if any(oidc_values):
+        if not all(oidc_values):
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="OIDC authentication is not fully configured.",
+            )
+        if not authorization or not authorization.startswith("Bearer "):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Valid bearer token required.",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        token = authorization.removeprefix("Bearer ").strip()
+        if not token or " " in token:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Valid bearer token required.",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        try:
+            validate_oidc_bearer_token(
+                token,
+                issuer=oidc_values[0],
+                audience=oidc_values[1],
+                jwks_url=oidc_values[2],
+            )
+        except IdentityConfigurationError as error:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="OIDC authentication configuration is invalid.",
+            ) from error
+        except InvalidIdentityError as error:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Bearer token validation failed.",
+                headers={"WWW-Authenticate": "Bearer"},
+            ) from error
         return
     if not settings.lab_api_key:
         raise HTTPException(
