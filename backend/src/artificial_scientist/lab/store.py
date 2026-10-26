@@ -694,7 +694,10 @@ class LabRunStore:
                             raise ValueError(
                                 "Tenant has reached its binary artifact count quota."
                             )
-                        if int(tenant_usage["total_bytes"]) + len(content) > _MAX_BINARY_BYTES_PER_TENANT:
+                        if (
+                            int(tenant_usage["total_bytes"]) + len(content)
+                            > _MAX_BINARY_BYTES_PER_TENANT
+                        ):
                             raise ValueError(
                                 "Tenant has reached its binary artifact storage quota."
                             )
