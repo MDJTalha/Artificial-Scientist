@@ -75,23 +75,6 @@ class LabRunStore:
             }
             if "tenant_id" not in run_columns:
                 connection.execute("ALTER TABLE lab_runs ADD COLUMN tenant_id TEXT")
-            attempt_columns = {
-                row["name"]
-                for row in connection.execute("PRAGMA table_info(lab_execution_attempts)")
-            }
-            if "tenant_id" not in attempt_columns:
-                connection.execute("ALTER TABLE lab_execution_attempts ADD COLUMN tenant_id TEXT")
-            connection.execute(
-                "CREATE INDEX IF NOT EXISTS idx_lab_runs_created_at ON lab_runs(created_at DESC)"
-            )
-            connection.execute(
-                "CREATE INDEX IF NOT EXISTS idx_lab_runs_tenant_created "
-                "ON lab_runs(tenant_id, created_at DESC)"
-            )
-            connection.execute(
-                "CREATE INDEX IF NOT EXISTS idx_lab_attempts_tenant_status "
-                "ON lab_execution_attempts(tenant_id, status, updated_at)"
-            )
             connection.execute(
                 """
                 CREATE TABLE IF NOT EXISTS lab_execution_attempts (
@@ -109,6 +92,23 @@ class LabRunStore:
                     tenant_id TEXT
                 )
                 """
+            )
+            attempt_columns = {
+                row["name"]
+                for row in connection.execute("PRAGMA table_info(lab_execution_attempts)")
+            }
+            if "tenant_id" not in attempt_columns:
+                connection.execute("ALTER TABLE lab_execution_attempts ADD COLUMN tenant_id TEXT")
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_lab_runs_created_at ON lab_runs(created_at DESC)"
+            )
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_lab_runs_tenant_created "
+                "ON lab_runs(tenant_id, created_at DESC)"
+            )
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_lab_attempts_tenant_status "
+                "ON lab_execution_attempts(tenant_id, status, updated_at)"
             )
             connection.execute(
                 "CREATE INDEX IF NOT EXISTS idx_lab_execution_attempts_status "
