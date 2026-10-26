@@ -30,7 +30,7 @@ The project is organized into **15 phases, Phase 0 through Phase 14**. These are
 **Build:** structured scientific concepts, terminology, equation metadata, and supported relationships between concepts.  
 **Exit criteria:** search and relationship tests pass; concept provenance is traceable; conflicting definitions are not silently merged.
 
-**Current implementation:** typed concept and relation records, controlled vocabulary enums, concept/alias/definition search with server-side pagination, evidence-source links, directed relationships with explicit assertion status, self-link rejection, hierarchy-cycle checks, and bounded graph-neighborhood traversal are implemented on `phase-4-knowledge-graph`. Current CI is validating this branch; acceptance depends on the final run recorded in `docs/PHASE_4_KNOWLEDGE_GRAPH.md`.
+**Current implementation:** typed concept and relation records, controlled vocabulary enums, concept/alias/definition search with server-side pagination, evidence-source links, directed relationships with explicit assertion status, self-link rejection, hierarchy-cycle checks, and bounded graph-neighborhood traversal are implemented on `phase-4-knowledge-graph`. The code commit passed Ruff and 46 backend tests on Python 3.12 and 13, plus frontend type-check, 6 tests, and production build; see the [verified run](https://github.com/MDJTalha/Artificial-Scientist/actions/runs/40265564598) and `docs/PHASE_4_KNOWLEDGE_GRAPH.md`. Phase 4 is awaiting review/integration.
 
 ## Phase 5 — Mathematics and scientific tools
 
@@ -88,6 +88,8 @@ The project is organized into **15 phases, Phase 0 through Phase 14**. These are
 - **Phase 1 — core application foundation:** CI passed on Python 3.12 and 3.13; frontend type-check, six unit tests, and production build passed on the recorded implementation commit.
 - **Phase 2 — research records and provenance:** acceptance checks passed on the stacked phase branch; see the recorded [Phase 2 CI run](https://github.com/MDJTalha/Artificial-Scientist/actions/runs/40263258124). Phase 2 remains a draft awaiting review/integration.
 - **Phase 3 — literature retrieval:** implementation tests passed on code commit `a3d139a56526ad0d512ab568c1dca71cba815b8a`; see the [passing CI run](https://github.com/MDJTalha/Artificial-Scientist/actions/runs/40264595989) and `docs/PHASE_3_LITERATURE.md`. It is awaiting review/integration.
+
+- **Phase 4 — knowledge graph and vocabulary:** implementation tests passed on code commit `2e652fd211c0b32d4dd77bace69240223c3cbccb`; see the [passing CI run](https://github.com/MDJTalha/Artificial-Scientist/actions/runs/40265564598) and `docs/PHASE_4_KNOWLEDGE_GRAPH.md`. Pull Request #4 is draft and targets Phase 3; it is not merged.
 
 The status above reflects recorded repository evidence. It is not a declaration of scientific discovery capability.
 
