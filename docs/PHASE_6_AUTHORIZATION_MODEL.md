@@ -35,9 +35,9 @@ The current lab router uses a single shared `X-Lab-API-Key` outside development.
 - [x] Add transactionally enforced per-tenant binary-attachment count and byte caps, with regression tests across multiple runs.
 - [x] Add a tenant-wide lab-run count cap with a serialized reservation transaction and regression coverage.
 - [x] Add transactionally enforced per-tenant JSON artifact count and byte budgets with regression tests.
-- [x] Add concurrency stress tests for binary uploads and run creation; CI passes on the current working branch.
+- [x] Add concurrency stress tests for binary uploads, run creation, and tenant-wide JSON artifact reservations; CI must pass on the latest commit before the branch is considered verified.
 - [x] Persist tenant-scoped lab request outcomes (allowed, denied, failed) with principal, tenant, action, object target, correlation ID, route, method, and HTTP status; audit metadata excludes credentials and request payloads. Authentication failures occurring before tenant resolution are recorded as anonymous request events. Audit persistence failure blocks the response.
-- [ ] Complete negative cross-tenant tests across every object endpoint, including UUID substitution for export, verification, execution status, uploads, and downloads. Current coverage includes store-level run/artifact/binary isolation, execution status, and API-level denial for read/export/verification/download paths; a regression test now checks that cross-tenant binary uploads are rejected before scanning.
+- [x] Add negative cross-tenant API tests for run reads, execution status, verification, exports, JSON artifact listing/read, binary artifact listing/download, and binary upload before scanning. UUID substitution is exercised with another tenant's run and artifact identifiers. Additional adversarial review remains required before production rollout.
 - [ ] Verify behavior in CI and conduct an independent security review before exposing untrusted or multi-tenant traffic.
 
 ## Legacy ownership claim procedure
