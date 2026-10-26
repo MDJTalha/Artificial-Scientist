@@ -52,8 +52,11 @@ The project is organized into **15 phases, Phase 0 through Phase 14**. These are
 
 ## Phase 7 — Hypothesis and discovery engine
 
-**Build:** research-question decomposition, competing hypotheses, prior-work checks, novelty screening, and falsification plans.  
-**Exit criteria:** each hypothesis records evidence, assumptions, alternatives, and a proposed discriminating test; novelty is expressed as a provisional assessment, never guaranteed by search alone.
+**Implemented on `phase-7-hypothesis-discovery`:** `POST /api/v1/discovery/assess` accepts 2–10 competing caller-supplied candidates, validates bounded assumptions/alternatives/predictions/falsification criteria/discriminating tests, checks linked source and claim record types, computes a transparent structural completeness rubric, flags likely near-duplicates, and persists immutable hypothesis records with predictions and discriminating tests. Regression coverage lives in `backend/tests/test_discovery.py`; implementation details and limitations are in [Phase 7 documentation](PHASE_7_HYPOTHESIS_DISCOVERY.md).
+
+**Not claimed:** autonomous hypothesis generation, a live literature novelty search, proof of scientific truth, or independent domain-expert validation. The lexical duplicate heuristic is only a review aid. The current record store remains non-tenant-scoped until Phase 6 production release gates are independently met.
+
+**Exit criteria:** each hypothesis records evidence, assumptions, alternatives, predictions, falsification criteria, and a proposed discriminating test; novelty is expressed as a provisional assessment, never guaranteed by search alone. The latest exact branch SHA must pass all backend and frontend CI jobs before code acceptance.
 
 ## Phase 8 — Experimental planning and orchestration
 
