@@ -177,6 +177,14 @@ def _literal_number(node: ast.AST) -> float | int | None:
 def _parse_tree(expression: str) -> ast.Expression:
     if len(expression) > 500:
         raise MathToolError("Expression exceeds the 500-character limit.")
+    nesting = 0
+    for character in expression:
+        if character == "(":
+            nesting += 1
+            if nesting > 64:
+                raise MathToolError("Expression nesting exceeds the 64-level limit.")
+        elif character == ")":
+            nesting = max(0, nesting - 1)
     try:
         tree = ast.parse(expression, mode="eval")
     except (SyntaxError, ValueError, MemoryError, RecursionError) as error:
