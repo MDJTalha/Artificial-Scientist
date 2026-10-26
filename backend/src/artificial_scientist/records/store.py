@@ -618,7 +618,8 @@ class RecordStore:
                     connection.execute(
                         """
                         INSERT INTO research_records
-                            (id, record_type, schema_version, created_at, content_sha256, payload_json)
+                            (id, record_type, schema_version, created_at, content_sha256,
+                             payload_json)
                         VALUES (?, ?, ?, ?, ?, ?)
                         """,
                         (
@@ -638,7 +639,8 @@ class RecordStore:
                     connection.execute(
                         """
                         INSERT INTO audit_events
-                            (event_id, occurred_at, action, actor, record_id, record_type, content_sha256)
+                            (event_id, occurred_at, action, actor, record_id, record_type,
+                             content_sha256)
                         VALUES (?, ?, 'record.created', 'local-api-client', ?, ?, ?)
                         """,
                         (
