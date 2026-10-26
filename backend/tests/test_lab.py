@@ -918,6 +918,19 @@ def test_interrupted_execution_attempts_are_recovered_and_auditable(tmp_path) ->
 
     interrupted_id = uuid4()
     store.begin_execution(interrupted_id, request)
+    with sqlite3.connect(database) as connection:
+        connection.execute(
+            """
+            UPDATE lab_execution_attempts
+            SET started_at = ?, updated_at = ?
+            WHERE run_id = ?
+            """,
+            (
+                "2020-01-01T00:00:00+00:00",
+                "2020-01-01T00:00:00+00:00",
+                str(interrupted_id),
+            ),
+        )
     restarted_store = LabRunStore(database)
     interrupted = restarted_store.get_execution_status(interrupted_id)
     assert interrupted["status"] == "interrupted"
