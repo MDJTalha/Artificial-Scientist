@@ -1,6 +1,6 @@
 # Phase 6 — Identity, Authorization, and Tenant-Isolation Design
 
-**Status: OIDC validation, tenant directory, tenant membership checks on lab routes, and tenant-scoped run/artifact persistence are implemented on the working branch. Tenant-wide binary and JSON artifact count/byte quotas and lab-run count quotas are implemented with serialized SQLite transactions; concurrency stress tests, complete adversarial coverage, production identity-provider verification, and independent security review remain outstanding.**  
+**Status: OIDC validation, tenant directory, tenant membership checks on lab routes, and tenant-scoped run/artifact persistence are implemented on the working branch. Tenant-wide binary and JSON artifact count/byte quotas and lab-run count quotas are implemented with serialized SQLite transactions; CI confirmation of the new concurrency and audit regressions, complete adversarial coverage, production identity-provider verification, and independent security review remain outstanding.**  
 **Scope:** controlled-lab runs, execution attempts, JSON artifacts, binary attachments, exports, and retention records.
 
 ## Security problem
@@ -36,7 +36,7 @@ The current lab router uses a single shared `X-Lab-API-Key` outside development.
 - [x] Add a tenant-wide lab-run count cap with a serialized reservation transaction and regression coverage.
 - [x] Add transactionally enforced per-tenant JSON artifact count and byte budgets with regression tests.
 - [ ] Add concurrency stress tests for uploads and run creation.
-- [ ] Add security audit events without recording secrets or raw request payloads.
+- [x] Persist tenant-scoped lab request outcomes (allowed, denied, failed) with principal, tenant, action, object target, correlation ID, route, method, and HTTP status; audit metadata excludes credentials and request payloads. Audit persistence failure blocks the response.
 - [ ] Complete negative cross-tenant tests across every object endpoint, including UUID substitution for export, verification, execution status, uploads, and downloads. Current coverage includes store-level run/artifact/binary isolation, execution status, and API-level denial for read/export/verification/download paths; a regression test now checks that cross-tenant binary uploads are rejected before scanning.
 - [ ] Verify behavior in CI and conduct an independent security review before exposing untrusted or multi-tenant traffic.
 
@@ -70,4 +70,4 @@ This is an incremental authorization implementation, not a claim of production S
 
 The current branch adds `artificial_scientist.authorization.TenantDirectory`, which persists opaque principal IDs derived from the trusted issuer/subject pair, tenant records, explicit active memberships, and append-only-style security audit events. The supported roles are `tenant_admin`, `researcher`, `viewer`, and `auditor`; unknown roles/actions deny by default. Membership checks record allowed and denied outcomes without recording credentials or scientific payloads.
 
-This is an incremental authorization and persistence layer, not a completed migration or enforcement layer. The current branch adds nullable tenant ownership to run and execution-attempt records and scopes protected run/artifact operations by tenant; legacy rows remain unowned and must stay inaccessible to tenant-scoped requests. Migration/claim handling, concurrency stress tests, complete cross-tenant endpoint coverage, production identity-provider verification, and independent security review remain open. Tenant-wide binary/JSON artifact and lab-run count quotas are implemented on this branch; the new changes require CI confirmation. Do not expose this branch to multiple customers until those controls and reviews are complete.
+This is an incremental authorization and persistence layer, not a completed migration or enforcement layer. The current branch adds nullable tenant ownership to run and execution-attempt records and scopes protected run/artifact operations by tenant; legacy rows remain unowned and must stay inaccessible to tenant-scoped requests. Migration/claim handling, CI confirmation of concurrency and audit regressions, complete cross-tenant endpoint coverage, production identity-provider verification, and independent security review remain open. Tenant-wide binary/JSON artifact and lab-run count quotas are implemented on this branch; the new changes require CI confirmation. Do not expose this branch to multiple customers until those controls and reviews are complete.
