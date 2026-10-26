@@ -1,5 +1,8 @@
 """Regression tests for tenant-scoped controlled-lab persistence."""
 
+from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier
+
 import pytest
 
 from artificial_scientist.lab.engine import run_lab
@@ -174,3 +177,48 @@ def test_legacy_database_schema_migrates_without_assigning_tenant_ownership(tmp_
         ).fetchone()[0]
     assert "tenant_id" in columns
     assert owner is None
+
+
+
+def test_concurrent_run_saves_cannot_oversubscribe_tenant_json_artifact_quota(
+    tmp_path, monkeypatch
+) -> None:
+    import artificial_scientist.lab.store as store_module
+
+    quota = 2
+    workers = 6
+    store = LabRunStore(str(tmp_path / "json-quota-concurrency.sqlite3"))
+    store.save(_run("Tenant existing run"), tenant_id="tenant-concurrent")
+    monkeypatch.setattr(store_module, "_MAX_JSON_ARTIFACTS_PER_TENANT", quota)
+    candidates = [_run(f"Concurrent run {index}") for index in range(workers)]
+    barrier = Barrier(workers)
+
+    def persist(index: int) -> bool:
+        barrier.wait(timeout=5)
+        try:
+            store.save(candidates[index], tenant_id="tenant-concurrent")
+        except ValueError as exc:
+            if "JSON artifact count quota" not in str(exc):
+                raise
+            return False
+        return True
+
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        outcomes = list(executor.map(persist, range(workers)))
+
+    assert sum(outcomes) == quota - 1
+    runs, total = store.list_runs(tenant_id="tenant-concurrent")
+    assert total == quota
+    assert len(runs) == quota
+    assert len(store.list_artifacts(runs[0].run_id, tenant_id="tenant-concurrent")) == 1
+    with store._connect() as connection:
+        artifact_count = connection.execute(
+            """
+            SELECT COUNT(*)
+            FROM lab_artifacts AS artifacts
+            JOIN lab_runs AS runs ON runs.run_id = artifacts.run_id
+            WHERE runs.tenant_id = ?
+            """,
+            ("tenant-concurrent",),
+        ).fetchone()[0]
+    assert artifact_count == quota
