@@ -1,6 +1,6 @@
 # Backend
 
-The backend is a Python/FastAPI research foundation with health/readiness endpoints, a local record/provenance API, a bounded OpenAlex/Crossref metadata search API, and a scientific knowledge graph API. Research records, concepts, and relationships are stored immutably in SQLite with checksums and creation events. Concept search covers preferred labels, aliases, and definitions; graph links retain direction, evidence-source IDs, and assertion status. It does not download full-text papers, assess scientific truth, call an LLM, or run experiments.
+The backend is a Python/FastAPI research foundation with health/readiness endpoints, a local record/provenance API, a bounded OpenAlex/Crossref metadata search API,  a scientific knowledge graph API, and bounded mathematical and scientific computation endpoints. Research records, concepts, and relationships are stored immutably in SQLite with checksums and creation events. Concept search covers preferred labels, aliases, and definitions; graph links retain direction, evidence-source IDs, and assertion status. It does not download full-text papers, assess scientific truth, call an LLM, or run experiments.
 
 ## Requirements
 
@@ -39,6 +39,13 @@ If Python 3.12 is not installed, use an installed supported Python version (3.12
 - POST /api/v1/knowledge/relationships — add an evidence-linkable relation between existing concepts
 - GET /api/v1/knowledge/concepts/{concept_id}/relationships — list incoming/outgoing relations
 - GET /api/v1/knowledge/graph/neighborhood?concept_id={uuid}&depth=1 — traverse a bounded concept neighborhood
+- POST /api/v1/math/symbolic — restricted symbolic algebra, differentiation, integration, solving, substitution, and real evaluation
+- POST /api/v1/math/numeric/integrate — definite numerical integration with error estimate and convergence status
+- POST /api/v1/math/numeric/root — bracketed real root finding using Brent's method
+- POST /api/v1/math/statistics — descriptive statistics and quartiles for bounded numeric samples
+- GET /api/v1/math/units — list supported unit tokens
+- POST /api/v1/math/units/convert — convert compatible allowlisted units
+- POST /api/v1/math/units/check — check dimensional compatibility of arithmetic expressions
 
 Readiness currently checks only application configuration; it does not assert that remote scholarly APIs, models, or computational services are available. Literature search requires outbound internet access and may return partial or unavailable provider statuses. Records default to `data/artificial_scientist.sqlite3` relative to the backend working directory. Override with `ARTIFICIAL_SCIENTIST_DB_PATH` to select another path. The API is a local development foundation and has no authentication yet; do not expose it to untrusted networks.
 
