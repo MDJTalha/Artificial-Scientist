@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, R
 
 from artificial_scientist.config import get_settings
 from artificial_scientist.identity import (
+    AuthenticatedPrincipal,
     IdentityConfigurationError,
     InvalidIdentityError,
     validate_oidc_bearer_token,
@@ -43,6 +44,7 @@ from artificial_scientist.lab.store import (
 def require_lab_access(
     x_lab_api_key: str | None = Header(default=None),
     authorization: str | None = Header(default=None),
+    request: Request = None,
 ) -> None:
     """Require configured OIDC identity or the legacy deployment-level API key."""
     settings = get_settings()
@@ -74,7 +76,7 @@ def require_lab_access(
                 headers={"WWW-Authenticate": "Bearer"},
             )
         try:
-            validate_oidc_bearer_token(
+            principal = validate_oidc_bearer_token(
                 token,
                 issuer=oidc_values[0],
                 audience=oidc_values[1],
@@ -91,6 +93,8 @@ def require_lab_access(
                 detail="Bearer token validation failed.",
                 headers={"WWW-Authenticate": "Bearer"},
             ) from error
+        if request is not None:
+            request.state.authenticated_principal = principal
         return
     if not settings.lab_api_key:
         raise HTTPException(
@@ -107,6 +111,12 @@ def require_lab_access(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Valid lab API key required.",
             headers={"WWW-Authenticate": "ApiKey"},
+        )
+    if request is not None:
+        request.state.authenticated_principal = AuthenticatedPrincipal(
+            subject="legacy-shared-api-key",
+            issuer="deployment-configured",
+            audience="artificial-scientist-lab",
         )
 
 
