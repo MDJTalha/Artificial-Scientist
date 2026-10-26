@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 import json
+from datetime import UTC, datetime
 from typing import Literal
 
 import httpx
@@ -16,11 +16,11 @@ from artificial_scientist.literature.models import (
     ProviderSearchStatus,
 )
 from artificial_scientist.literature.providers import (
+    USER_AGENT,
     CrossrefProvider,
     LiteratureProviderError,
     OpenAlexProvider,
     ProviderWork,
-    USER_AGENT,
 )
 from artificial_scientist.records.identity import source_identity_key
 from artificial_scientist.records.models import Provenance, SourceRecord
