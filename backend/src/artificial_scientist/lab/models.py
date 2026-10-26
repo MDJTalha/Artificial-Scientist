@@ -85,7 +85,7 @@ class LabRunResponse(BaseModel):
         "Declarative allowlisted operations only; arbitrary generated code is never executed."
     )
     limitations: list[str] = [
-        "Run output is returned to the caller and is not yet durably stored as an artifact.",
+        "Canonical JSON run-result artifacts are stored; general binary scientific artifacts and retention policies are not implemented.",
         "Wall-clock duration is measured, not enforced as a hard process timeout.",
         "This service is not an operating-system sandbox and must remain on "
         "trusted local infrastructure.",
