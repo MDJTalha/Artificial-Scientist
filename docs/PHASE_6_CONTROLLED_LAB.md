@@ -8,12 +8,12 @@
 The first lab API is a declarative runner over existing allowlisted math tools. It does not accept or execute Python source code.
 
 - `POST /api/v1/lab/runs` accepts a titled run with 1–20 declarative steps and persists the result in SQLite.
-- `GET /api/v1/lab/runs` lists stored runs with bounded pagination; `GET /api/v1/lab/runs/{run_id}` retrieves one run. Stored result payloads are checked against their recorded digest.
+- `GET /api/v1/lab/runs` lists stored runs with bounded pagination; `GET /api/v1/lab/runs/{run_id}` retrieves one run. Stored run records are checked against a canonical digest covering all persisted response fields except the digest itself.
 - Allowed operations are `symbolic`, `integrate`, `root`, `statistics`, and `unit_convert`.
 - Every step is validated using the same Pydantic contracts as the existing math endpoints.
 - Duplicate step IDs, unknown operations, extra fields in typed math requests, non-finite JSON values, oversized step inputs, and oversized run configurations are rejected.
 - A failed step stops subsequent work; later steps are explicitly marked skipped.
-- Each response contains a run ID, UTC timestamps, per-step duration/status, bounded diagnostic logs, SHA-256 hashes of canonicalized configuration and result payloads, and optional plan/seed metadata.
+- Each response contains a run ID, UTC timestamps, per-step duration/status, bounded diagnostic logs, SHA-256 hashes of canonicalized configuration and the complete run record, and optional plan/seed metadata.
 - The runner does not expose filesystem, network, shell, import, or arbitrary-code capabilities to expressions.
 
 ## Example request
@@ -37,11 +37,11 @@ The first lab API is a declarative runner over existing allowlisted math tools. 
 }
 ```
 
-The configuration and result hashes support integrity comparison; they are not digital signatures and do not prove that a result is scientifically valid.
+The configuration and result hashes support integrity comparison; the result digest covers the full persisted response record, including title, timestamps, durations, steps, logs, and metadata. These hashes are not digital signatures, do not protect against an attacker who can rewrite both the record and its digest, and do not prove scientific validity.
 
 ## Current limitations — do not treat Phase 6 as complete
 
-- Runs and artifacts are returned in the HTTP response but are **not yet durably persisted** by this lab API.
+- Run records are persisted in SQLite; binary artifact blob storage and artifact lifecycle management are **not yet implemented**.
 - Duration is measured, but no hard process-level wall-clock timeout or OS-level CPU/memory quota is enforced.
 - This is not an operating-system sandbox. The endpoint must remain on trusted local infrastructure; the application currently has no authentication.
 - A seed is recorded as metadata only; these deterministic math operations do not currently consume it.
