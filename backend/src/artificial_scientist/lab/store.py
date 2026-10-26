@@ -79,6 +79,19 @@ class LabRunStore:
             connection.execute(
                 "CREATE INDEX IF NOT EXISTS idx_lab_artifacts_run_id ON lab_artifacts(run_id)"
             )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS lab_run_retention_events (
+                    run_id TEXT PRIMARY KEY,
+                    result_sha256 TEXT NOT NULL CHECK (length(result_sha256) = 64),
+                    configuration_sha256 TEXT NOT NULL CHECK (length(configuration_sha256) = 64),
+                    deleted_at TEXT NOT NULL,
+                    retention_cutoff TEXT NOT NULL,
+                    reason TEXT NOT NULL,
+                    artifacts_deleted INTEGER NOT NULL CHECK (artifacts_deleted >= 0)
+                )
+                """
+            )
             connection.commit()
 
     @staticmethod
@@ -169,6 +182,72 @@ class LabRunStore:
                     ),
                 )
         return run
+
+    def purge_runs_before(
+        self,
+        cutoff: str,
+        *,
+        limit: int = 100,
+        reason: str = "retention_policy",
+    ) -> list[str]:
+        """Delete old runs in a bounded batch while preserving a retention tombstone.
+
+        This is an internal store operation only; no unauthenticated HTTP deletion
+        endpoint is exposed. The caller must explicitly supply an ISO-8601 cutoff.
+        """
+        if not 1 <= limit <= 100:
+            raise ValueError("Retention purge limit must be between 1 and 100.")
+        if not reason.strip() or len(reason.strip()) > 200:
+            raise ValueError("Retention reason must contain 1 to 200 characters.")
+        try:
+            parsed_cutoff = datetime.fromisoformat(cutoff.replace("Z", "+00:00"))
+        except ValueError as error:
+            raise ValueError("Retention cutoff must be an ISO-8601 timestamp.") from error
+        if parsed_cutoff.tzinfo is None or parsed_cutoff.utcoffset() is None:
+            raise ValueError("Retention cutoff must include a timezone.")
+        normalized_cutoff = parsed_cutoff.astimezone(UTC).isoformat()
+        deleted_at = datetime.now(UTC).isoformat()
+        with closing(self._connect()) as connection:
+            with connection:
+                rows = connection.execute(
+                    """
+                    SELECT run_id, result_sha256, configuration_sha256
+                    FROM lab_runs
+                    WHERE created_at < ?
+                    ORDER BY created_at, run_id
+                    LIMIT ?
+                    """,
+                    (normalized_cutoff, limit),
+                ).fetchall()
+                purged: list[str] = []
+                for row in rows:
+                    run_id = row["run_id"]
+                    artifact_count = int(
+                        connection.execute(
+                            "SELECT COUNT(*) FROM lab_artifacts WHERE run_id = ?",
+                            (run_id,),
+                        ).fetchone()[0]
+                    )
+                    connection.execute(
+                        """
+                        INSERT INTO lab_run_retention_events (
+                            run_id, result_sha256, configuration_sha256, deleted_at,
+                            retention_cutoff, reason, artifacts_deleted
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            run_id,
+                            row["result_sha256"],
+                            row["configuration_sha256"],
+                            deleted_at,
+                            normalized_cutoff,
+                            reason.strip(),
+                            artifact_count,
+                        ),
+                    )
+                    connection.execute("DELETE FROM lab_runs WHERE run_id = ?", (run_id,))
+                    purged.append(run_id)
+        return purged
 
     def get(self, run_id: UUID) -> LabRunResponse:
         with closing(self._connect()) as connection:
