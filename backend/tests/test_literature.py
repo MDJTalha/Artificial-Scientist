@@ -89,7 +89,10 @@ def handler_for(
     def handler(request: httpx.Request) -> httpx.Response:
         if request.url.host == "api.openalex.org":
             if openalex_status != 200:
-                return httpx.Response(openalex_status, json={"error": "upstream detail not exposed"})
+                return httpx.Response(
+                    openalex_status,
+                    json={"error": "upstream detail not exposed"},
+                )
             payload = openalex_payload
             if payload is None:
                 payload = {"results": [openalex_work()]}
@@ -204,7 +207,9 @@ def test_repeated_search_reuses_existing_source_record(store: RecordStore) -> No
         LiteratureSearchRequest(query=QUERY, providers=["openalex"])
     )
     second = make_service(store, handler_for()).search(
-        LiteratureSearchRequest(query="another wording for a related search", providers=["crossref"])
+        LiteratureSearchRequest(
+            query="another wording for a related search", providers=["crossref"]
+        )
     )
 
     assert first.results[0].saved_record_id == second.results[0].saved_record_id
@@ -259,7 +264,10 @@ def test_all_providers_failed_is_explicit_and_does_not_create_records(store: Rec
 def test_malformed_provider_payload_is_not_presented_as_a_success(store: RecordStore) -> None:
     result = make_service(
         store,
-        handler_for(openalex_payload={"unexpected": "shape"}, crossref_payload={"message": {"items": []}}),
+        handler_for(
+            openalex_payload={"unexpected": "shape"},
+            crossref_payload={"message": {"items": []}},
+        ),
     ).search(LiteratureSearchRequest(query=QUERY))
 
     assert result.status == "partial"
