@@ -135,3 +135,22 @@ def test_concurrent_run_creation_cannot_oversubscribe_tenant_quota(
             ("tenant-concurrent",),
         ).fetchone()[0]
     assert persisted_attempts == quota
+
+
+def test_retention_purge_releases_tenant_run_quota(tmp_path, monkeypatch) -> None:
+    from artificial_scientist.lab.engine import run_lab
+    import artificial_scientist.lab.store as store_module
+
+    monkeypatch.setattr(store_module, "_MAX_RUNS_PER_TENANT", 1)
+    store = LabRunStore(str(tmp_path / "execution-retention-quota.sqlite3"))
+    tenant_id = "tenant-retention"
+    first_run_id = uuid4()
+    store.begin_execution(first_run_id, _request(), tenant_id=tenant_id)
+    store.save(run_lab(_request(), run_id=first_run_id), tenant_id=tenant_id)
+
+    assert store.purge_runs_before("9999-12-31T23:59:59+00:00") == [str(first_run_id)]
+
+    # The retained tombstone preserves evidence, but a purged run no longer consumes
+    # the tenant's live run quota.
+    second = store.begin_execution(uuid4(), _request(), tenant_id=tenant_id)
+    assert second["status"] == "running"
