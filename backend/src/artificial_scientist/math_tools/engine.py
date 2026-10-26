@@ -179,8 +179,8 @@ def _parse_tree(expression: str) -> ast.Expression:
         raise MathToolError("Expression exceeds the 500-character limit.")
     try:
         tree = ast.parse(expression, mode="eval")
-    except (SyntaxError, ValueError, MemoryError) as error:
-        raise MathToolError("Expression syntax is invalid.") from error
+    except (SyntaxError, ValueError, MemoryError, RecursionError) as error:
+        raise MathToolError("Expression syntax is invalid or too deeply nested.") from error
     if sum(1 for _ in ast.walk(tree)) > MAX_EXPRESSION_NODES:
         raise MathToolError("Expression exceeds the configured complexity limit.")
     return tree
