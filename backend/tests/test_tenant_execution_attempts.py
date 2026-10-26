@@ -168,3 +168,33 @@ def test_failed_execution_releases_tenant_run_quota(tmp_path, monkeypatch) -> No
 
     next_attempt = store.begin_execution(uuid4(), _request(), tenant_id=tenant_id)
     assert next_attempt["status"] == "running"
+
+
+def test_recovery_never_reconciles_run_across_tenant_ownership(tmp_path) -> None:
+    import sqlite3
+
+    from artificial_scientist.lab.engine import run_lab
+
+    database = str(tmp_path / "tenant-recovery-mismatch.sqlite3")
+    store = LabRunStore(database)
+    run_id = uuid4()
+    store.begin_execution(run_id, _request(), tenant_id="tenant-a")
+    store.save(run_lab(_request(), run_id=run_id), tenant_id="tenant-a")
+
+    # Simulate inconsistent/corrupted ownership metadata and a stale running attempt.
+    with sqlite3.connect(database) as connection:
+        connection.execute(
+            """
+            UPDATE lab_execution_attempts
+            SET tenant_id = ?, status = 'running', updated_at = ?,
+                finished_at = NULL, result_sha256 = NULL
+            WHERE run_id = ?
+            """,
+            ("tenant-b", "2020-01-01T00:00:00+00:00", str(run_id)),
+        )
+
+    recovered_store = LabRunStore(database)
+    status = recovered_store.get_execution_status(run_id, tenant_id="tenant-b")
+    assert status["status"] == "interrupted"
+    assert status["result_sha256"] is None
+    assert "Process stopped" in status["failure_reason"]
