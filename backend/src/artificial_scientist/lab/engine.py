@@ -6,7 +6,7 @@ import hashlib
 import json
 import time
 from datetime import UTC, datetime
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from pydantic import ValidationError
 
@@ -63,7 +63,7 @@ def _execute_step(
     return run_isolated(_execute_step_direct, (operation, inputs), timeout_seconds)
 
 
-def run_lab(request: LabRunRequest) -> LabRunResponse:
+def run_lab(request: LabRunRequest, *, run_id: UUID | None = None) -> LabRunResponse:
     """Run a bounded sequence; a failed step stops all later steps."""
     started = datetime.now(UTC)
     start_clock = time.perf_counter()
@@ -71,7 +71,7 @@ def run_lab(request: LabRunRequest) -> LabRunResponse:
     configuration_hash = hashlib.sha256(
         _canonical_json(configuration).encode("utf-8")
     ).hexdigest()
-    run_id = uuid4()
+    run_id = run_id or uuid4()
     logs = [f"run={run_id} accepted_steps={len(request.steps)}"]
     results: list[LabStepResult] = []
     failed = False
