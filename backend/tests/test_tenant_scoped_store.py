@@ -110,3 +110,67 @@ def test_tenant_wide_json_artifact_byte_quota_is_enforced(
         store.save(_run("Tenant A second"), tenant_id="tenant-a")
 
     store.save(_run("Tenant B first"), tenant_id="tenant-b")
+
+
+
+def test_legacy_database_schema_migrates_without_assigning_tenant_ownership(tmp_path) -> None:
+    import json
+    import sqlite3
+
+    database = str(tmp_path / "legacy-schema.sqlite3")
+    legacy_run = _run("Pre-tenant schema record")
+    payload = json.dumps(
+        legacy_run.model_dump(mode="json"),
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        allow_nan=False,
+    )
+
+    # Simulate the previous schema before tenant_id was introduced.
+    with sqlite3.connect(database) as connection:
+        connection.execute(
+            """
+            CREATE TABLE lab_runs (
+                run_id TEXT PRIMARY KEY,
+                status TEXT NOT NULL CHECK (status IN ('completed', 'failed')),
+                configuration_sha256 TEXT NOT NULL,
+                result_sha256 TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                payload_json TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            INSERT INTO lab_runs (
+                run_id, status, configuration_sha256, result_sha256,
+                created_at, payload_json
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                str(legacy_run.run_id),
+                legacy_run.status,
+                legacy_run.configuration_sha256,
+                legacy_run.result_sha256,
+                legacy_run.started_at,
+                payload,
+            ),
+        )
+
+    # Initialization performs the additive migration but must not infer an owner.
+    store = LabRunStore(database)
+    assert store.get(legacy_run.run_id).title == "Pre-tenant schema record"
+    with pytest.raises(LabRunNotFound):
+        store.get(legacy_run.run_id, tenant_id="tenant-a")
+
+    with sqlite3.connect(database) as connection:
+        columns = {
+            row[1] for row in connection.execute("PRAGMA table_info(lab_runs)")
+        }
+        owner = connection.execute(
+            "SELECT tenant_id FROM lab_runs WHERE run_id = ?",
+            (str(legacy_run.run_id),),
+        ).fetchone()[0]
+    assert "tenant_id" in columns
+    assert owner is None
