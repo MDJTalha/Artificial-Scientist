@@ -37,7 +37,7 @@ The project is organized into **15 phases, Phase 0 through Phase 14**. These are
 **Build:** symbolic computation, numerical calculations, units/dimensional checks where supported, statistics, and plotting.  
 **Exit criteria:** reference cases and numerical tolerances documented; independent checks used where feasible; failures and unsupported operations are explicit.
 
-**Current implementation:** bounded symbolic simplify/differentiate/integrate/solve/substitute/evaluate; bracketed real root finding; adaptive definite integration with error estimates; descriptive statistics; an allowlisted unit registry and dimensional-expression checker. The implementation uses a strict expression-AST allowlist rather than evaluating arbitrary Python text. Acceptance depends on current GitHub Actions and is tracked in `docs/PHASE_5_MATH_TOOLS.md`.
+**Current implementation:** bounded symbolic simplify/differentiate/integrate/solve/substitute/evaluate; bracketed real root finding; adaptive definite integration with error estimates; descriptive statistics; safe one-dimensional PNG plotting; and an allowlisted unit registry and dimensional-expression checker. The implementation uses a strict expression-AST allowlist rather than evaluating arbitrary Python text. Acceptance depends on current GitHub Actions and is tracked in `docs/PHASE_5_MATH_TOOLS.md`.
 
 ## Phase 6 — Controlled computational laboratory
 
