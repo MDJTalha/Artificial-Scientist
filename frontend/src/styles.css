@@ -68,7 +68,7 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--mint); outline-
 
 .sidebar-section-label { color: #5c7584; padding: 0 13px 13px; }
 .sidebar nav { display: grid; gap: 5px; }
-.nav-item { position: relative; min-height: 43px; display: flex; align-items: center; gap: 11px; padding: 0 13px; color: #8ca1ad; text-decoration: none; font-size: 12px; border: 1px solid transparent; border-radius: 7px; }
+.nav-item { appearance: none; width: 100%; position: relative; min-height: 43px; display: flex; align-items: center; gap: 11px; padding: 0 13px; color: #8ca1ad; background: transparent; text-align: left; text-decoration: none; font-size: 12px; border: 1px solid transparent; border-radius: 7px; cursor: pointer; }
 .nav-item-active { color: #e6f3f1; background: linear-gradient(90deg, rgba(64, 151, 129, .18), rgba(40, 100, 100, .07)); border-color: rgba(118, 226, 189, .15); }
 .nav-symbol { width: 18px; color: var(--mint); text-align: center; font-size: 17px; }
 .nav-indicator { width: 4px; height: 4px; background: var(--mint); border-radius: 50%; margin-left: auto; }
