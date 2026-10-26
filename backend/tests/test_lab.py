@@ -12,6 +12,7 @@ from pydantic import ValidationError
 from artificial_scientist.api.routes import lab as lab_routes
 from artificial_scientist.api.routes.lab import get_lab_store
 from artificial_scientist.lab.engine import run_lab
+from artificial_scientist.lab import execution as lab_execution
 from artificial_scientist.lab.execution import LabExecutionTimeout, _stop_process, run_isolated
 from artificial_scientist.lab.integrity import result_digest
 from artificial_scientist.lab.models import LabRunRequest
@@ -297,6 +298,43 @@ def test_lab_api_returns_generic_server_error_for_tampered_run_listing(tmp_path)
         assert listing.json()["detail"] == "Stored lab run failed integrity validation."
     finally:
         app.dependency_overrides.pop(get_lab_store, None)
+
+def test_posix_worker_resource_limits_are_configured(monkeypatch) -> None:
+    if lab_execution.resource is None:
+        pytest.skip("POSIX resource limits are unavailable on this platform")
+    configured: dict[int, tuple[int, int]] = {}
+
+    monkeypatch.setattr(lab_execution.os, "name", "posix")
+    monkeypatch.setattr(
+        lab_execution.resource,
+        "getrlimit",
+        lambda _limit: (lab_execution.resource.RLIM_INFINITY, lab_execution.resource.RLIM_INFINITY),
+    )
+    monkeypatch.setattr(
+        lab_execution.resource,
+        "setrlimit",
+        lambda limit, bounds: configured.__setitem__(limit, bounds),
+    )
+
+    lab_execution._apply_worker_resource_limits()
+
+    assert configured[lab_execution.resource.RLIMIT_CPU] == (
+        lab_execution._WORKER_CPU_SECONDS,
+        lab_execution._WORKER_CPU_SECONDS,
+    )
+    assert configured[lab_execution.resource.RLIMIT_AS] == (
+        lab_execution._WORKER_ADDRESS_SPACE_BYTES,
+        lab_execution._WORKER_ADDRESS_SPACE_BYTES,
+    )
+    assert configured[lab_execution.resource.RLIMIT_FSIZE] == (
+        lab_execution._WORKER_FILE_SIZE_BYTES,
+        lab_execution._WORKER_FILE_SIZE_BYTES,
+    )
+    assert configured[lab_execution.resource.RLIMIT_NOFILE] == (
+        lab_execution._WORKER_OPEN_FILES,
+        lab_execution._WORKER_OPEN_FILES,
+    )
+
 
 def test_worker_cleanup_escalates_from_terminate_to_kill() -> None:
     class StubbornProcess:
