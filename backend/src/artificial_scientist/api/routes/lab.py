@@ -15,17 +15,17 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, R
 from artificial_scientist.config import get_settings
 from artificial_scientist.lab.engine import run_lab
 from artificial_scientist.lab.manifest import capture_environment_manifest
-from artificial_scientist.lab.scanning import (
-    MalwareDetected,
-    ScannerUnavailable,
-    scan_binary_content,
-)
 from artificial_scientist.lab.models import (
     LabArtifactMetadata,
     LabArtifactResponse,
     LabRunRequest,
     LabRunResponse,
     LabRunVerificationResponse,
+)
+from artificial_scientist.lab.scanning import (
+    MalwareDetected,
+    ScannerUnavailable,
+    scan_binary_content,
 )
 from artificial_scientist.lab.store import (
     LabArtifactNotFound,
