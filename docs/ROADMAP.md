@@ -90,18 +90,14 @@ The project is organized into **15 phases, Phase 0 through Phase 14**. These are
 
 ## Current implementation status
 
-- **Phase 0 — foundation documents:** established in the Phase 0–1 draft pull request.
-- **Phase 1 — core application foundation:** CI passed on Python 3.12 and 3.13; frontend type-check, six unit tests, and production build passed on the recorded implementation commit.
-- **Phase 2 — research records and provenance:** acceptance checks passed on the stacked phase branch; see the recorded [Phase 2 CI run](https://github.com/MDJTalha/Artificial-Scientist/actions/runs/40263258124). Phase 2 remains a draft awaiting review/integration.
-- **Phase 3 — literature retrieval:** implementation tests passed on code commit `a3d139a56526ad0d512ab568c1dca71cba815b8a`; see the [passing CI run](https://github.com/MDJTalha/Artificial-Scientist/actions/runs/40264595989) and `docs/PHASE_3_LITERATURE.md`. It is awaiting review/integration.
+- **Phases 0–1 — foundation and application shell:** integrated into `main` through [PR #1](https://github.com/MDJTalha/Artificial-Scientist/pull/1). The merge-triggered CI run passed backend tests on Python 3.12 and 3.13 plus frontend type-check, unit tests, and production build.
+- **Phase 2 — research records and provenance:** integrated into `main` through [PR #2](https://github.com/MDJTalha/Artificial-Scientist/pull/2). The recorded branch CI passed before merge; this does not by itself prove every longer-term data-governance exit criterion is complete.
+- **Phase 3 — literature retrieval:** integrated into `main` through [PR #3](https://github.com/MDJTalha/Artificial-Scientist/pull/3). Provider and frontend CI passed before merge.
+- **Phase 4 — knowledge graph and vocabulary:** integrated into `main` through [PR #4](https://github.com/MDJTalha/Artificial-Scientist/pull/4). Knowledge-graph and frontend CI passed before merge.
+- **Phase 5 — mathematics and scientific tools:** integrated into `main` through [PR #5](https://github.com/MDJTalha/Artificial-Scientist/pull/5). Math-tool and frontend CI passed before merge; the post-merge `main` CI run also passed.
+- **Phase 6 — controlled computational laboratory:** remains in progress in [PR #6](https://github.com/MDJTalha/Artificial-Scientist/pull/6), targeting `main`. It currently supports allowlisted declarative math runs, durable SQLite records, canonical JSON result artifacts, SHA-256 integrity checks, and provenance-linked retrieval. A regression test now verifies tampered persisted records return a controlled generic server error from the list API. The latest recorded Phase 6 CI run at commit `ea133b7cb042b93a7c6f96addaa9fe969f290aa7` passed Ruff, backend tests on Python 3.12 and 3.13, and frontend checks. New documentation changes require another fresh run. Hard execution timeouts, OS-level process/resource isolation, authentication, general binary artifact lifecycle, and reproducible environment/replay support remain unresolved; Phase 6 must not be declared complete yet.
 
-- **Phase 4 — knowledge graph and vocabulary:** implementation tests passed on code commit `2e652fd211c0b32d4dd77bace69240223c3cbccb`; see the [passing CI run](https://github.com/MDJTalha/Artificial-Scientist/actions/runs/40265564598) and `docs/PHASE_4_KNOWLEDGE_GRAPH.md`. Pull Request #4 is draft and targets Phase 3; it is not merged.
-
-- **Phase 5 — mathematics and scientific tools:** core implementation CI passed on commit `bdf3dfffea45ed428fcb21667d282c035fc8d49d`; see the [passing run](https://github.com/MDJTalha/Artificial-Scientist/actions/runs/40266731194) and `docs/PHASE_5_MATH_TOOLS.md`. Draft Pull Request #5 targets Phase 4; it remains unmerged.
-
-- **Phase 6 — controlled computational laboratory:** declarative runs, SQLite persistence, canonical JSON result artifacts, artifact retrieval APIs, digest verification, and run/plan/step provenance are implemented on `phase-6-controlled-lab`. The artifact-storage head is awaiting fresh CI verification; general binary artifacts, hard timeouts, OS isolation, and reproducible environment manifests remain outstanding. It remains in progress.
-
-The status above reflects recorded repository evidence. It is not a declaration of scientific discovery capability.
+The status above reflects recorded repository evidence. Passing CI is necessary but does not prove scientific validity, production readiness, or completion of all phase exit criteria.
 
 ## Release gates
 
