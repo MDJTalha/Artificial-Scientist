@@ -2,7 +2,9 @@
 
 ## Implemented scope
 
-The Phase 7 API exposes `POST /api/v1/discovery/assess` and `POST /api/v1/discovery/prior-work-screen`. Assessment accepts one research question and 2–10 competing, caller-supplied candidates. Prior-work screening queries the existing OpenAlex and Crossref metadata connectors for 2–5 candidates, without persisting search results. Each candidate must include assumptions, alternative explanations, predictions, falsification criteria, and a discriminating test. Source and claim references are validated against stored records before any hypothesis is written.
+The decomposition endpoint extracts only conservative patterns from the research question, reports unresolved variables/context/controls/time horizon, and returns clarification prompts. It labels its method as a bounded heuristic and leaves unrecognized variables unset rather than inventing them.
+
+The Phase 7 API exposes `POST /api/v1/discovery/decompose`, `POST /api/v1/discovery/assess`, and `POST /api/v1/discovery/prior-work-screen`. Assessment accepts one research question and 2–10 competing, caller-supplied candidates. Prior-work screening queries the existing OpenAlex and Crossref metadata connectors for 2–5 candidates, without persisting search results. Each candidate must include assumptions, alternative explanations, predictions, falsification criteria, and a discriminating test. Source and claim references are validated against stored records before any hypothesis is written.
 
 The service:
 - checks required structure and bounded input sizes with Pydantic;
@@ -15,6 +17,8 @@ The service:
 - returns record IDs and explicit limitations.
 
 ## API request example
+
+Use `POST /api/v1/discovery/decompose` first when useful. Supply `research_question` and optional `domain_context`; the response includes candidate independent/dependent variables, question type, missing elements, and clarification prompts. Treat all extracted values as editable suggestions.
 
 ```json
 {
