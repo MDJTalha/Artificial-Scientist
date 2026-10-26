@@ -424,6 +424,19 @@ class LabRunStore:
                     )
                     connection.execute("DELETE FROM lab_runs WHERE run_id = ?", (run_id,))
                     purged.append(run_id)
+                connection.execute(
+                    """
+                    UPDATE lab_execution_attempts
+                    SET request_json = '{}'
+                    WHERE started_at < ?
+                      AND status IN ('failed', 'interrupted')
+                      AND NOT EXISTS (
+                          SELECT 1 FROM lab_runs
+                          WHERE lab_runs.run_id = lab_execution_attempts.run_id
+                      )
+                    """,
+                    (normalized_cutoff,),
+                )
         return purged
 
     def get(self, run_id: UUID) -> LabRunResponse:
