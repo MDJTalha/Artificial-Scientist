@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from importlib.metadata import PackageNotFoundError, version
+
 import platform
 import sys
-from importlib.metadata import PackageNotFoundError, version
 
 
 _RELEVANT_PACKAGES = ("artificial-scientist", "numpy", "scipy", "sympy", "pint", "pydantic")
