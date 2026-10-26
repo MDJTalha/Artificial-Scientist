@@ -10,15 +10,15 @@ import ast
 import math
 import operator
 import warnings
-from io import BytesIO
 from collections.abc import Callable
+from io import BytesIO
 from typing import Any
 
 import numpy as np
 import pint
+import sympy as sp
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 from matplotlib.figure import Figure
-import sympy as sp
 from pint.errors import DimensionalityError, PintError
 from scipy.integrate import IntegrationWarning, quad
 from scipy.optimize import root_scalar
@@ -523,7 +523,9 @@ def render_function_plot(request: PlotRequest) -> bytes:
     except MathToolError:
         raise
     except (ArithmeticError, TypeError, ValueError, OverflowError) as error:
-        raise MathToolError("The function could not be evaluated across the plot interval.") from error
+        raise MathToolError(
+            "The function could not be evaluated across the plot interval."
+        ) from error
 
     if not np.all(np.isfinite(x_values)) or not np.all(np.isfinite(y_values)):
         raise MathToolError("The plot contains non-finite values and was not generated.")
