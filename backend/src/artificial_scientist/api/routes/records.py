@@ -15,6 +15,7 @@ from artificial_scientist.records.models import (
     RecordType,
 )
 from artificial_scientist.records.store import (
+    DuplicateSource,
     InvalidRelationship,
     RecordConflict,
     RecordIntegrityError,
@@ -33,7 +34,7 @@ def get_record_store() -> RecordStore:
 
 
 def _translate_store_error(error: RecordStoreError) -> HTTPException:
-    if isinstance(error, RecordConflict):
+    if isinstance(error, (RecordConflict, DuplicateSource)):
         return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error))
     if isinstance(error, InvalidRelationship):
         return HTTPException(status_code=422, detail=str(error))
