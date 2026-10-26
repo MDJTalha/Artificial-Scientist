@@ -3,6 +3,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
+from uuid import uuid4
 
 from artificial_scientist.api.routes.health import router as health_router
 from artificial_scientist.api.routes.knowledge import router as knowledge_router
@@ -42,8 +43,35 @@ class LabSecurityAuditMiddleware:
             if message["type"] == "http.response.start":
                 state = scope.get("state") or {}
                 context = state.get("authorization_audit")
+                status_code = int(message["status"])
+                # Authentication can fail before tenant authorization builds its
+                # richer context. Record those outcomes as anonymous request events.
+                if context is None and status_code in {401, 403, 503}:
+                    context = {
+                        "principal_id": None,
+                        "tenant_id": None,
+                        "action": "authentication:request",
+                        "target_type": "request",
+                        "target_id": None,
+                        "correlation_id": (
+                            scope.get("headers", [])
+                            and next(
+                                (
+                                    value.decode("latin-1")
+                                    for key, value in scope.get("headers", [])
+                                    if key.lower() == b"x-correlation-id"
+                                    and len(value) <= 128
+                                ),
+                                None,
+                            )
+                        ) or str(uuid4()),
+                        "method": scope.get("method", "UNKNOWN"),
+                        "route": scope.get("path", "")[:512],
+                        "database_path": state.get(
+                            "security_audit_database_path", self.database_path
+                        ),
+                    }
                 if context:
-                    status_code = int(message["status"])
                     outcome = (
                         "denied"
                         if status_code in {401, 403, 404}
@@ -53,13 +81,13 @@ class LabSecurityAuditMiddleware:
                     )
                     try:
                         TenantDirectory(context.get("database_path", self.database_path)).audit(
-                            principal_id=context["principal_id"],
-                            tenant_id=context["tenant_id"],
+                            principal_id=context.get("principal_id"),
+                            tenant_id=context.get("tenant_id"),
                             action=context["action"],
                             target_type=context["target_type"],
-                            target_id=context["target_id"],
+                            target_id=context.get("target_id"),
                             outcome=outcome,
-                            correlation_id=context["correlation_id"],
+                            correlation_id=context.get("correlation_id"),
                             metadata={
                                 "method": context["method"],
                                 "route": context["route"],
