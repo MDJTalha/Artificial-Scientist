@@ -278,11 +278,15 @@ def test_prior_work_screen_uses_metadata_search_without_persisting() -> None:
                     "candidates": [
                         {
                             "title": "Hypothesis A",
-                            "statement": "Temperature increases reaction rate under fixed pressure.",
+                            "statement": (
+                                "Temperature increases reaction rate under fixed pressure."
+                            ),
                         },
                         {
                             "title": "Hypothesis B",
-                            "statement": "Temperature decreases reaction rate under fixed pressure.",
+                            "statement": (
+                                "Temperature decreases reaction rate under fixed pressure."
+                            ),
                         },
                     ],
                 },
