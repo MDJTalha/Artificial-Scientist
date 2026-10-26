@@ -5,6 +5,7 @@ import hashlib
 import hmac
 import io
 import json
+import re
 import zipfile
 from functools import lru_cache
 from typing import Annotated
@@ -165,7 +166,9 @@ def require_tenant_access(request: Request, action: str) -> str | None:
         )
     principal_id = stable_principal_id(principal.issuer, principal.subject)
     correlation_id = request.headers.get("x-correlation-id", "").strip()
-    if not correlation_id or len(correlation_id) > 128:
+    # Correlation IDs are untrusted metadata. Keep a conservative printable
+    # alphabet so control characters and whitespace cannot pollute audit records.
+    if not re.fullmatch(r"[A-Za-z0-9._:-]{1,128}", correlation_id):
         correlation_id = str(uuid4())
 
     # Tenant IDs are generated UUIDs. Reject malformed or unbounded selectors before
