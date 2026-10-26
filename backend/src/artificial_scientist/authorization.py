@@ -95,9 +95,13 @@ class TenantDirectory:
                     created_at TEXT NOT NULL
                 );
                 CREATE TABLE IF NOT EXISTS asds_memberships (
-                    principal_id TEXT NOT NULL REFERENCES asds_principals(principal_id) ON DELETE CASCADE,
-                    tenant_id TEXT NOT NULL REFERENCES asds_tenants(tenant_id) ON DELETE CASCADE,
-                    role TEXT NOT NULL CHECK(role IN ('tenant_admin','researcher','viewer','auditor')),
+                    principal_id TEXT NOT NULL REFERENCES asds_principals(principal_id)
+                        ON DELETE CASCADE,
+                    tenant_id TEXT NOT NULL REFERENCES asds_tenants(tenant_id)
+                        ON DELETE CASCADE,
+                    role TEXT NOT NULL CHECK(role IN (
+                        'tenant_admin','researcher','viewer','auditor'
+                    )),
                     created_at TEXT NOT NULL,
                     active INTEGER NOT NULL DEFAULT 1 CHECK(active IN (0,1)),
                     PRIMARY KEY(principal_id, tenant_id)
@@ -130,7 +134,12 @@ class TenantDirectory:
 
     def register_principal(self, issuer: str, subject: str) -> str:
         principal_id = stable_principal_id(issuer, subject)
-        if not issuer.strip() or len(issuer) > 512 or not subject.strip() or len(subject) > _SUBJECT_MAX:
+        if (
+            not issuer.strip()
+            or len(issuer) > 512
+            or not subject.strip()
+            or len(subject) > _SUBJECT_MAX
+        ):
             raise ValueError("Issuer and subject must be non-empty and bounded.")
         with closing(self._connect()) as connection:
             with connection:
@@ -226,7 +235,11 @@ class TenantDirectory:
         encoded = json.dumps(safe_metadata, sort_keys=True, separators=(",", ":"), allow_nan=False)
         if len(encoded.encode("utf-8")) > 4096:
             raise ValueError("Audit metadata exceeds 4 KiB.")
-        event_id = str(uuid5(NAMESPACE_URL, f"asds:audit:{datetime.now(UTC).isoformat()}:{principal_id}:{action}:{target_id}"))
+        event_material = (
+            f"asds:audit:{datetime.now(UTC).isoformat()}:"
+            f"{principal_id}:{action}:{target_id}"
+        )
+        event_id = str(uuid5(NAMESPACE_URL, event_material))
         with closing(self._connect()) as connection:
             with connection:
                 connection.execute(
