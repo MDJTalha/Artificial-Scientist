@@ -1,6 +1,6 @@
 # Backend
 
-The backend is a Python/FastAPI research foundation with health/readiness endpoints and a local record/provenance API. The record API validates typed research records and relationships, persists them in SQLite, hashes stored payloads, and records creation events. These records remain unverified user-submitted material; the application does not yet perform autonomous scientific research, call an LLM, query scholarly databases, or run experiments.
+The backend is a Python/FastAPI research foundation with health/readiness endpoints, a local record/provenance API, and a bounded scholarly metadata search API for OpenAlex and Crossref. The record API validates typed research records and relationships, persists them in SQLite, hashes stored payloads, and records creation events. Literature search normalizes provider metadata, records retrieval provenance, and can persist source records. It does not download full-text papers, assess scientific truth, call an LLM, or run experiments.
 
 ## Requirements
 
@@ -31,8 +31,9 @@ If Python 3.12 is not installed, use an installed supported Python version (3.12
 - GET /api/v1/records — list records, optionally filtered by record type
 - GET /api/v1/records/{record_id} — fetch and verify a record's SHA-256 payload checksum and schema
 - GET /api/v1/records/audit-events — list server-generated creation audit events
+- POST /api/v1/literature/search — search OpenAlex and/or Crossref, normalize metadata, deduplicate results, and optionally persist source records
 
-Readiness currently checks only application configuration; it does not assert that models, scholarly sources, or computational services are available. Records default to `data/artificial_scientist.sqlite3` relative to the backend working directory. Override with `ARTIFICIAL_SCIENTIST_DB_PATH` to select another path. The API is a local development foundation and has no authentication yet; do not expose it to untrusted networks.
+Readiness currently checks only application configuration; it does not assert that remote scholarly APIs, models, or computational services are available. Literature search requires outbound internet access and may return partial or unavailable provider statuses. Records default to `data/artificial_scientist.sqlite3` relative to the backend working directory. Override with `ARTIFICIAL_SCIENTIST_DB_PATH` to select another path. The API is a local development foundation and has no authentication yet; do not expose it to untrusted networks.
 
 ## Tests and quality checks
 

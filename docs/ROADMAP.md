@@ -23,6 +23,8 @@ The project is organized into **15 phases, Phase 0 through Phase 14**. These are
 **Build:** source connectors, metadata normalization, search, document ingestion, and citation validation.  
 **Exit criteria:** source identifiers and retrieval metadata preserved; unavailable sources and rate limits handled; references verified against source records; licensing restrictions documented.
 
+**Current implementation:** OpenAlex and Crossref metadata search adapters, bounded JSON handling, typed normalized results, DOI-based duplicate detection, SQLite source identity migration, provenance-carrying source records, and deterministic provider tests are implemented on `phase-3-literature-retrieval`. CI passed Ruff and 33 backend tests on Python 3.12 and 13. The frontend's type-check, 6 unit tests, and production build passed as well; see the [verified run](https://github.com/MDJTalha/Artificial-Scientist/actions/runs/40264595989). The phase is ready for review, while integration remains sequential.
+
 ## Phase 4 — Knowledge and terminology
 
 **Build:** structured scientific concepts, terminology, equation metadata, and supported relationships between concepts.  
@@ -82,7 +84,8 @@ The project is organized into **15 phases, Phase 0 through Phase 14**. These are
 
 - **Phase 0 — foundation documents:** established in the Phase 0–1 draft pull request.
 - **Phase 1 — core application foundation:** CI passed on Python 3.12 and 3.13; frontend type-check, six unit tests, and production build passed on the recorded implementation commit.
-- **Phase 2 — research records and provenance:** acceptance checks pass on implementation commit `48ce326a4402da23ad5787b7eceb82943f2d071f`; see the [passing CI run](https://github.com/MDJTalha/Artificial-Scientist/actions/runs/40263258124). Phase is awaiting review/integration. Core research connectors and AI-powered research remain unimplemented.
+- **Phase 2 — research records and provenance:** acceptance checks passed on the stacked phase branch; see the recorded [Phase 2 CI run](https://github.com/MDJTalha/Artificial-Scientist/actions/runs/40263258124). Phase 2 remains a draft awaiting review/integration.
+- **Phase 3 — literature retrieval:** implementation tests passed on code commit `a3d139a56526ad0d512ab568c1dca71cba815b8a`; see the [passing CI run](https://github.com/MDJTalha/Artificial-Scientist/actions/runs/40264595989) and `docs/PHASE_3_LITERATURE.md`. It is awaiting review/integration.
 
 The status above reflects recorded repository evidence. It is not a declaration of scientific discovery capability.
 

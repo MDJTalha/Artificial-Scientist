@@ -8,11 +8,11 @@ This is **not a commercial SaaS product**. Its guiding objective is to contribut
 
 ## Current status
 
-**Phase 0 is documented; Phase 1 and Phase 2 acceptance checks pass. Phase 2 is available as a draft pull request on `phase-2-research-records`, pending review and sequential integration.**
+**Phase 0–2 foundations have passing CI. Phase 3 — Scholarly Literature Retrieval is implemented with passing CI checks and is available as draft Pull Request #3 for review.**
 
-The Phase 1 branch now contains a FastAPI backend foundation, health/readiness endpoints, a React + TypeScript overview dashboard that checks the actual local API, basic automated tests, and a GitHub Actions workflow. The CI result must be reviewed before this phase is accepted.
+The foundation includes a FastAPI backend, health/readiness endpoints, a React + TypeScript overview dashboard that checks the actual local API, typed research records, SQLite provenance storage, and GitHub Actions verification.
 
-The scientific research engine, autonomous agents, scholarly source connectors, research database, computation laboratory, and hypothesis-discovery capabilities **are not implemented yet**. Planned capabilities are not presented as active features.
+Phase 3 adds OpenAlex and Crossref metadata search adapters, source normalization, DOI-based deduplication, and optional persistent source records. The Phase 3 CI run passed 33 backend tests on Python 3.12, 33 on Python 3.13, and all 6 frontend tests, type-checks, and production build. Full-text ingestion, claim verification, autonomous hypothesis generation, scientific computation, and agent orchestration **are not implemented yet**. Planned capabilities are not presented as active features.
 
 ## Scientific principles
 
@@ -61,7 +61,7 @@ See [docs/ROADMAP.md](docs/ROADMAP.md) for phase goals and exit criteria.
 - **Persistence planned:** SQLite initially, behind repository interfaces that allow later migration
 - **Models planned:** provider-independent adapters; optional local inference with Ollama
 - **Workflow orchestration planned:** explicit, testable workflows; evaluate LangGraph when checkpointed orchestration is needed
-- **Research sources planned:** lawful, source-aware connectors such as OpenAlex, Crossref, and selected repositories
+- **Scholarly metadata connectors:** OpenAlex and Crossref are implemented in Phase 3; additional repositories and full-text handling remain future work
 - **Verification:** pytest, Ruff, TypeScript type checking, frontend unit tests, production build, regression tests, and reproducibility checks
 
 This stack is provisional. Add a dependency only when it solves a defined problem and can be tested. See [docs/TECHNOLOGY_DECISIONS.md](docs/TECHNOLOGY_DECISIONS.md).
@@ -122,6 +122,7 @@ Passing these checks verifies the current application foundation only; it does n
 - [docs/PHASE_1_FOUNDATION.md](docs/PHASE_1_FOUNDATION.md) — Phase 1 setup, test commands, accepted CI results, and limitations
 - [docs/PHASE_2_RECORDS.md](docs/PHASE_2_RECORDS.md) — Phase 2 record schema, persistence, API examples, verified CI results, and limitations
 - [backend/README.md](backend/README.md) — backend setup and endpoint reference
+- [docs/PHASE_3_LITERATURE.md](docs/PHASE_3_LITERATURE.md) — scholarly search API, provenance, rate limits, and acceptance criteria
 
 ## Development approach
 

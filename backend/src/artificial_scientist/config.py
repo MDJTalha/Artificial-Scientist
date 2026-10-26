@@ -13,6 +13,8 @@ class Settings:
     environment: str
     allowed_origins: tuple[str, ...]
     database_path: str
+    openalex_api_key: str | None
+    crossref_contact_email: str | None
 
 
 def get_settings() -> Settings:
@@ -35,4 +37,6 @@ def get_settings() -> Settings:
         database_path=os.getenv(
             "ARTIFICIAL_SCIENTIST_DB_PATH", "data/artificial_scientist.sqlite3"
         ),
+        openalex_api_key=os.getenv("OPENALEX_API_KEY") or None,
+        crossref_contact_email=os.getenv("CROSSREF_CONTACT_EMAIL") or None,
     )

@@ -6,10 +6,12 @@ on:
       - main
       - phase-0-foundation
       - phase-2-research-records
+      - phase-3-literature-retrieval
   pull_request:
     branches:
       - main
       - phase-0-foundation
+      - phase-2-research-records
   workflow_dispatch:
 
 permissions:
