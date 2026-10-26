@@ -51,3 +51,15 @@ def test_execution_status_for_unknown_id_is_not_found_for_tenant(tmp_path) -> No
 
     with pytest.raises(LabExecutionNotFound):
         store.get_execution_status(uuid4(), tenant_id="tenant-a")
+
+
+def test_failure_update_cannot_mutate_another_tenants_attempt(tmp_path) -> None:
+    store = LabRunStore(str(tmp_path / "execution-failure-tenant.sqlite3"))
+    run_id = uuid4()
+    store.begin_execution(run_id, _request(), tenant_id="tenant-a")
+
+    store.fail_execution(run_id, tenant_id="tenant-b")
+
+    assert store.get_execution_status(run_id, tenant_id="tenant-a")["status"] == "running"
+    store.fail_execution(run_id, tenant_id="tenant-a")
+    assert store.get_execution_status(run_id, tenant_id="tenant-a")["status"] == "failed"
