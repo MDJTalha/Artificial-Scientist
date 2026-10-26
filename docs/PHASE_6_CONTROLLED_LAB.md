@@ -7,7 +7,8 @@
 
 The first lab API is a declarative runner over existing allowlisted math tools. It does not accept or execute Python source code.
 
-- `POST /api/v1/lab/runs` accepts a titled run with 1–20 declarative steps and persists the result in SQLite.\n- `GET /api/v1/lab/runs` lists stored runs with bounded pagination; `GET /api/v1/lab/runs/{run_id}` retrieves one run. Stored result payloads are checked against their recorded digest.
+- `POST /api/v1/lab/runs` accepts a titled run with 1–20 declarative steps and persists the result in SQLite.
+- `GET /api/v1/lab/runs` lists stored runs with bounded pagination; `GET /api/v1/lab/runs/{run_id}` retrieves one run. Stored result payloads are checked against their recorded digest.
 - Allowed operations are `symbolic`, `integrate`, `root`, `statistics`, and `unit_convert`.
 - Every step is validated using the same Pydantic contracts as the existing math endpoints.
 - Duplicate step IDs, unknown operations, extra fields in typed math requests, non-finite JSON values, oversized step inputs, and oversized run configurations are rejected.
