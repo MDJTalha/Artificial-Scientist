@@ -223,3 +223,17 @@ def test_isolated_lab_worker_respects_deadline() -> None:
         run_isolated(_slow_lab_worker, (), timeout_seconds=0.1)
     assert time.monotonic() - started < 5
 
+def test_lab_request_bounds_per_step_timeout() -> None:
+    with pytest.raises(ValidationError):
+        LabRunRequest(
+            title="Excessive timeout",
+            step_timeout_seconds=30.1,
+            steps=[
+                {
+                    "step_id": "stats",
+                    "operation": "statistics",
+                    "inputs": {"values": [1, 2, 3]},
+                }
+            ],
+        )
+
