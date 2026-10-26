@@ -9,7 +9,12 @@ from pydantic import ValidationError
 
 from artificial_scientist.api.routes.literature import get_literature_service
 from artificial_scientist.api.routes.records import get_record_store
-from artificial_scientist.discovery import DiscoveryAssessmentRequest, assess_candidates
+from artificial_scientist.discovery import (
+    DiscoveryAssessmentRequest,
+    ResearchQuestionDecompositionRequest,
+    assess_candidates,
+    decompose_research_question,
+)
 from artificial_scientist.literature.models import (
     LiteratureResult,
     LiteratureSearchResponse,
@@ -45,6 +50,36 @@ def candidate(
 @pytest.fixture
 def store(tmp_path: Path) -> RecordStore:
     return RecordStore(tmp_path / "discovery.sqlite3")
+
+
+def test_question_decomposition_extracts_variables_and_exposes_unknowns() -> None:
+    result = decompose_research_question(
+        ResearchQuestionDecompositionRequest(
+            research_question=(
+                "How does temperature affect reaction rate under fixed pressure "
+                "in a closed reactor?"
+            ),
+            domain_context="reaction kinetics",
+        )
+    )
+    assert result.question_type == "causal"
+    assert result.independent_variable == "temperature"
+    assert result.dependent_variable == "reaction rate"
+    assert result.system_or_population == "a closed reactor"
+    assert "confounders_and_controls" in result.missing_elements
+    assert result.method == "bounded_heuristic"
+
+
+def test_question_decomposition_does_not_invent_unrecognized_variables() -> None:
+    result = decompose_research_question(
+        ResearchQuestionDecompositionRequest(
+            research_question="Why do some complex systems behave unexpectedly?"
+        )
+    )
+    assert result.independent_variable is None
+    assert result.dependent_variable is None
+    assert "independent_variable" in result.missing_elements
+    assert result.clarification_prompts
 
 
 def test_assessment_is_transparent_and_does_not_claim_truth() -> None:
