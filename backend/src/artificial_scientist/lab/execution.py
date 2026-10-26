@@ -79,7 +79,7 @@ def _worker_entry(
                 {
                     "ok": False,
                     "error_type": type(error).__name__,
-                    "error": str(error).replace("\\n", " ")[:500],
+                    "error": " ".join(str(error).split())[:500],
                 }
             )
         except (BrokenPipeError, EOFError, OSError):
