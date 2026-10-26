@@ -12,6 +12,7 @@ from pydantic import ValidationError
 
 from artificial_scientist.lab.execution import run_isolated
 from artificial_scientist.lab.integrity import result_digest
+from artificial_scientist.lab.manifest import capture_environment_manifest
 from artificial_scientist.lab.models import LabRunRequest, LabRunResponse, LabStepResult
 from artificial_scientist.math_tools.engine import (
     MathToolError,
@@ -137,6 +138,8 @@ def run_lab(request: LabRunRequest) -> LabRunResponse:
         logs=logs,
         plan_record_id=request.plan_record_id,
         random_seed=request.random_seed,
+        configuration=configuration,
+        environment_manifest=capture_environment_manifest(),
     )
     digest = result_digest(response.model_dump(mode="json"))
     return response.model_copy(update={"result_sha256": digest})
