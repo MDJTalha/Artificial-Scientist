@@ -151,9 +151,12 @@ def test_api_rejects_missing_evidence_before_persisting_any_hypothesis(
         app.dependency_overrides.pop(get_record_store, None)
 
 
-def test_api_rejects_claim_id_that_references_wrong_record_type(store: RecordStore) -> None:
-    concept_like_claim = store.create(
-        ClaimRecord(claim_text="A stored claim record for evidence validation.", evidence_status="inferred")
+def test_api_rejects_source_reference_with_wrong_record_type(store: RecordStore) -> None:
+    stored_claim = store.create(
+        ClaimRecord(
+            claim_text="A stored claim record for evidence validation.",
+            evidence_status="inferred",
+        )
     )
     app.dependency_overrides[get_record_store] = lambda: store
     try:
@@ -163,7 +166,7 @@ def test_api_rejects_claim_id_that_references_wrong_record_type(store: RecordSto
                 json={
                     "research_question": "How does temperature affect reaction rate?",
                     "candidates": [
-                        candidate(claims=[str(concept_like_claim.id)]),
+                        candidate(sources=[str(stored_claim.id)]),
                         candidate(
                             "Hypothesis B",
                             "An alternative mechanism changes reaction rate under fixed pressure.",
@@ -171,6 +174,8 @@ def test_api_rejects_claim_id_that_references_wrong_record_type(store: RecordSto
                     ],
                 },
             )
-        assert response.status_code == 201, response.text
+        assert response.status_code == 422
+        _, total = store.list_records()
+        assert total == 1
     finally:
         app.dependency_overrides.pop(get_record_store, None)
