@@ -960,6 +960,12 @@ def test_interrupted_execution_attempts_are_recovered_and_auditable(tmp_path) ->
     finally:
         app.dependency_overrides.pop(get_lab_store, None)
 
+    active_id = uuid4()
+    store.begin_execution(active_id, request)
+    active_store = LabRunStore(database)
+    assert active_store.get_execution_status(active_id)["status"] == "running"
+    store.fail_execution(active_id)
+
     completed_id = uuid4()
     store.begin_execution(completed_id, request)
     run = run_lab(request, run_id=completed_id)
