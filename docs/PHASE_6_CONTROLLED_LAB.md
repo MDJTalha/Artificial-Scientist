@@ -53,7 +53,7 @@ The configuration and result hashes support integrity comparison; the result dig
 
 - [x] Strict declarative input schema and finite configuration size.
 - [x] Explicit allowlist of supported operation types; no arbitrary code execution.
-- [x] Bounded step count, bounded step input size, and an ASGI-level 64 KiB request-body cap with oversized-body regression test.
+- [x] Bounded step count, bounded step input size, and an ASGI-level 64 KiB request-body cap tested both with an oversized declared body and streamed chunks without `Content-Length`.
 - [x] Per-step status, logs, duration measurement, and configuration/result SHA-256 digests.
 - [x] Fail-fast behavior with later steps marked skipped.
 - [x] API and adversarial-input tests added.
@@ -61,7 +61,7 @@ The configuration and result hashes support integrity comparison; the result dig
 - [x] Durable SQLite run storage, bounded listing/retrieval, and full-record integrity checks.
 - [x] Durable JSON result artifacts with byte-digest verification and run/plan/step provenance metadata.
 - [ ] General binary artifact support, automated retention scheduling, export packages, and complete provenance linkage to experiment plans/records. The bounded internal purge primitive and audit tombstones are implemented, but no public deletion API or scheduler is enabled.
-- [x] Enforced per-step wall-clock timeout and child-process termination test.
+- [x] Enforced per-step wall-clock timeout, termination-to-kill escalation, and regression tests for both timeout handling and cleanup escalation.
 - [ ] OS-level process/resource isolation and CPU/memory quota tests.
 - [x] Runtime environment manifest and stored-configuration rerun/verification endpoint with output comparison tests.
 - [x] Shared API-key gate for lab endpoints outside development, with unauthorized and missing-secret tests; this is not per-user authorization.
