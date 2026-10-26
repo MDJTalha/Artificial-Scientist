@@ -470,3 +470,57 @@ def test_lab_request_fails_closed_when_final_audit_persistence_fails(
         assert response.json()["detail"] == "Security audit persistence is unavailable."
     finally:
         app.dependency_overrides.pop(get_lab_store, None)
+
+
+def test_run_quota_exhaustion_returns_http_429(monkeypatch, tmp_path):
+    import artificial_scientist.lab.store as store_module
+
+    database = str(tmp_path / "tenant-run-quota-api.sqlite3")
+    principal = AuthenticatedPrincipal(
+        subject="tenant-quota-user",
+        issuer="https://identity.example.test/",
+        audience="scientific-api",
+    )
+    monkeypatch.setattr(
+        lab_routes,
+        "get_settings",
+        lambda: SimpleNamespace(
+            environment="production",
+            lab_api_key=None,
+            oidc_issuer="https://identity.example.test/",
+            oidc_audience="scientific-api",
+            oidc_jwks_url="https://identity.example.test/jwks.json",
+            database_path=database,
+        ),
+    )
+    monkeypatch.setattr(
+        lab_routes, "validate_oidc_bearer_token", lambda *_args, **_kwargs: principal
+    )
+    monkeypatch.setattr(store_module, "_MAX_RUNS_PER_TENANT", 0)
+    directory = TenantDirectory(database)
+    principal_id = directory.register_principal(principal.issuer, principal.subject)
+    tenant_id = directory.create_tenant("tenant-quota-api", "Tenant Quota API")
+    directory.grant_membership(principal_id, tenant_id, "researcher")
+
+    store = LabRunStore(database)
+    app.dependency_overrides[get_lab_store] = lambda: store
+    try:
+        response = TestClient(app).post(
+            "/api/v1/lab/runs",
+            headers={
+                "Authorization": "Bearer signed-token",
+                "X-Tenant-ID": tenant_id,
+            },
+            json={
+                "title": "Quota rejection",
+                "steps": [{
+                    "step_id": "summary",
+                    "operation": "statistics",
+                    "inputs": {"values": [1, 2, 3], "variance_mode": "population"},
+                }],
+            },
+        )
+        assert response.status_code == 429
+        assert response.json()["detail"] == "Tenant has reached its lab run quota."
+    finally:
+        app.dependency_overrides.pop(get_lab_store, None)
