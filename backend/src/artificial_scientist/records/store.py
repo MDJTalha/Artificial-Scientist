@@ -207,7 +207,8 @@ class RecordStore:
                     source_record = SourceRecord.model_validate_json(payload_json)
                 except Exception as exc:
                     raise RecordIntegrityError(
-                        f"Existing source {source_row['id']} failed schema validation during migration."
+                        f"Existing source {source_row['id']} failed schema validation "
+                        "during migration."
                     ) from exc
                 connection.execute(
                     "INSERT OR IGNORE INTO source_identity(identity_key, record_id) VALUES (?, ?)",
