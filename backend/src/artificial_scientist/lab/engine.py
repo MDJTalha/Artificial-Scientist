@@ -10,6 +10,7 @@ from uuid import uuid4
 
 from pydantic import ValidationError
 
+from artificial_scientist.lab.execution import run_isolated
 from artificial_scientist.lab.integrity import result_digest
 from artificial_scientist.lab.models import LabRunRequest, LabRunResponse, LabStepResult
 from artificial_scientist.math_tools.engine import (
@@ -39,7 +40,7 @@ def _canonical_json(value: object) -> str:
     )
 
 
-def _execute_step(operation: str, inputs: dict[str, object]) -> dict[str, object]:
+def _execute_step_direct(operation: str, inputs: dict[str, object]) -> dict[str, object]:
     """Validate inputs through the same strict contracts used by the public math API."""
     dispatch = {
         "symbolic": (SymbolicRequest, run_symbolic),
@@ -52,6 +53,13 @@ def _execute_step(operation: str, inputs: dict[str, object]) -> dict[str, object
     request = model.model_validate(inputs)
     response = function(request)
     return response.model_dump(mode="json")
+
+
+def _execute_step(
+    operation: str, inputs: dict[str, object], timeout_seconds: float
+) -> dict[str, object]:
+    """Run one allowlisted math operation in a killable child process."""
+    return run_isolated(_execute_step_direct, (operation, inputs), timeout_seconds)
 
 
 def run_lab(request: LabRunRequest) -> LabRunResponse:
@@ -81,7 +89,7 @@ def run_lab(request: LabRunRequest) -> LabRunResponse:
             )
             continue
         try:
-            output = _execute_step(step.operation, step.inputs)
+            output = _execute_step(step.operation, step.inputs, request.step_timeout_seconds)
             results.append(
                 LabStepResult(
                     step_id=step.step_id,
