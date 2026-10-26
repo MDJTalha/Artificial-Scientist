@@ -57,7 +57,8 @@ The configuration and result hashes support integrity comparison; the result dig
 - [x] Fail-fast behavior with later steps marked skipped.
 - [x] API and adversarial-input tests added.
 - [ ] CI passes on the final Phase 6 head (must be checked from a fresh GitHub Actions run).
-- [x] Durable SQLite run storage, bounded listing/retrieval, and result-payload integrity checks.\n- [ ] Durable artifact blob storage and full provenance linkage to experiment plans/records.
+- [x] Durable SQLite run storage, bounded listing/retrieval, and full-record integrity checks.
+- [ ] Durable artifact blob storage and full provenance linkage to experiment plans/records.
 - [ ] Enforced timeout and process/resource isolation tests.
 - [ ] Reproducible environment manifest and rerun/verification workflow.
 - [ ] Security review of the execution boundary before enabling generated code or untrusted users.
