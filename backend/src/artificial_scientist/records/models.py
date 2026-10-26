@@ -4,7 +4,7 @@ These schemas validate the shape of submitted records. They do not independently
 verify source truth, the identity of a reviewer, or whether an experiment occurred.
 """
 
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from typing import Annotated, Literal
 from uuid import UUID, uuid4
 
@@ -13,7 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 
 def utc_now() -> datetime:
     """Return a timezone-aware UTC timestamp."""
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class Provenance(BaseModel):
