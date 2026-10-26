@@ -76,7 +76,7 @@ Run one command at a time from the repository root:
 
     cd backend
     py -3.12 -m venv .venv
-    .\.venv\Scripts\Activate.ps1
+    .\\.venv\\Scripts\\Activate.ps1
     python -m pip install --upgrade pip
     pip install -e ".[dev]"
     python -m uvicorn artificial_scientist.main:app --reload
@@ -124,8 +124,7 @@ Passing these checks verifies the current application foundation only; it does n
 - [backend/README.md](backend/README.md) — backend setup and endpoint reference
 - [docs/PHASE_3_LITERATURE.md](docs/PHASE_3_LITERATURE.md) — scholarly search API, provenance, rate limits, and acceptance criteria
 - [docs/PHASE_4_KNOWLEDGE_GRAPH.md](docs/PHASE_4_KNOWLEDGE_GRAPH.md) — concept schemas, controlled relations, graph API, verified CI results, and acceptance criteria
-- [docs/PHASE_5_MATH_TOOLS.md](docs/PHASE_5_MATH_TOOLS.md) — mathematical API contracts, supported operations, safety bounds, numerical reference cases, and CI evidence
-- [docs/PHASE_5_MATH_TOOLS.md](docs/PHASE_5_MATH_TOOLS.md) — mathematical API contracts, supported operations, safety bounds, numerical reference cases, and acceptance criteria
+- [docs/PHASE_5_MATH_TOOLS.md](docs/PHASE_5_MATH_TOOLS.md) — mathematical API contracts, supported operations, safety bounds, numerical reference cases, CI evidence, and acceptance criteria
 
 ## Development approach
 
