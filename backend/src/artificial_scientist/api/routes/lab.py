@@ -201,6 +201,11 @@ def export_lab_run(
             store.get_artifact(item.artifact_id).model_dump(mode="json")
             for item in artifacts
         ]
+        binary_artifacts = store.list_binary_artifacts(run_id)
+        binary_documents = [
+            store.get_binary_artifact(UUID(item["artifact_id"]))
+            for item in binary_artifacts
+        ]
     except LabRunNotFound as error:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Lab run not found."
@@ -218,7 +223,16 @@ def export_lab_run(
         "artifacts.json": json.dumps(
             artifact_documents, sort_keys=True, separators=(",", ":"), allow_nan=False
         ).encode("utf-8"),
+        "binary-artifacts.json": json.dumps(
+            [
+                {key: value for key, value in item.items() if key != "content"}
+                for item in binary_documents
+            ],
+            sort_keys=True, separators=(",", ":"), allow_nan=False
+        ).encode("utf-8"),
     }
+    for item in binary_documents:
+        files[f"binary/{item['artifact_id']}-{item['filename']}"] = item["content"]
     manifest = {
         "format": "asds-lab-export-v1",
         "run_id": str(run_id),
