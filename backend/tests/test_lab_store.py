@@ -193,7 +193,8 @@ def test_tenant_ownership_schema_migrates_legacy_records_without_assignment(tmp_
                 '2026-01-01T00:00:00+00:00', '{}'
             );
             INSERT INTO lab_execution_attempts VALUES (
-                'legacy-run', 'completed', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+                'legacy-run', 'completed',
+                'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
                 '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:01+00:00',
                 '2026-01-01T00:00:01+00:00', NULL,
                 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', '{}'
