@@ -16,7 +16,6 @@ from artificial_scientist.lab.models import (
     LabRunResponse,
     LabRunVerificationResponse,
 )
-from artificial_scientist.lab.integrity import result_digest
 from artificial_scientist.lab.store import (
     LabArtifactNotFound,
     LabRunNotFound,
