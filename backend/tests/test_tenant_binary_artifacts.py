@@ -46,3 +46,23 @@ def test_binary_artifact_read_and_list_are_tenant_scoped(tmp_path) -> None:
         store.get_binary_artifact(
             __import__("uuid").UUID(artifact["artifact_id"]), tenant_id="tenant-b"
         )
+
+def test_unowned_legacy_binary_artifact_is_not_visible_to_tenant(tmp_path) -> None:
+    store = LabRunStore(str(tmp_path / "binary-legacy-tenant.sqlite3"))
+    legacy_run = _run()
+    store.save(legacy_run)
+    artifact = store.save_binary_artifact(
+        legacy_run.run_id,
+        "legacy.bin",
+        "application/octet-stream",
+        b"legacy attachment",
+        scan_status="skipped_development",
+    )
+
+    with pytest.raises(LabRunNotFound):
+        store.list_binary_artifacts(legacy_run.run_id, tenant_id="tenant-a")
+    with pytest.raises(LabArtifactNotFound):
+        store.get_binary_artifact(
+            __import__("uuid").UUID(artifact["artifact_id"]), tenant_id="tenant-a"
+        )
+
