@@ -182,23 +182,6 @@ def require_tenant_access(request: Request, action: str) -> str | None:
     correlation_id = request.headers.get("x-correlation-id", "").strip()
     if not correlation_id or len(correlation_id) > 128:
         correlation_id = str(uuid4())
-    try:
-        directory.authorize(principal_id, tenant_id, action)
-    except (AuthorizationDenied, ValueError) as error:
-        directory.audit(
-            principal_id=principal_id,
-            tenant_id=tenant_id,
-            action=action,
-            target_type=target_type,
-            target_id=target_id,
-            outcome="denied",
-            correlation_id=correlation_id,
-            metadata={"method": request.method, "route": request.url.path},
-        )
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Requested tenant resource is not available.",
-        ) from error
     request.state.authorization_audit = {
         "principal_id": principal_id,
         "tenant_id": tenant_id,
@@ -210,6 +193,13 @@ def require_tenant_access(request: Request, action: str) -> str | None:
         "method": request.method,
         "route": request.url.path,
     }
+    try:
+        directory.authorize(principal_id, tenant_id, action)
+    except (AuthorizationDenied, ValueError) as error:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Requested tenant resource is not available.",
+        ) from error
     return tenant_id
 
 
