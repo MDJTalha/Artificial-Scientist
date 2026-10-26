@@ -11,13 +11,14 @@ from datetime import date
 from typing import Any, Literal
 
 import httpx
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, TypeAdapter, ValidationError
 
 from artificial_scientist.config import Settings
 from artificial_scientist.records.identity import normalize_doi
 
 ProviderName = Literal["openalex", "crossref"]
 MAX_RESPONSE_BYTES = 2 * 1024 * 1024
+HTTP_URL_ADAPTER = TypeAdapter(HttpUrl)
 USER_AGENT = (
     "ArtificialScientist/0.1.0 "
     "(research project; https://github.com/MDJTalha/Artificial-Scientist)"
@@ -138,10 +139,10 @@ def _safe_web_url(value: object) -> str | None:
     if not isinstance(value, str):
         return None
     candidate = value.strip()
-    if not (candidate.startswith("https://") or candidate.startswith("http://")):
+    if not (candidate[:8].casefold() == "https://" or candidate[:7].casefold() == "http://"):
         return None
     try:
-        return str(HttpUrl(candidate))
+        return str(HTTP_URL_ADAPTER.validate_python(candidate))
     except ValidationError:
         return None
 
