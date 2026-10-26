@@ -522,5 +522,12 @@ def test_run_quota_exhaustion_returns_http_429(monkeypatch, tmp_path):
         )
         assert response.status_code == 429
         assert response.json()["detail"] == "Tenant has reached its lab run quota."
+        quota_events = directory.list_audit_events(tenant_id, limit=100)
+        assert any(
+            event["action"] == "run:create"
+            and event["outcome"] == "denied"
+            and event["metadata"].get("http_status") == 429
+            for event in quota_events
+        )
     finally:
         app.dependency_overrides.pop(get_lab_store, None)
