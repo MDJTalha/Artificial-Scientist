@@ -128,7 +128,7 @@ Deterministic tests cover:
 
 - [x] Current code commit passed Ruff and 46 backend tests on Python 3.12 and 46 on Python 3.13.
 - [x] Frontend type-check, all 6 frontend tests, and production build passed.
-- [x] Current code commit's GitHub Actions result is reviewed and linked below; the updated documentation head is receiving a separate CI run.
+- [x] Code and documentation commits passed GitHub Actions; see the [implementation run](https://github.com/MDJTalha/Artificial-Scientist/actions/runs/40265564598) and [documentation-head pull-request run](https://github.com/MDJTalha/Artificial-Scientist/actions/runs/40265672406).
 - [x] Concept search filters and paginates at the database layer.
 - [x] New concept and relationship records retain source references and checksums.
 - [x] Invalid relationship endpoints and self-relations are rejected.
