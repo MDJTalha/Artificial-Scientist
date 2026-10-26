@@ -14,7 +14,10 @@ from artificial_scientist.discovery import (
     PriorWorkMatch,
     PriorWorkScreenRequest,
     PriorWorkScreenResponse,
+    ResearchQuestionDecompositionRequest,
+    ResearchQuestionDecompositionResponse,
     assess_candidates,
+    decompose_research_question,
 )
 from artificial_scientist.literature.models import LiteratureSearchRequest
 from artificial_scientist.literature.service import LiteratureService
@@ -65,6 +68,18 @@ def _validate_evidence_references(
             raise HTTPException(
                 status_code=422, detail=f"Evidence record {record_id} is not a claim."
             )
+
+
+@router.post(
+    "/decompose",
+    response_model=ResearchQuestionDecompositionResponse,
+    summary="Create a bounded research-question decomposition draft",
+)
+def decompose_question(
+    request: ResearchQuestionDecompositionRequest,
+) -> ResearchQuestionDecompositionResponse:
+    """Extract conservative variable/context hints and expose unresolved details."""
+    return decompose_research_question(request)
 
 
 @router.post(
