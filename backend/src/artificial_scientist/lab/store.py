@@ -532,11 +532,16 @@ class LabRunStore:
                 ) from error
         return runs, total
 
-    def list_artifacts(self, run_id: UUID) -> list[LabArtifactMetadata]:
+    def list_artifacts(
+        self, run_id: UUID, tenant_id: str | None = None
+    ) -> list[LabArtifactMetadata]:
+        query = "SELECT 1 FROM lab_runs WHERE run_id = ?"
+        parameters: tuple[object, ...] = (str(run_id),)
+        if tenant_id is not None:
+            query += " AND tenant_id = ?"
+            parameters += (tenant_id,)
         with closing(self._connect()) as connection:
-            exists = connection.execute(
-                "SELECT 1 FROM lab_runs WHERE run_id = ?", (str(run_id),)
-            ).fetchone()
+            exists = connection.execute(query, parameters).fetchone()
             if exists is None:
                 raise LabRunNotFound(str(run_id))
             rows = connection.execute(
@@ -545,7 +550,7 @@ class LabRunStore:
             ).fetchall()
         artifacts: list[LabArtifactMetadata] = []
         for row in rows:
-            artifact = self.get_artifact(UUID(row["artifact_id"]))
+            artifact = self.get_artifact(UUID(row["artifact_id"]), tenant_id=tenant_id)
             artifacts.append(
                 LabArtifactMetadata.model_validate(artifact.model_dump(exclude={"content"}))
             )
