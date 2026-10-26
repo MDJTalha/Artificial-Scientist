@@ -203,3 +203,73 @@ def test_tenant_scoped_run_api_hides_runs_from_other_tenants(monkeypatch, tmp_pa
         assert no_tenant.status_code == 403
     finally:
         app.dependency_overrides.pop(get_lab_store, None)
+
+def test_cross_tenant_binary_upload_is_rejected_before_body_scanning(
+    monkeypatch, tmp_path
+):
+    database = str(tmp_path / "tenant-upload-api.sqlite3")
+    principal = AuthenticatedPrincipal(
+        subject="tenant-upload-user",
+        issuer="https://identity.example.test/",
+        audience="scientific-api",
+    )
+    monkeypatch.setattr(
+        lab_routes,
+        "get_settings",
+        lambda: SimpleNamespace(
+            environment="production",
+            lab_api_key=None,
+            oidc_issuer="https://identity.example.test/",
+            oidc_audience="scientific-api",
+            oidc_jwks_url="https://identity.example.test/jwks.json",
+            database_path=database,
+        ),
+    )
+    monkeypatch.setattr(
+        lab_routes, "validate_oidc_bearer_token", lambda *_args, **_kwargs: principal
+    )
+    monkeypatch.setattr(
+        lab_routes,
+        "scan_binary_content",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("Cross-tenant upload body must not reach the scanner.")
+        ),
+    )
+    directory = TenantDirectory(database)
+    principal_id = directory.register_principal(principal.issuer, principal.subject)
+    tenant_a = directory.create_tenant("tenant-upload-a", "Tenant Upload A")
+    tenant_b = directory.create_tenant("tenant-upload-b", "Tenant Upload B")
+    directory.grant_membership(principal_id, tenant_a, "researcher")
+
+    from artificial_scientist.lab.engine import run_lab
+    from artificial_scientist.lab.models import LabRunRequest
+
+    store = LabRunStore(database)
+    run_b = run_lab(
+        LabRunRequest(
+            title="Tenant B upload target",
+            steps=[
+                {
+                    "step_id": "summary",
+                    "operation": "statistics",
+                    "inputs": {"values": [1, 2, 3], "variance_mode": "population"},
+                }
+            ],
+        )
+    )
+    store.save(run_b, tenant_id=tenant_b)
+    app.dependency_overrides[get_lab_store] = lambda: store
+    try:
+        response = TestClient(app).post(
+            f"/api/v1/lab/runs/{run_b.run_id}/binary-artifacts?filename=probe.bin",
+            content=b"must-not-be-scanned",
+            headers={
+                "Authorization": "Bearer signed-token",
+                "X-Tenant-ID": tenant_a,
+                "Content-Type": "application/octet-stream",
+            },
+        )
+        assert response.status_code == 404
+    finally:
+        app.dependency_overrides.pop(get_lab_store, None)
+
