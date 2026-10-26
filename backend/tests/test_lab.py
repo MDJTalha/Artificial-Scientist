@@ -1,8 +1,8 @@
 """Reference and adversarial tests for the controlled computational lab."""
 
+import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
-import pytest
 
 from artificial_scientist.lab.engine import run_lab
 from artificial_scientist.lab.models import LabRunRequest
