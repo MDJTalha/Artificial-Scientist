@@ -2,10 +2,11 @@
 
 ## Implemented scope
 
-The Phase 7 API is exposed at `POST /api/v1/discovery/assess`. It accepts one research question and 2–10 competing, caller-supplied candidates. Each candidate must include assumptions, alternative explanations, predictions, falsification criteria, and a discriminating test. Source and claim references are validated against stored records before any hypothesis is written.
+The Phase 7 API exposes `POST /api/v1/discovery/assess` and `POST /api/v1/discovery/prior-work-screen`. Assessment accepts one research question and 2–10 competing, caller-supplied candidates. Prior-work screening queries the existing OpenAlex and Crossref metadata connectors for 2–5 candidates, without persisting search results. Each candidate must include assumptions, alternative explanations, predictions, falsification criteria, and a discriminating test. Source and claim references are validated against stored records before any hypothesis is written.
 
 The service:
 - checks required structure and bounded input sizes with Pydantic;
+- runs a bounded metadata-only prior-work search against OpenAlex/Crossref and returns source titles, DOI/year, provider status, and an explicit non-novelty-guarantee interpretation;
 - computes a transparent 0–100 **completeness** score from six explicit rubric checks;
 - flags likely near-duplicate statements using a deterministic lexical similarity heuristic;
 - records predictions and discriminating tests in immutable `HypothesisRecord` records;
@@ -47,6 +48,12 @@ The service:
 ```
 
 A successful request returns `201 Created`, per-candidate rubric results, near-duplicate warnings, and the persisted hypothesis record IDs. Source and claim IDs, when provided, must point to records of the correct type. If the request is marked `screened`, include `novelty_screen_notes`; this is caller-declared metadata and not proof that the search was adequate.
+
+## Prior-work screening
+
+Call `POST /api/v1/discovery/prior-work-screen` with a research question, 2–5 candidate titles/statements, optional provider selection, and `results_per_candidate` from 1 to 5. The route reuses the existing fixed-endpoint OpenAlex/Crossref adapters with persistence disabled. It returns per-candidate query status, matched metadata, provider status, and interpretation. An unavailable provider is reported rather than silently treated as an empty result set.
+
+The screen is a discovery aid, not an exhaustive systematic review. It does not fetch full text or determine whether a paper genuinely anticipates a hypothesis. Relevant-looking titles require manual source inspection and comparison of methods, results, assumptions, and limitations. No matches means only that the selected providers returned no match for that query.
 
 ## Rubric and interpretation
 
