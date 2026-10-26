@@ -1,7 +1,5 @@
 """HTTP endpoints for the bounded mathematical and scientific-tools service."""
 
-from typing import Annotated
-
 from fastapi import APIRouter, HTTPException
 
 from artificial_scientist.math_tools.engine import (
@@ -19,7 +17,6 @@ from artificial_scientist.math_tools.models import (
     DimensionCheckResponse,
     NumericIntegrationRequest,
     NumericIntegrationResponse,
-    NumericRequest,
     RootRequest,
     RootResponse,
     StatisticsRequest,
