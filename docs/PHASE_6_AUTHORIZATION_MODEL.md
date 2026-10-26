@@ -30,7 +30,7 @@ The current lab router uses a single shared `X-Lab-API-Key` outside development.
 - [x] Propagate the validated identity into request context; add an explicit role/action matrix that denies unknown roles and actions.
 - [x] Resolve validated request identity to a stable principal ID and require active tenant membership and action permission on run, execution-status, JSON artifact, binary artifact, verification, and export routes.
 - [x] Add nullable tenant ownership columns to run and execution-attempt records; legacy rows remain unowned rather than being assigned arbitrarily.
-- [ ] Define, test, and review the operational migration/claim process for legacy records before production rollout.
+- [x] Add an explicit dry-run-first, operator-authorized, conflict-rejecting legacy ownership claim tool with transactional audit records and regression tests; production rollout still requires an operator-run migration rehearsal and review.
 - [x] Add tenant filters to run lists/reads, execution-status reads, JSON artifact lists/reads, binary artifact lists/reads, and export/verification route storage calls.
 - [x] Add transactionally enforced per-tenant binary-attachment count and byte caps, with regression tests across multiple runs.
 - [x] Add a tenant-wide lab-run count cap with a serialized reservation transaction and regression coverage.
@@ -39,6 +39,43 @@ The current lab router uses a single shared `X-Lab-API-Key` outside development.
 - [x] Persist tenant-scoped lab request outcomes (allowed, denied, failed) with principal, tenant, action, object target, correlation ID, route, method, and HTTP status; audit metadata excludes credentials and request payloads. Audit persistence failure blocks the response.
 - [ ] Complete negative cross-tenant tests across every object endpoint, including UUID substitution for export, verification, execution status, uploads, and downloads. Current coverage includes store-level run/artifact/binary isolation, execution status, and API-level denial for read/export/verification/download paths; a regression test now checks that cross-tenant binary uploads are rejected before scanning.
 - [ ] Verify behavior in CI and conduct an independent security review before exposing untrusted or multi-tenant traffic.
+
+## Legacy ownership claim procedure
+
+The branch now includes `artificial_scientist.legacy_claim.claim_legacy_runs`, with a CLI entry point in `backend/src/artificial_scientist/legacy_claim.py`. It is intentionally separate from normal API traffic.
+
+- Prepare a reviewed JSON manifest containing only explicit `run_id` and existing `tenant_id` UUID pairs.
+- Run in dry-run mode first. The command refuses to initialize a missing database and verifies that every referenced run/attempt and tenant exists.
+- Applying requires `--apply` and an existing internal `--operator-principal-id`. Conflicting ownership rejects the whole operation; it never overwrites a different tenant assignment.
+- Run and execution-attempt ownership updates and the corresponding `legacy:claim` audit events are committed in one SQLite transaction. Re-running a matching claim is safe and records an audit event.
+- Review the dry-run output and backup the database before applying. This is an operator tool, not a self-service tenant endpoint.
+
+Example manifest:
+
+```json
+{
+  "claims": [
+    {
+      "run_id": "00000000-0000-4000-8000-000000000001",
+      "tenant_id": "00000000-0000-4000-8000-000000000002"
+    }
+  ]
+}
+```
+
+Dry-run:
+
+```powershell
+python -m artificial_scientist.legacy_claim --database .\\data\\lab.sqlite3 --manifest .\\legacy-claims.json
+```
+
+Apply only after reviewing the dry-run and taking a backup:
+
+```powershell
+python -m artificial_scientist.legacy_claim --database .\\data\\lab.sqlite3 --manifest .\\legacy-claims.json --apply --operator-principal-id 00000000-0000-4000-8000-000000000003
+```
+
+The claim tool does not automatically assign owners to records without a manifest entry. Retention records for already-deleted runs are not claimable by this workflow and require a separate reviewed retention-evidence migration.
 
 ## Minimum acceptance tests
 
@@ -70,4 +107,4 @@ This is an incremental authorization implementation, not a claim of production S
 
 The current branch adds `artificial_scientist.authorization.TenantDirectory`, which persists opaque principal IDs derived from the trusted issuer/subject pair, tenant records, explicit active memberships, and append-only-style security audit events. The supported roles are `tenant_admin`, `researcher`, `viewer`, and `auditor`; unknown roles/actions deny by default. Membership checks record allowed and denied outcomes without recording credentials or scientific payloads.
 
-This is an incremental authorization and persistence layer, not a completed migration or enforcement layer. The current branch adds nullable tenant ownership to run and execution-attempt records and scopes protected run/artifact operations by tenant; legacy rows remain unowned and must stay inaccessible to tenant-scoped requests. Migration/claim handling, CI confirmation of concurrency and audit regressions, complete cross-tenant endpoint coverage, production identity-provider verification, and independent security review remain open. Tenant-wide binary/JSON artifact and lab-run count quotas are implemented on this branch; the new changes require CI confirmation. Do not expose this branch to multiple customers until those controls and reviews are complete.
+This is an incremental authorization and persistence layer, not a completed migration or enforcement layer. The current branch adds nullable tenant ownership to run and execution-attempt records and scopes protected run/artifact operations by tenant; legacy rows remain unowned and must stay inaccessible to tenant-scoped requests. Production migration rehearsal and review, CI confirmation of concurrency/audit/claim regressions, complete cross-tenant endpoint coverage, production identity-provider verification, and independent security review remain open. Tenant-wide binary/JSON artifact and lab-run count quotas are implemented on this branch; the new changes require CI confirmation. Do not expose this branch to multiple customers until those controls and reviews are complete.
