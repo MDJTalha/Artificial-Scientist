@@ -19,6 +19,8 @@ from artificial_scientist.lab.models import (
 )
 
 _MAX_ARTIFACT_BYTES = 1_048_576
+_MAX_BINARY_ARTIFACTS_PER_RUN = 100
+_MAX_BINARY_BYTES_PER_RUN = 50 * 1024 * 1024
 
 
 class LabRunNotFound(LookupError):
@@ -404,19 +406,36 @@ class LabRunStore:
         }
         with closing(self._connect()) as connection:
             with connection:
-                connection.execute(
-                    """
-                    INSERT OR IGNORE INTO lab_binary_artifacts (
-                        artifact_id, run_id, filename, content_type, sha256,
-                        size_bytes, created_at, provenance_json, content
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        str(artifact_id), str(run_id), filename, content_type,
-                        digest, len(content), created_at,
-                        self._canonical_json(provenance), sqlite3.Binary(content),
-                    ),
-                )
+                existing = connection.execute(
+                    "SELECT * FROM lab_binary_artifacts WHERE artifact_id = ?",
+                    (str(artifact_id),),
+                ).fetchone()
+                if existing is None:
+                    usage = connection.execute(
+                        """
+                        SELECT COUNT(*) AS artifact_count,
+                               COALESCE(SUM(size_bytes), 0) AS total_bytes
+                        FROM lab_binary_artifacts WHERE run_id = ?
+                        """,
+                        (str(run_id),),
+                    ).fetchone()
+                    if int(usage["artifact_count"]) >= _MAX_BINARY_ARTIFACTS_PER_RUN:
+                        raise ValueError("Run has reached its binary artifact count quota.")
+                    if int(usage["total_bytes"]) + len(content) > _MAX_BINARY_BYTES_PER_RUN:
+                        raise ValueError("Run has reached its binary artifact storage quota.")
+                    connection.execute(
+                        """
+                        INSERT INTO lab_binary_artifacts (
+                            artifact_id, run_id, filename, content_type, sha256,
+                            size_bytes, created_at, provenance_json, content
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            str(artifact_id), str(run_id), filename, content_type,
+                            digest, len(content), created_at,
+                            self._canonical_json(provenance), sqlite3.Binary(content),
+                        ),
+                    )
                 row = connection.execute(
                     "SELECT * FROM lab_binary_artifacts WHERE artifact_id = ?",
                     (str(artifact_id),),
