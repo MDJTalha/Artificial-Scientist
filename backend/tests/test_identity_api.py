@@ -5,6 +5,8 @@ from types import SimpleNamespace
 from fastapi.testclient import TestClient
 
 from artificial_scientist.api.routes import lab as lab_routes
+from artificial_scientist.authorization import TenantDirectory, stable_principal_id
+from artificial_scientist.identity import AuthenticatedPrincipal
 from artificial_scientist.api.routes.lab import get_lab_store
 from artificial_scientist.lab.store import LabRunStore
 from artificial_scientist.main import app
@@ -47,21 +49,35 @@ def test_configured_oidc_accepts_only_validated_bearer_identity(monkeypatch, tmp
             oidc_issuer="https://identity.example.test/",
             oidc_audience="scientific-api",
             oidc_jwks_url="https://identity.example.test/jwks.json",
+            database_path=str(tmp_path / "oidc-api.sqlite3"),
         ),
     )
     validated = []
+    principal = AuthenticatedPrincipal(
+        subject="researcher-123",
+        issuer="https://identity.example.test/",
+        audience="scientific-api",
+    )
     monkeypatch.setattr(
         lab_routes,
         "validate_oidc_bearer_token",
-        lambda token, **kwargs: validated.append((token, kwargs)),
+        lambda token, **kwargs: (validated.append((token, kwargs)) or principal),
     )
+
+    tenant_directory = TenantDirectory(str(tmp_path / "oidc-api.sqlite3"))
+    principal_id = tenant_directory.register_principal(principal.issuer, principal.subject)
+    tenant_id = tenant_directory.create_tenant("oidc-test-tenant", "OIDC Test Tenant")
+    tenant_directory.grant_membership(principal_id, tenant_id, "researcher")
 
     store = LabRunStore(str(tmp_path / "oidc-api.sqlite3"))
     app.dependency_overrides[get_lab_store] = lambda: store
     try:
         response = TestClient(app).get(
             "/api/v1/lab/runs",
-            headers={"Authorization": "Bearer signed-token"},
+            headers={
+                "Authorization": "Bearer signed-token",
+                "X-Tenant-ID": tenant_id,
+            },
         )
         assert response.status_code == 200
         assert validated[0][0] == "signed-token"
