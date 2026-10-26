@@ -9,6 +9,7 @@ from pydantic import ValidationError
 
 from artificial_scientist.api.routes.lab import get_lab_store
 from artificial_scientist.lab.engine import run_lab
+from artificial_scientist.lab.execution import LabExecutionTimeout, run_isolated
 from artificial_scientist.lab.models import LabRunRequest
 from artificial_scientist.lab.store import LabRunStore
 from artificial_scientist.main import app
@@ -213,4 +214,12 @@ def test_lab_api_returns_generic_server_error_for_tampered_run_listing(tmp_path)
         assert listing.json()["detail"] == "Stored lab run failed integrity validation."
     finally:
         app.dependency_overrides.pop(get_lab_store, None)
+
+def test_isolated_lab_worker_respects_deadline() -> None:
+    import time
+
+    started = time.monotonic()
+    with pytest.raises(LabExecutionTimeout, match="execution deadline"):
+        run_isolated(_slow_lab_worker, (), timeout_seconds=0.1)
+    assert time.monotonic() - started < 5
 
