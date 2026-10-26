@@ -539,11 +539,7 @@ async def upload_lab_binary_artifact(
 
     raw_content_type = request.headers.get("content-type", "application/octet-stream")
     media_type = raw_content_type.split(";", 1)[0].strip()
-    media_type_pattern = r"[A-Za-z0-9!#    content_length = request.headers.get("content-length")
-    if content_length is not None:
-^_.+-]+/[A-Za-z0-9!#    content_length = request.headers.get("content-length")
-    if content_length is not None:
-^_.+-]+"
+    media_type_pattern = r"[A-Za-z0-9!#$&^_.+-]+/[A-Za-z0-9!#$&^_.+-]+"
     if not re.fullmatch(media_type_pattern, media_type):
         raise HTTPException(status_code=422, detail="Invalid binary artifact content type.")
 
