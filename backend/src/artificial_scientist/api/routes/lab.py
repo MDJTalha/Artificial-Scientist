@@ -183,10 +183,12 @@ def create_lab_run(
     store.begin_execution(run_id, lab_request, tenant_id=tenant_id)
     try:
         run = run_lab(lab_request, run_id=run_id)
+        # Persistence can fail independently (for example, a tenant storage quota).
+        # Mark the reservation failed rather than leaving a false "running" status.
+        return store.save(run, tenant_id=tenant_id)
     except Exception:
         store.fail_execution(run_id, tenant_id=tenant_id)
         raise
-    return store.save(run, tenant_id=tenant_id)
 
 
 @router.get("/runs/{run_id}/execution-status", response_model=dict[str, object])
