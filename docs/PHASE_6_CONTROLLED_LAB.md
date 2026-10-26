@@ -45,7 +45,7 @@ The configuration and result hashes support integrity comparison; the result dig
 - Each allowlisted lab step now runs in a separate spawned child process with a configurable hard wall-clock deadline (default 10 seconds, maximum 30 seconds); timed-out workers are terminated. This is process separation, not an OS security sandbox, and no OS-level CPU/memory quota is enforced.
 - This is not an operating-system sandbox. The endpoint must remain on trusted local infrastructure; the application currently has no authentication.
 - A seed is recorded as metadata only; these deterministic math operations do not currently consume it.
-- Environment/dependency manifests, replay across versions, interruption recovery, and cross-system durable audit linkage remain future acceptance work.
+- Runs now persist their original validated configuration and a runtime manifest (Python implementation/version, platform, machine, and key scientific dependency versions). `POST /api/v1/lab/runs/{run_id}/verify` replays that configuration and compares configuration digest, exact environment manifest, and per-step outputs. Verification is an observed replay comparison, not proof of scientific validity or bit-for-bit reproducibility across platforms. Older records without replayable configuration return HTTP 409. Interruption recovery and cross-system durable audit linkage remain future acceptance work.
 - The lab currently stops at the first failed step and does not support arbitrary dependency graphs or parallel execution.
 
 ## Acceptance criteria for full Phase 6
@@ -62,7 +62,7 @@ The configuration and result hashes support integrity comparison; the result dig
 - [ ] General binary artifact support, lifecycle policy, and complete provenance linkage to experiment plans/records.
 - [x] Enforced per-step wall-clock timeout and child-process termination test.
 - [ ] OS-level process/resource isolation and CPU/memory quota tests.
-- [ ] Reproducible environment manifest and rerun/verification workflow.
+- [x] Runtime environment manifest and stored-configuration rerun/verification endpoint with output comparison tests.
 - [ ] Security review of the execution boundary before enabling generated code or untrusted users.
 
 Phase 6 remains in progress until all required security, durability, reproducibility, and CI gates are evidenced. No arbitrary generated code should be enabled before a separately reviewed isolation boundary exists.
