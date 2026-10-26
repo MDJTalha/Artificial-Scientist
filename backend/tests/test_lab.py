@@ -458,7 +458,7 @@ def test_lab_api_requires_constant_time_key_outside_development(monkeypatch, tmp
     monkeypatch.setattr(
         lab_routes,
         "get_settings",
-        lambda: SimpleNamespace(environment="production", lab_api_key="test-secret"),
+        lambda: SimpleNamespace(environment="production", lab_api_key="test-secret-value-that-is-at-least-32-chars"),
     )
     store = LabRunStore(str(tmp_path / "authenticated-lab.sqlite3"))
     app.dependency_overrides[get_lab_store] = lambda: store
@@ -469,7 +469,7 @@ def test_lab_api_requires_constant_time_key_outside_development(monkeypatch, tmp
             "/api/v1/lab/runs", headers={"X-Lab-API-Key": "wrong"}
         ).status_code == 401
         accepted = client.get(
-            "/api/v1/lab/runs", headers={"X-Lab-API-Key": "test-secret"}
+            "/api/v1/lab/runs", headers={"X-Lab-API-Key": "test-secret-value-that-is-at-least-32-chars"}
         )
         assert accepted.status_code == 200
     finally:
@@ -485,6 +485,22 @@ def test_lab_api_fails_closed_when_production_key_is_missing(monkeypatch) -> Non
     response = TestClient(app).get("/api/v1/lab/runs")
     assert response.status_code == 503
     assert response.json()["detail"] == "Lab API authentication is not configured."
+
+
+def test_lab_api_fails_closed_when_production_key_is_too_short(monkeypatch) -> None:
+    monkeypatch.setattr(
+        lab_routes,
+        "get_settings",
+        lambda: SimpleNamespace(environment="production", lab_api_key="short-key"),
+    )
+    response = TestClient(app).get(
+        "/api/v1/lab/runs",
+        headers={"X-Lab-API-Key": "short-key"},
+    )
+    assert response.status_code == 503
+    assert response.json()["detail"] == (
+        "Lab API authentication requires a configured key of at least 32 characters."
+    )
 
 
 
