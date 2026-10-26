@@ -75,7 +75,7 @@ class LabSecurityAuditMiddleware:
                 if context:
                     outcome = (
                         "denied"
-                        if status_code in {401, 403, 404}
+                        if 400 <= status_code < 500
                         else "failed"
                         if status_code >= 500
                         else "allowed"
