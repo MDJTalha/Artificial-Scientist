@@ -1,6 +1,6 @@
 # Phase 3 — Scholarly Literature Retrieval and Evidence Provenance
 
-**Status:** Implementation and acceptance testing in progress.  
+**Status:** Implementation acceptance checks passed on code commit `a3d139a56526ad0d512ab568c1dca71cba815b8a`. See the [passing GitHub Actions run](https://github.com/MDJTalha/Artificial-Scientist/actions/runs/40264595989).  
 **Branch:** \`phase-3-literature-retrieval\`  
 **Objective:** retrieve bounded scholarly metadata from documented public APIs, normalize it into consistent source records, preserve how it was retrieved, and fail transparently when a provider cannot be used.
 
@@ -91,17 +91,26 @@ Tests use deterministic HTTP mocks, not live network calls. The suite covers:
 
 ## Acceptance criteria
 
-- [ ] Current branch passes Ruff and backend tests on Python 3.12 and 3.13.
-- [ ] Current branch passes frontend TypeScript checks, tests, and production build.
-- [ ] Both provider adapters validate normalized results without needing real credentials.
-- [ ] Partial provider failure retains valid results from another provider.
-- [ ] Total provider failure is disclosed as unavailable, not as an empty successful search.
-- [ ] Duplicate DOI results map to one persisted source record.
-- [ ] Repeated searches reuse existing matching source records.
-- [ ] Source records preserve provider IDs, query context, connector name, and retrieval time.
-- [ ] Schema-v1 source rows migrate to schema v2 without losing the original record.
-- [ ] No full text is downloaded and no scientific claim is marked verified automatically.
-- [ ] Latest CI result is recorded here.
+- [x] Current code commit passed Ruff and backend tests on Python 3.12 and 3.13.
+- [x] Current code commit passed frontend TypeScript checks, tests, and production build.
+- [x] Both provider adapters validate normalized results without needing real credentials.
+- [x] Partial provider failure retains valid results from another provider.
+- [x] Total provider failure is disclosed as unavailable, not as an empty successful search.
+- [x] Duplicate DOI results map to one persisted source record.
+- [x] Repeated searches reuse existing matching source records.
+- [x] Source records preserve provider IDs, query context, connector name, and retrieval time.
+- [x] Schema-v1 source rows migrate to schema v2 without losing the original record.
+- [x] No full text is downloaded and no scientific claim is marked verified automatically.
+- [x] CI results are recorded here.
+
+## Verified CI result
+
+- [Passing GitHub Actions run](https://github.com/MDJTalha/Artificial-Scientist/actions/runs/40264595989) for code commit `a3d139a56526ad0d512ab568c1dca71cba815b8a`.
+- Backend: Ruff passed; 33 tests passed on Python 3.12 and 33 tests passed on Python 3.13.
+- Frontend: TypeScript type-check passed, 6 unit tests passed, and the production build completed.
+- Tests are deterministic and use mocked provider responses; no live-provider reliability or metadata freshness claim is inferred from them.
+
+The pull-request workflow will also validate the current branch and PR base configuration. Phase approval remains review/integration-gated.
 
 ## Not implemented
 
