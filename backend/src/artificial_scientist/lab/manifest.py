@@ -1,5 +1,7 @@
 """Capture the runtime environment needed to interpret controlled-lab results."""
 
+# ruff: noqa: I001
+
 from __future__ import annotations
 
 import platform
