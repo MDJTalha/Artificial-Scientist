@@ -4,10 +4,10 @@ import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
+from artificial_scientist.api.routes.lab import get_lab_store
 from artificial_scientist.lab.engine import run_lab
 from artificial_scientist.lab.models import LabRunRequest
 from artificial_scientist.lab.store import LabRunStore
-from artificial_scientist.api.routes.lab import get_lab_store
 from artificial_scientist.main import app
 
 
