@@ -273,3 +273,68 @@ def test_cross_tenant_binary_upload_is_rejected_before_body_scanning(
     finally:
         app.dependency_overrides.pop(get_lab_store, None)
 
+
+
+
+def test_result_persistence_failure_marks_execution_failed(monkeypatch, tmp_path):
+    from uuid import UUID
+
+    database = str(tmp_path / "tenant-persistence-failure.sqlite3")
+    principal = AuthenticatedPrincipal(
+        subject="persistence-failure-user",
+        issuer="https://identity.example.test/",
+        audience="scientific-api",
+    )
+    monkeypatch.setattr(
+        lab_routes,
+        "get_settings",
+        lambda: SimpleNamespace(
+            environment="production",
+            lab_api_key=None,
+            oidc_issuer="https://identity.example.test/",
+            oidc_audience="scientific-api",
+            oidc_jwks_url="https://identity.example.test/jwks.json",
+            database_path=database,
+        ),
+    )
+    monkeypatch.setattr(
+        lab_routes, "validate_oidc_bearer_token", lambda *_args, **_kwargs: principal
+    )
+    directory = TenantDirectory(database)
+    principal_id = directory.register_principal(principal.issuer, principal.subject)
+    tenant_id = directory.create_tenant("persistence-failure-tenant", "Persistence Failure")
+    directory.grant_membership(principal_id, tenant_id, "researcher")
+
+    store = LabRunStore(database)
+    attempted_ids = []
+
+    def reject_persistence(run, *, tenant_id=None):
+        attempted_ids.append(run.run_id)
+        raise ValueError("Tenant storage quota reached.")
+
+    monkeypatch.setattr(store, "save", reject_persistence)
+    app.dependency_overrides[get_lab_store] = lambda: store
+    try:
+        response = TestClient(app, raise_server_exceptions=False).post(
+            "/api/v1/lab/runs",
+            json={
+                "title": "Persistence quota rejection",
+                "steps": [
+                    {
+                        "step_id": "summary",
+                        "operation": "statistics",
+                        "inputs": {"values": [1, 2, 3], "variance_mode": "population"},
+                    }
+                ],
+            },
+            headers={
+                "Authorization": "Bearer signed-token",
+                "X-Tenant-ID": tenant_id,
+            },
+        )
+        assert response.status_code == 500
+        assert len(attempted_ids) == 1
+        status = store.get_execution_status(UUID(str(attempted_ids[0])), tenant_id=tenant_id)
+        assert status["status"] == "failed"
+    finally:
+        app.dependency_overrides.pop(get_lab_store, None)
