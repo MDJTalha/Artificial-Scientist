@@ -202,6 +202,7 @@ def require_tenant_access(request: Request, action: str) -> str | None:
     request.state.authorization_audit = {
         "principal_id": principal_id,
         "tenant_id": tenant_id,
+        "database_path": settings.database_path,
         "action": action,
         "target_type": target_type,
         "target_id": target_id,
