@@ -26,6 +26,8 @@ _MAX_BINARY_BYTES_PER_RUN = 50 * 1024 * 1024
 _MAX_BINARY_ARTIFACTS_PER_TENANT = 500
 _MAX_BINARY_BYTES_PER_TENANT = 250 * 1024 * 1024
 _MAX_RUNS_PER_TENANT = 1_000
+_MAX_JSON_ARTIFACTS_PER_TENANT = 5_000
+_MAX_JSON_BYTES_PER_TENANT = 250 * 1024 * 1024
 _EXECUTION_STALE_AFTER_SECONDS = 15 * 60
 
 
@@ -359,6 +361,31 @@ class LabRunStore:
         }
         with closing(self._connect()) as connection:
             with connection:
+                if tenant_id is not None:
+                    tenant_usage = connection.execute(
+                        """
+                        SELECT COUNT(*) AS artifact_count,
+                               COALESCE(SUM(artifacts.size_bytes), 0) AS total_bytes
+                        FROM lab_artifacts AS artifacts
+                        JOIN lab_runs AS runs ON runs.run_id = artifacts.run_id
+                        WHERE runs.tenant_id = ?
+                        """,
+                        (tenant_id,),
+                    ).fetchone()
+                    if (
+                        int(tenant_usage["artifact_count"])
+                        >= _MAX_JSON_ARTIFACTS_PER_TENANT
+                    ):
+                        raise ValueError(
+                            "Tenant has reached its JSON artifact count quota."
+                        )
+                    if (
+                        int(tenant_usage["total_bytes"]) + len(artifact_bytes)
+                        > _MAX_JSON_BYTES_PER_TENANT
+                    ):
+                        raise ValueError(
+                            "Tenant has reached its JSON artifact storage quota."
+                        )
                 connection.execute(
                     """
                     INSERT INTO lab_runs (
