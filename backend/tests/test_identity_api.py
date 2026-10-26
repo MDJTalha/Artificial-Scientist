@@ -1,0 +1,83 @@
+"""API-boundary tests for configured OIDC authentication."""
+
+from types import SimpleNamespace
+
+from fastapi.testclient import TestClient
+
+from artificial_scientist.api.routes import lab as lab_routes
+from artificial_scientist.main import app
+
+
+def test_configured_oidc_cannot_be_bypassed_with_legacy_api_key(monkeypatch):
+    monkeypatch.setattr(
+        lab_routes,
+        "get_settings",
+        lambda: SimpleNamespace(
+            environment="production",
+            lab_api_key="legacy-shared-secret-that-is-long-enough",
+            oidc_issuer="https://identity.example.test/",
+            oidc_audience="scientific-api",
+            oidc_jwks_url="https://identity.example.test/jwks.json",
+        ),
+    )
+    monkeypatch.setattr(
+        lab_routes,
+        "validate_oidc_bearer_token",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("Token validator must not run without a bearer token.")
+        ),
+    )
+
+    client = TestClient(app)
+    assert client.get(
+        "/api/v1/lab/runs",
+        headers={"X-Lab-API-Key": "legacy-shared-secret-that-is-long-enough"},
+    ).status_code == 401
+
+
+def test_configured_oidc_accepts_only_validated_bearer_identity(monkeypatch):
+    monkeypatch.setattr(
+        lab_routes,
+        "get_settings",
+        lambda: SimpleNamespace(
+            environment="production",
+            lab_api_key="legacy-shared-secret-that-is-long-enough",
+            oidc_issuer="https://identity.example.test/",
+            oidc_audience="scientific-api",
+            oidc_jwks_url="https://identity.example.test/jwks.json",
+        ),
+    )
+    validated = []
+    monkeypatch.setattr(
+        lab_routes,
+        "validate_oidc_bearer_token",
+        lambda token, **kwargs: validated.append((token, kwargs)),
+    )
+
+    response = TestClient(app).get(
+        "/api/v1/lab/runs",
+        headers={"Authorization": "Bearer signed-token"},
+    )
+    assert response.status_code == 200
+    assert validated[0][0] == "signed-token"
+    assert validated[0][1]["issuer"] == "https://identity.example.test/"
+
+
+def test_partial_oidc_configuration_fails_closed(monkeypatch):
+    monkeypatch.setattr(
+        lab_routes,
+        "get_settings",
+        lambda: SimpleNamespace(
+            environment="production",
+            lab_api_key="legacy-shared-secret-that-is-long-enough",
+            oidc_issuer="https://identity.example.test/",
+            oidc_audience=None,
+            oidc_jwks_url=None,
+        ),
+    )
+    response = TestClient(app).get(
+        "/api/v1/lab/runs",
+        headers={"X-Lab-API-Key": "legacy-shared-secret-that-is-long-enough"},
+    )
+    assert response.status_code == 503
+    assert response.json()["detail"] == "OIDC authentication is not fully configured."
