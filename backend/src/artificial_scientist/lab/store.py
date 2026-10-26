@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 import sqlite3
 from contextlib import closing
@@ -10,6 +9,7 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID
 
+from artificial_scientist.lab.integrity import result_digest
 from artificial_scientist.lab.models import LabRunResponse
 
 
@@ -79,21 +79,8 @@ class LabRunStore:
 
     @staticmethod
     def _verify_result_hash(run: LabRunResponse) -> None:
-        """Verify the stored step payload against the digest recorded at execution."""
-        canonical = json.dumps(
-            {
-                "run_id": str(run.run_id),
-                "configuration_sha256": run.configuration_sha256,
-                "status": run.status,
-                "steps": [step.model_dump(mode="json") for step in run.steps],
-            },
-            sort_keys=True,
-            separators=(",", ":"),
-            ensure_ascii=False,
-            allow_nan=False,
-        )
-        actual = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
-        if actual != run.result_sha256:
+        """Verify every persisted response field except its digest."""
+        if result_digest(run.model_dump(mode="json")) != run.result_sha256:
             raise RuntimeError("Stored lab run result hash does not match its payload.")
 
     def get(self, run_id: UUID) -> LabRunResponse:
