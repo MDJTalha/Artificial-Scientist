@@ -537,6 +537,9 @@ async def upload_lab_binary_artifact(
             status_code=500, detail="Stored lab data failed integrity validation."
         ) from error
 
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,179}", filename):
+        raise HTTPException(status_code=422, detail="Invalid binary artifact filename.")
+
     raw_content_type = request.headers.get("content-type", "application/octet-stream")
     media_type = raw_content_type.split(";", 1)[0].strip()
     media_type_pattern = r"[A-Za-z0-9!#$&^_.+-]+/[A-Za-z0-9!#$&^_.+-]+"
