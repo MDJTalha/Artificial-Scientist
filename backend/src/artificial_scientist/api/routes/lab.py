@@ -173,28 +173,32 @@ def require_tenant_access(request: Request, action: str) -> str | None:
 
 @router.post("/runs", response_model=LabRunResponse, status_code=status.HTTP_201_CREATED)
 def create_lab_run(
-    request: LabRunRequest,
+    lab_request: LabRunRequest,
+    http_request: Request,
     store: Annotated[LabRunStore, Depends(get_lab_store)],
 ) -> LabRunResponse:
     """Execute a bounded declarative run and persist its traceable response."""
+    tenant_id = require_tenant_access(http_request, "run:create")
     run_id = uuid4()
-    store.begin_execution(run_id, request)
+    store.begin_execution(run_id, lab_request, tenant_id=tenant_id)
     try:
-        run = run_lab(request, run_id=run_id)
+        run = run_lab(lab_request, run_id=run_id)
     except Exception:
         store.fail_execution(run_id)
         raise
-    return store.save(run)
+    return store.save(run, tenant_id=tenant_id)
 
 
 @router.get("/runs/{run_id}/execution-status", response_model=dict[str, object])
 def get_lab_execution_status(
     run_id: UUID,
+    request: Request,
     store: Annotated[LabRunStore, Depends(get_lab_store)],
 ) -> dict[str, object]:
     """Retrieve durable execution status, including recovered interruptions."""
+    tenant_id = require_tenant_access(request, "run:read")
     try:
-        return store.get_execution_status(run_id)
+        return store.get_execution_status(run_id, tenant_id=tenant_id)
     except LabExecutionNotFound as error:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -204,13 +208,15 @@ def get_lab_execution_status(
 
 @router.get("/runs", response_model=dict[str, object])
 def list_lab_runs(
+    request: Request,
     store: Annotated[LabRunStore, Depends(get_lab_store)],
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
 ) -> dict[str, object]:
     """List persisted lab runs with bounded pagination."""
+    tenant_id = require_tenant_access(request, "run:list")
     try:
-        runs, total = store.list_runs(limit=limit, offset=offset)
+        runs, total = store.list_runs(limit=limit, offset=offset, tenant_id=tenant_id)
     except RuntimeError as error:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -222,11 +228,13 @@ def list_lab_runs(
 @router.get("/runs/{run_id}", response_model=LabRunResponse)
 def get_lab_run(
     run_id: UUID,
+    request: Request,
     store: Annotated[LabRunStore, Depends(get_lab_store)],
 ) -> LabRunResponse:
     """Retrieve a persisted run by UUID."""
+    tenant_id = require_tenant_access(request, "run:read")
     try:
-        return store.get(run_id)
+        return store.get(run_id, tenant_id=tenant_id)
     except LabRunNotFound as error:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Lab run not found."
@@ -241,11 +249,13 @@ def get_lab_run(
 @router.post("/runs/{run_id}/verify", response_model=LabRunVerificationResponse)
 def verify_lab_run(
     run_id: UUID,
+    request: Request,
     store: Annotated[LabRunStore, Depends(get_lab_store)],
 ) -> LabRunVerificationResponse:
     """Replay a stored declarative configuration and compare scientific outputs."""
+    tenant_id = require_tenant_access(request, "run:verify")
     try:
-        recorded = store.get(run_id)
+        recorded = store.get(run_id, tenant_id=tenant_id)
     except LabRunNotFound as error:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Lab run not found."
@@ -319,19 +329,21 @@ def verify_lab_run(
 @router.get("/runs/{run_id}/export")
 def export_lab_run(
     run_id: UUID,
+    request: Request,
     store: Annotated[LabRunStore, Depends(get_lab_store)],
 ) -> Response:
     """Export a run and its verified result artifact as a checksum-manifest ZIP."""
+    tenant_id = require_tenant_access(request, "run:export")
     try:
-        run = store.get(run_id)
-        artifacts = store.list_artifacts(run_id)
+        run = store.get(run_id, tenant_id=tenant_id)
+        artifacts = store.list_artifacts(run_id, tenant_id=tenant_id)
         artifact_documents = [
-            store.get_artifact(item.artifact_id).model_dump(mode="json")
+            store.get_artifact(item.artifact_id, tenant_id=tenant_id).model_dump(mode="json")
             for item in artifacts
         ]
-        binary_artifacts = store.list_binary_artifacts(run_id)
+        binary_artifacts = store.list_binary_artifacts(run_id, tenant_id=tenant_id)
         binary_documents = [
-            store.get_binary_artifact(UUID(item["artifact_id"]))
+            store.get_binary_artifact(UUID(item["artifact_id"]), tenant_id=tenant_id)
             for item in binary_artifacts
         ]
     except LabRunNotFound as error:
@@ -387,11 +399,13 @@ def export_lab_run(
 @router.get("/runs/{run_id}/artifacts", response_model=list[LabArtifactMetadata])
 def list_lab_run_artifacts(
     run_id: UUID,
+    request: Request,
     store: Annotated[LabRunStore, Depends(get_lab_store)],
 ) -> list[LabArtifactMetadata]:
     """List artifact metadata and provenance attached to one run."""
+    tenant_id = require_tenant_access(request, "artifact:read")
     try:
-        return store.list_artifacts(run_id)
+        return store.list_artifacts(run_id, tenant_id=tenant_id)
     except LabRunNotFound as error:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Lab run not found."
@@ -406,11 +420,13 @@ def list_lab_run_artifacts(
 @router.get("/artifacts/{artifact_id}", response_model=LabArtifactResponse)
 def get_lab_artifact(
     artifact_id: UUID,
+    request: Request,
     store: Annotated[LabRunStore, Depends(get_lab_store)],
 ) -> LabArtifactResponse:
     """Retrieve an artifact after validating its byte digest and run provenance."""
+    tenant_id = require_tenant_access(request, "artifact:read")
     try:
-        return store.get_artifact(artifact_id)
+        return store.get_artifact(artifact_id, tenant_id=tenant_id)
     except LabArtifactNotFound as error:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Lab artifact not found."
