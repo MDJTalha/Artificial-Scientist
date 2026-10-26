@@ -317,3 +317,41 @@ def test_lab_request_bounds_per_step_timeout() -> None:
             ],
         )
 
+
+
+def test_lab_replay_verification_rejects_legacy_record_without_configuration(tmp_path) -> None:
+    database = str(tmp_path / "legacy-replay.sqlite3")
+    store = LabRunStore(database)
+    run = run_lab(
+        LabRunRequest(
+            title="Legacy replay is unavailable",
+            steps=[
+                {
+                    "step_id": "stats",
+                    "operation": "statistics",
+                    "inputs": {"values": [1, 2, 3]},
+                }
+            ],
+        )
+    )
+    store.save(run)
+    legacy_payload = run.model_dump(mode="json")
+    legacy_payload.pop("configuration")
+    legacy_payload.pop("environment_manifest")
+    legacy_payload["result_sha256"] = result_digest(legacy_payload)
+    with sqlite3.connect(database) as connection:
+        connection.execute(
+            "UPDATE lab_runs SET payload_json = ? WHERE run_id = ?",
+            (json.dumps(legacy_payload), str(run.run_id)),
+        )
+
+    app.dependency_overrides[get_lab_store] = lambda: store
+    client = TestClient(app)
+    try:
+        response = client.post(f"/api/v1/lab/runs/{run.run_id}/verify")
+        assert response.status_code == 409
+        assert response.json()["detail"] == (
+            "This stored run predates replayable configuration metadata."
+        )
+    finally:
+        app.dependency_overrides.pop(get_lab_store, None)
