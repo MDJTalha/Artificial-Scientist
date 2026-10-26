@@ -81,6 +81,25 @@ class LabRunStore:
             )
             connection.execute(
                 """
+                CREATE TABLE IF NOT EXISTS lab_binary_artifacts (
+                    artifact_id TEXT PRIMARY KEY,
+                    run_id TEXT NOT NULL REFERENCES lab_runs(run_id) ON DELETE CASCADE,
+                    filename TEXT NOT NULL CHECK (length(filename) BETWEEN 1 AND 180),
+                    content_type TEXT NOT NULL CHECK (length(content_type) BETWEEN 1 AND 120),
+                    sha256 TEXT NOT NULL CHECK (length(sha256) = 64),
+                    size_bytes INTEGER NOT NULL CHECK (size_bytes BETWEEN 1 AND 10485760),
+                    created_at TEXT NOT NULL,
+                    provenance_json TEXT NOT NULL,
+                    content BLOB NOT NULL
+                )
+                """
+            )
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_lab_binary_artifacts_run_id "
+                "ON lab_binary_artifacts(run_id)"
+            )
+            connection.execute(
+                """
                 CREATE TABLE IF NOT EXISTS lab_run_retention_events (
                     run_id TEXT PRIMARY KEY,
                     result_sha256 TEXT NOT NULL CHECK (length(result_sha256) = 64),
@@ -341,3 +360,105 @@ class LabRunStore:
                 "Stored lab artifact provenance, schema, or integrity validation failed."
             ) from error
         return LabArtifactResponse(**metadata.model_dump(), content=content)
+
+
+    def save_binary_artifact(
+        self,
+        run_id: UUID,
+        filename: str,
+        content_type: str,
+        content: bytes,
+    ) -> dict[str, Any]:
+        """Persist a bounded immutable binary attachment with run provenance."""
+        import re
+
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,179}", filename):
+            raise ValueError("filename must be a safe 1–180 character filename.")
+        if not re.fullmatch(r"[A-Za-z0-9!#$&^_.+-]+/[A-Za-z0-9!#$&^_.+-]+", content_type):
+            raise ValueError("content_type must be a valid media type.")
+        if not content or len(content) > 10 * 1024 * 1024:
+            raise ValueError("Binary artifacts must be between 1 byte and 10 MiB.")
+        run = self.get(run_id)
+        artifact_id = uuid5(
+            NAMESPACE_URL,
+            f"artificial-scientist:binary:{run_id}:{filename}:{hashlib.sha256(content).hexdigest()}",
+        )
+        digest = hashlib.sha256(content).hexdigest()
+        created_at = datetime.now(UTC).isoformat()
+        provenance = {
+            "run_id": str(run.run_id),
+            "title": run.title,
+            "configuration_sha256": run.configuration_sha256,
+            "result_sha256": run.result_sha256,
+            "plan_record_id": str(run.plan_record_id) if run.plan_record_id else None,
+            "artifact_role": "binary-scientific-attachment",
+            "filename": filename,
+        }
+        with closing(self._connect()) as connection:
+            with connection:
+                connection.execute(
+                    """
+                    INSERT OR IGNORE INTO lab_binary_artifacts (
+                        artifact_id, run_id, filename, content_type, sha256,
+                        size_bytes, created_at, provenance_json, content
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        str(artifact_id), str(run_id), filename, content_type,
+                        digest, len(content), created_at,
+                        self._canonical_json(provenance), sqlite3.Binary(content),
+                    ),
+                )
+                row = connection.execute(
+                    "SELECT * FROM lab_binary_artifacts WHERE artifact_id = ?",
+                    (str(artifact_id),),
+                ).fetchone()
+        return self._binary_artifact_document(row, include_content=False)
+
+    @staticmethod
+    def _binary_artifact_document(
+        row: sqlite3.Row, *, include_content: bool
+    ) -> dict[str, Any]:
+        content = bytes(row["content"])
+        if hashlib.sha256(content).hexdigest() != row["sha256"]:
+            raise RuntimeError("Stored binary artifact digest does not match its content.")
+        if len(content) != row["size_bytes"] or not 1 <= len(content) <= 10 * 1024 * 1024:
+            raise RuntimeError("Stored binary artifact size validation failed.")
+        provenance = json.loads(row["provenance_json"])
+        if provenance.get("run_id") != row["run_id"] or provenance.get("filename") != row["filename"]:
+            raise RuntimeError("Stored binary artifact provenance validation failed.")
+        document: dict[str, Any] = {
+            "artifact_id": row["artifact_id"],
+            "run_id": row["run_id"],
+            "filename": row["filename"],
+            "content_type": row["content_type"],
+            "sha256": row["sha256"],
+            "size_bytes": row["size_bytes"],
+            "created_at": row["created_at"],
+            "provenance": provenance,
+        }
+        if include_content:
+            document["content"] = content
+        return document
+
+    def list_binary_artifacts(self, run_id: UUID) -> list[dict[str, Any]]:
+        """List binary attachment metadata after validating stored bytes."""
+        self.get(run_id)
+        with closing(self._connect()) as connection:
+            rows = connection.execute(
+                "SELECT * FROM lab_binary_artifacts WHERE run_id = ? "
+                "ORDER BY created_at, artifact_id",
+                (str(run_id),),
+            ).fetchall()
+        return [self._binary_artifact_document(row, include_content=False) for row in rows]
+
+    def get_binary_artifact(self, artifact_id: UUID) -> dict[str, Any]:
+        """Retrieve a binary attachment only after digest, size and provenance checks."""
+        with closing(self._connect()) as connection:
+            row = connection.execute(
+                "SELECT * FROM lab_binary_artifacts WHERE artifact_id = ?",
+                (str(artifact_id),),
+            ).fetchone()
+        if row is None:
+            raise LabArtifactNotFound(str(artifact_id))
+        return self._binary_artifact_document(row, include_content=True)
