@@ -19,6 +19,8 @@ from artificial_scientist.records.models import (
     ExperimentPlanRecord,
     ExperimentRunRecord,
     HypothesisRecord,
+    KnowledgeConceptRecord,
+    KnowledgeRelationshipRecord,
     RecordBase,
     RecordEnvelope,
     RecordType,
@@ -38,6 +40,8 @@ MODEL_BY_TYPE: dict[str, type[RecordBase]] = {
     "artifact": ArtifactRecord,
     "review": ReviewRecord,
     "approval_request": ApprovalRequestRecord,
+    "knowledge_concept": KnowledgeConceptRecord,
+    "knowledge_relationship": KnowledgeRelationshipRecord,
 }
 
 
@@ -303,6 +307,28 @@ class RecordStore:
                 set(MODEL_BY_TYPE),
                 "related_record_ids",
             )
+        elif isinstance(record, KnowledgeConceptRecord):
+            add_many(record.source_record_ids, {"source"}, "source_record_ids")
+        elif isinstance(record, KnowledgeRelationshipRecord):
+            references.extend(
+                [
+                    (
+                        record.source_concept_id,
+                        {"knowledge_concept"},
+                        "source_concept_id",
+                    ),
+                    (
+                        record.target_concept_id,
+                        {"knowledge_concept"},
+                        "target_concept_id",
+                    ),
+                ]
+            )
+            add_many(
+                record.evidence_source_record_ids,
+                {"source"},
+                "evidence_source_record_ids",
+            )
         elif isinstance(record, (ReviewRecord, ApprovalRequestRecord)):
             references.append(
                 (
@@ -333,6 +359,164 @@ class RecordStore:
                     f"{field_name} expects record type [{allowed}], "
                     f"but {reference_id} has type '{actual_type}'."
                 )
+
+        if isinstance(record, KnowledgeRelationshipRecord):
+            if record.source_concept_id == record.target_concept_id:
+                raise InvalidRelationship("A concept cannot have a relationship to itself.")
+            if record.assertion_status != "rejected" and record.predicate in {
+                "broader_than",
+                "narrower_than",
+                "subclass_of",
+                "part_of",
+                "prerequisite_of",
+            }:
+                self._validate_acyclic_relationship(connection, record)
+
+    @staticmethod
+    def _validate_acyclic_relationship(
+        connection: sqlite3.Connection, record: KnowledgeRelationshipRecord
+    ) -> None:
+        """Reject cycles within one of the controlled transitive predicates."""
+        rows = connection.execute(
+            """
+            SELECT * FROM research_records
+            WHERE record_type = 'knowledge_relationship'
+            """
+        ).fetchall()
+        adjacency: dict[UUID, list[UUID]] = {}
+        for row in rows:
+            envelope = RecordStore._row_to_envelope(row)
+            payload = envelope.payload
+            if (
+                payload.get("predicate") != record.predicate
+                or payload.get("assertion_status") == "rejected"
+            ):
+                continue
+            source = UUID(str(payload["source_concept_id"]))
+            target = UUID(str(payload["target_concept_id"]))
+            adjacency.setdefault(source, []).append(target)
+
+        pending = [record.target_concept_id]
+        visited: set[UUID] = set()
+        while pending:
+            current = pending.pop()
+            if current == record.source_concept_id:
+                raise InvalidRelationship(
+                    f"Adding predicate '{record.predicate}' would create a cycle."
+                )
+            if current in visited:
+                continue
+            visited.add(current)
+            pending.extend(adjacency.get(current, []))
+
+    def search_knowledge_concepts(
+        self,
+        *,
+        query: str | None = None,
+        scientific_domain: str | None = None,
+        concept_type: str | None = None,
+        concept_status: str | None = None,
+        limit: int = 20,
+        offset: int = 0,
+    ) -> tuple[list[RecordEnvelope], int]:
+        """Search concept labels, definitions, and aliases with server-side pagination."""
+        if not 1 <= limit <= 100:
+            raise ValueError("limit must be between 1 and 100")
+        if offset < 0:
+            raise ValueError("offset must be non-negative")
+
+        conditions = ["record_type = 'knowledge_concept'"]
+        parameters: list[object] = []
+        if query and query.strip():
+            pattern = f"%{' '.join(query.split()).casefold()}%"
+            conditions.append(
+                """
+                (
+                    lower(json_extract(payload_json, '$.preferred_label')) LIKE ?
+                    OR lower(json_extract(payload_json, '$.definition')) LIKE ?
+                    OR EXISTS (
+                        SELECT 1
+                        FROM json_each(payload_json, '$.aliases') AS alias
+                        WHERE lower(alias.value) LIKE ?
+                    )
+                )
+                """
+            )
+            parameters.extend([pattern, pattern, pattern])
+        for field_name, value in (
+            ("scientific_domain", scientific_domain),
+            ("concept_type", concept_type),
+            ("status", concept_status),
+        ):
+            if value:
+                conditions.append(
+                    f"json_extract(payload_json, '$.{field_name}') = ?"
+                )
+                parameters.append(value)
+
+        where = " WHERE " + " AND ".join(conditions)
+        with closing(self._connect()) as connection:
+            total = int(
+                connection.execute(
+                    "SELECT COUNT(*) FROM research_records" + where,
+                    tuple(parameters),
+                ).fetchone()[0]
+            )
+            rows = connection.execute(
+                "SELECT * FROM research_records"
+                + where
+                + " ORDER BY created_at DESC, id ASC LIMIT ? OFFSET ?",
+                (*parameters, limit, offset),
+            ).fetchall()
+        return [self._row_to_envelope(row) for row in rows], total
+
+    def list_knowledge_relationships(
+        self,
+        *,
+        concept_id: UUID,
+        direction: str = "both",
+        predicate: str | None = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> tuple[list[RecordEnvelope], int]:
+        """List graph assertions incident to a concept, with direction preserved."""
+        if direction not in {"incoming", "outgoing", "both"}:
+            raise ValueError("direction must be incoming, outgoing, or both")
+        if not 1 <= limit <= 100:
+            raise ValueError("limit must be between 1 and 100")
+        if offset < 0:
+            raise ValueError("offset must be non-negative")
+
+        source_clause = "json_extract(payload_json, '$.source_concept_id') = ?"
+        target_clause = "json_extract(payload_json, '$.target_concept_id') = ?"
+        if direction == "outgoing":
+            incident_clause = source_clause
+        elif direction == "incoming":
+            incident_clause = target_clause
+        else:
+            incident_clause = f"({source_clause} OR {target_clause})"
+        conditions = ["record_type = 'knowledge_relationship'", incident_clause]
+        parameters: list[object] = [str(concept_id)]
+        if direction == "both":
+            parameters.append(str(concept_id))
+        if predicate:
+            conditions.append("json_extract(payload_json, '$.predicate') = ?")
+            parameters.append(predicate)
+        where = " WHERE " + " AND ".join(conditions)
+        with closing(self._connect()) as connection:
+            total = int(
+                connection.execute(
+                    "SELECT COUNT(*) FROM research_records" + where,
+                    tuple(parameters),
+                ).fetchone()[0]
+            )
+            rows = connection.execute(
+                "SELECT * FROM research_records"
+                + where
+                + " ORDER BY created_at DESC, id ASC LIMIT ? OFFSET ?",
+                (*parameters, limit, offset),
+            ).fetchall()
+        return [self._row_to_envelope(row) for row in rows], total
 
     def create(self, record: RecordBase) -> RecordEnvelope:
         """Atomically persist a validated record and its server-generated audit event."""
