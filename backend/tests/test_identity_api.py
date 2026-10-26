@@ -238,6 +238,27 @@ def test_tenant_scoped_run_api_hides_runs_from_other_tenants(monkeypatch, tmp_pa
         assert all(event["principal_id"] == principal_id for event in denied_run_events)
         assert all(event["correlation_id"] for event in denied_run_events)
 
+        # Object-ID substitution must be denied and audited at the object level,
+        # not merely as a generic run denial.
+        artifact_denials = [
+            event
+            for event in audit_events
+            if event["target_id"] == str(json_artifact_b.artifact_id)
+            and event["target_type"] == "artifact"
+            and event["outcome"] == "denied"
+            and event["metadata"].get("http_status") == 404
+        ]
+        binary_denials = [
+            event
+            for event in audit_events
+            if event["target_id"] == str(binary_artifact_b["artifact_id"])
+            and event["target_type"] == "binary_artifact"
+            and event["outcome"] == "denied"
+            and event["metadata"].get("http_status") == 404
+        ]
+        assert artifact_denials
+        assert binary_denials
+
         no_tenant = client.get(
             "/api/v1/lab/runs",
             headers={"Authorization": "Bearer signed-token"},
