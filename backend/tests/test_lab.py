@@ -208,21 +208,35 @@ def test_lab_export_contains_run_artifact_and_checksum_manifest(tmp_path) -> Non
         assert created.status_code == 201
         run_id = created.json()["run_id"]
 
+        binary_payload = b"exported binary evidence\\x00\\x02"
+        binary_upload = client.post(
+            f"/api/v1/lab/runs/{run_id}/binary-artifacts?filename=evidence.bin",
+            content=binary_payload,
+            headers={"Content-Type": "application/octet-stream"},
+        )
+        assert binary_upload.status_code == 201
+
         response = client.get(f"/api/v1/lab/runs/{run_id}/export")
         assert response.status_code == 200
         assert response.headers["content-type"] == "application/zip"
         with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
+            binary_path = f"binary/{binary_upload.json()['artifact_id']}-evidence.bin"
             assert set(archive.namelist()) == {
                 "run.json",
                 "artifacts.json",
+                "binary-artifacts.json",
                 "manifest.json",
+                binary_path,
             }
             run_document = json.loads(archive.read("run.json"))
             artifact_documents = json.loads(archive.read("artifacts.json"))
+            binary_metadata = json.loads(archive.read("binary-artifacts.json"))
             manifest = json.loads(archive.read("manifest.json"))
             assert run_document["run_id"] == run_id
             assert artifact_documents[0]["content"]["run_id"] == run_id
-            for name in ("run.json", "artifacts.json"):
+            assert binary_metadata[0]["sha256"] == hashlib.sha256(binary_payload).hexdigest()
+            assert archive.read(binary_path) == binary_payload
+            for name in ("run.json", "artifacts.json", "binary-artifacts.json", binary_path):
                 payload = archive.read(name)
                 assert manifest["files"][name]["sha256"] == hashlib.sha256(payload).hexdigest()
                 assert manifest["files"][name]["size_bytes"] == len(payload)
