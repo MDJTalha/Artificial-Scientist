@@ -28,6 +28,7 @@ from artificial_scientist.math_tools.models import (
     DimensionCheckResponse,
     NumericIntegrationRequest,
     NumericIntegrationResponse,
+    PlotRequest,
     RootRequest,
     RootResponse,
     StatisticsRequest,
