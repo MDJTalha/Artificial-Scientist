@@ -107,7 +107,7 @@ def main() -> int:
     parser.add_argument(
         "--manifest",
         required=True,
-        help='JSON file with exactly {"claims": [...]}' ,
+        help='JSON file with exactly {"claims": [...]}',
     )
     parser.add_argument("--operator-principal-id", required=True, help="Existing operator UUID.")
     args = parser.parse_args()
