@@ -8,7 +8,7 @@ This is **not a commercial SaaS product**. Its guiding objective is to contribut
 
 ## Current status
 
-**Phase 0 documentation is established. Phase 1 — Core Application Foundation is in progress.**
+**Phase 0 documentation is established. Phase 1 — Core Application Foundation acceptance checks pass on the current implementation.**
 
 The Phase 1 branch now contains a FastAPI backend foundation, health/readiness endpoints, a React + TypeScript overview dashboard that checks the actual local API, basic automated tests, and a GitHub Actions workflow. The CI result must be reviewed before this phase is accepted.
 
