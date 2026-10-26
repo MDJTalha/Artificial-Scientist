@@ -508,6 +508,19 @@ def test_retention_purge_deletes_artifacts_and_preserves_audit_tombstone(tmp_pat
             ],
         )
     )
+    store.begin_execution(
+        run.run_id,
+        LabRunRequest(
+            title="Expired retention fixture",
+            steps=[
+                {
+                    "step_id": "stats",
+                    "operation": "statistics",
+                    "inputs": {"values": [1, 2, 3]},
+                }
+            ],
+        ),
+    )
     store.save(run)
     artifact_id = store.list_artifacts(run.run_id)[0].artifact_id
     store.save_binary_artifact(
@@ -543,6 +556,13 @@ def test_retention_purge_deletes_artifacts_and_preserves_audit_tombstone(tmp_pat
             """,
             (str(run.run_id),),
         ).fetchone()
+        retained_attempt = connection.execute(
+            """
+            SELECT status, configuration_sha256, result_sha256, request_json
+            FROM lab_execution_attempts WHERE run_id = ?
+            """,
+            (str(run.run_id),),
+        ).fetchone()
     assert run_count == 0
     assert artifact_count == 0
     assert tombstone == (
@@ -551,6 +571,12 @@ def test_retention_purge_deletes_artifacts_and_preserves_audit_tombstone(tmp_pat
         "2021-01-01T00:00:00+00:00",
         "test_retention",
         2,
+    )
+    assert retained_attempt == (
+        "completed",
+        run.configuration_sha256,
+        run.result_sha256,
+        "{}",
     )
     with pytest.raises(LabArtifactNotFound):
         store.get_artifact(artifact_id)
