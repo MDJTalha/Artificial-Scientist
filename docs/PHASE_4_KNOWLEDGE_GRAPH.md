@@ -1,6 +1,6 @@
 # Phase 4 — Scientific Knowledge Graph and Controlled Vocabulary
 
-**Status:** Implementation and acceptance verification in progress.  
+**Status:** Core implementation acceptance checks passed on code commit `2e652fd211c0b32d4dd77bace69240223c3cbccb`. See the [passing GitHub Actions run](https://github.com/MDJTalha/Artificial-Scientist/actions/runs/40265564598).  
 **Branch:** \`phase-4-knowledge-graph\`, stacked on \`phase-3-literature-retrieval\`.  
 **Design objective:** convert source-traceable research records into a queryable network of scientific concepts and explicitly asserted relationships, without silently merging concepts or treating unreviewed links as established facts.
 
@@ -126,15 +126,22 @@ Deterministic tests cover:
 
 ## Acceptance criteria
 
-- [ ] Current branch passes Ruff and all backend tests on Python 3.12 and 3.13.
-- [ ] Frontend type-check, all frontend tests, and production build pass.
-- [ ] Current branch and draft pull-request CI results are reviewed and linked here.
-- [ ] Concept search filters and paginates at the database layer.
-- [ ] New concept and relationship records retain source references and checksums.
-- [ ] Invalid relationship endpoints and self-relations are rejected.
-- [ ] Repeated hierarchy/part/dependency links cannot create a checked same-predicate cycle.
-- [ ] Same-label concepts remain separate unless a future reviewed resolution workflow explicitly merges them.
-- [ ] Graph output exposes relation status and reports bounded traversal truncation.
+- [x] Current code commit passed Ruff and 46 backend tests on Python 3.12 and 46 on Python 3.13.
+- [x] Frontend type-check, all 6 frontend tests, and production build passed.
+- [x] Current code commit's GitHub Actions result is reviewed and linked below; the updated documentation head is receiving a separate CI run.
+- [x] Concept search filters and paginates at the database layer.
+- [x] New concept and relationship records retain source references and checksums.
+- [x] Invalid relationship endpoints and self-relations are rejected.
+- [x] Repeated hierarchy/part/dependency links cannot create a checked same-predicate cycle.
+- [x] Same-label concepts remain separate unless a future reviewed resolution workflow explicitly merges them.
+- [x] Graph output exposes relation status and reports bounded traversal truncation.
+
+## Verified CI result
+
+- [Passing GitHub Actions run](https://github.com/MDJTalha/Artificial-Scientist/actions/runs/40265564598) for code commit `2e652fd211c0b32d4dd77bace69240223c3cbccb`.
+- Backend: Ruff passed; 46 tests passed on Python 3.12 and 46 tests passed on Python 3.13.
+- Frontend: TypeScript type-check passed, 6 unit tests passed, and production build completed.
+- The tests are repository-controlled, deterministic tests; they verify implementation behavior, not broad scientific correctness or ontology quality.
 
 ## Limitations and not implemented
 
