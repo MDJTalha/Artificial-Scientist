@@ -41,6 +41,7 @@ from artificial_scientist.lab.scanning import (
 from artificial_scientist.lab.store import (
     LabArtifactNotFound,
     LabExecutionNotFound,
+    LabQuotaExceeded,
     LabRunNotFound,
     LabRunStore,
 )
@@ -215,7 +216,13 @@ def create_lab_run(
     """Execute a bounded declarative run and persist its traceable response."""
     tenant_id = require_tenant_access(http_request, "run:create")
     run_id = uuid4()
-    store.begin_execution(run_id, lab_request, tenant_id=tenant_id)
+    try:
+        store.begin_execution(run_id, lab_request, tenant_id=tenant_id)
+    except LabQuotaExceeded as error:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Tenant has reached its lab run quota.",
+        ) from error
     try:
         run = run_lab(lab_request, run_id=run_id)
         # Persistence can fail independently (for example, a tenant storage quota).
