@@ -1,0 +1,176 @@
+"""Regression tests for Phase 7 hypothesis assessment and persistence."""
+
+from pathlib import Path
+from uuid import uuid4
+
+import pytest
+from fastapi.testclient import TestClient
+from pydantic import ValidationError
+
+from artificial_scientist.api.routes.records import get_record_store
+from artificial_scientist.discovery import DiscoveryAssessmentRequest, assess_candidates
+from artificial_scientist.main import app
+from artificial_scientist.records.models import ClaimRecord, HypothesisRecord, SourceRecord
+from artificial_scientist.records.store import RecordStore
+
+
+def candidate(
+    title: str = "Hypothesis A",
+    statement: str = "Increasing input temperature increases reaction rate under fixed pressure.",
+    *,
+    sources: list | None = None,
+    claims: list | None = None,
+) -> dict:
+    return {
+        "title": title,
+        "statement": statement,
+        "assumptions": ["Pressure remains fixed."],
+        "alternative_explanations": ["Catalyst concentration changed."],
+        "predictions": ["Measured rate increases in the predefined temperature range."],
+        "falsification_criteria": ["The rate does not increase beyond measurement uncertainty."],
+        "discriminating_test": "Randomize temperature levels and measure rate with blinded analysis.",
+        "source_record_ids": sources or [],
+        "claim_record_ids": claims or [],
+    }
+
+
+@pytest.fixture
+def store(tmp_path: Path) -> RecordStore:
+    return RecordStore(tmp_path / "discovery.sqlite3")
+
+
+def test_assessment_is_transparent_and_does_not_claim_truth() -> None:
+    request = DiscoveryAssessmentRequest(
+        research_question="How does temperature affect reaction rate under fixed pressure?",
+        candidates=[
+            candidate(sources=[uuid4()]),
+            candidate(
+                "Hypothesis B",
+                "Increasing input temperature decreases reaction rate under fixed pressure.",
+                sources=[uuid4()],
+            ),
+        ],
+    )
+    result = assess_candidates(request)
+    assert len(result.assessments) == 2
+    assert result.assessments[0].completeness_score == 100
+    assert result.assessments[0].rubric["falsification_criteria"] is True
+    assert result.overall_status == "draft"
+    assert any("not truth" in item for item in result.limitations)
+
+
+def test_candidate_lists_reject_blank_or_duplicate_items() -> None:
+    invalid = candidate()
+    invalid["predictions"] = ["Same prediction", " same prediction "]
+    with pytest.raises(ValidationError, match="must be unique"):
+        DiscoveryAssessmentRequest(
+            research_question="How does temperature affect reaction rate?",
+            candidates=[invalid, candidate("Hypothesis B", "An alternate mechanism changes the reaction rate.")],
+        )
+
+
+def test_near_duplicate_hypotheses_are_flagged() -> None:
+    request = DiscoveryAssessmentRequest(
+        research_question="What changes reaction rate under controlled conditions?",
+        candidates=[
+            candidate("First hypothesis", "Temperature increases reaction rate under fixed pressure."),
+            candidate("Second hypothesis", "Temperature increases reaction rate under fixed pressure."),
+        ],
+    )
+    result = assess_candidates(request)
+    assert result.assessments[1].near_duplicate_of == "First hypothesis"
+    assert result.overall_status == "needs_revision"
+
+
+def test_api_persists_hypotheses_with_predictions_and_test(store: RecordStore) -> None:
+    source = store.create(
+        SourceRecord(
+            title="Reaction kinetics reference",
+            source_url="https://example.org/kinetics",
+            external_identifier="phase7:test:kinetics",
+        )
+    )
+    app.dependency_overrides[get_record_store] = lambda: store
+    try:
+        with TestClient(app) as client:
+            response = client.post(
+                "/api/v1/discovery/assess",
+                json={
+                    "research_question": "How does temperature affect reaction rate under fixed pressure?",
+                    "candidates": [
+                        candidate(sources=[str(source.id)]),
+                        candidate(
+                            "Hypothesis B",
+                            "Increasing input temperature decreases reaction rate under fixed pressure.",
+                            sources=[str(source.id)],
+                        ),
+                    ],
+                },
+            )
+        assert response.status_code == 201, response.text
+        body = response.json()
+        assert len(body["assessments"]) == 2
+        record_id = body["assessments"][0]["persisted_record_id"]
+        stored = store.get(record_id)
+        record = HypothesisRecord.model_validate(stored.payload)
+        assert record.predictions == [
+            "Measured rate increases in the predefined temperature range."
+        ]
+        assert record.discriminating_test.startswith("Randomize temperature")
+        assert record.source_record_ids == [source.id]
+        events, total = store.list_audit_events()
+        assert total == 3
+        assert any(event.record_id == record.id for event in events)
+    finally:
+        app.dependency_overrides.pop(get_record_store, None)
+
+
+def test_api_rejects_missing_evidence_before_persisting_any_hypothesis(
+    store: RecordStore,
+) -> None:
+    app.dependency_overrides[get_record_store] = lambda: store
+    try:
+        with TestClient(app) as client:
+            response = client.post(
+                "/api/v1/discovery/assess",
+                json={
+                    "research_question": "How does temperature affect reaction rate?",
+                    "candidates": [
+                        candidate(sources=[str(uuid4())]),
+                        candidate(
+                            "Hypothesis B",
+                            "A different mechanism changes reaction rate under fixed pressure.",
+                        ),
+                    ],
+                },
+            )
+        assert response.status_code == 422
+        _, total = store.list_records()
+        assert total == 0
+    finally:
+        app.dependency_overrides.pop(get_record_store, None)
+
+
+def test_api_rejects_claim_id_that_references_wrong_record_type(store: RecordStore) -> None:
+    concept_like_claim = store.create(
+        ClaimRecord(claim_text="A stored claim record for evidence validation.", evidence_status="inferred")
+    )
+    app.dependency_overrides[get_record_store] = lambda: store
+    try:
+        with TestClient(app) as client:
+            response = client.post(
+                "/api/v1/discovery/assess",
+                json={
+                    "research_question": "How does temperature affect reaction rate?",
+                    "candidates": [
+                        candidate(claims=[str(concept_like_claim.id)]),
+                        candidate(
+                            "Hypothesis B",
+                            "An alternative mechanism changes reaction rate under fixed pressure.",
+                        ),
+                    ],
+                },
+            )
+        assert response.status_code == 201, response.text
+    finally:
+        app.dependency_overrides.pop(get_record_store, None)
