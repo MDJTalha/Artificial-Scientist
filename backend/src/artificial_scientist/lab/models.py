@@ -90,8 +90,9 @@ class LabRunResponse(BaseModel):
     limitations: list[str] = [
         "Canonical JSON run-result artifacts are stored; "
         "general binary scientific artifacts and retention policies are not implemented.",
-        "Wall-clock duration is measured, not enforced as a hard process timeout.",
-        "This service is not an operating-system sandbox and must remain on "
+        "Per-step wall-clock deadlines are enforced, but OS-level CPU and memory quotas are not.",
+        "Environment manifests and replay comparison are available, but identical outputs do not "
+        "prove scientific validity. This service is not an OS sandbox and must remain on "
         "trusted local infrastructure.",
     ]
 
