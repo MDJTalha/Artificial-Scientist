@@ -1,7 +1,7 @@
 # Phase 6 — Controlled Computational Laboratory
 
 **Status: initial implementation slice; phase is not complete.**  
-**Branch:** `phase-6-controlled-lab`, stacked on `phase-5-mathematical-tools`.
+**Branch:** `phase-6-controlled-lab`, targeting `main`.
 
 ## Scope delivered in this slice
 
@@ -58,7 +58,8 @@ The configuration and result hashes support integrity comparison; the result dig
 - [x] API and adversarial-input tests added.
 - [ ] CI passes on the final Phase 6 head (must be checked from a fresh GitHub Actions run).
 - [x] Durable SQLite run storage, bounded listing/retrieval, and full-record integrity checks.
-- [x] Durable JSON result artifacts with byte-digest verification and run/plan/step provenance metadata.\n- [ ] General binary artifact support, lifecycle policy, and complete provenance linkage to experiment plans/records.
+- [x] Durable JSON result artifacts with byte-digest verification and run/plan/step provenance metadata.
+- [ ] General binary artifact support, lifecycle policy, and complete provenance linkage to experiment plans/records.
 - [ ] Enforced timeout and process/resource isolation tests.
 - [ ] Reproducible environment manifest and rerun/verification workflow.
 - [ ] Security review of the execution boundary before enabling generated code or untrusted users.
