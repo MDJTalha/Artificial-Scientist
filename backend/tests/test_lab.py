@@ -698,3 +698,86 @@ def test_opt_in_retention_job_validates_days_and_timezone(tmp_path) -> None:
         run_retention(store, 0)
     with pytest.raises(ValueError, match="timezone"):
         run_retention(store, 30, now=datetime(2026, 10, 26))
+
+
+
+def test_binary_artifact_upload_download_and_provenance(tmp_path) -> None:
+    store = LabRunStore(str(tmp_path / "binary-artifact-api.sqlite3"))
+    app.dependency_overrides[get_lab_store] = lambda: store
+    client = TestClient(app)
+    try:
+        created = client.post(
+            "/api/v1/lab/runs",
+            json={
+                "title": "Binary attachment test",
+                "steps": [
+                    {
+                        "step_id": "stats",
+                        "operation": "statistics",
+                        "inputs": {"values": [2, 4, 6]},
+                    }
+                ],
+            },
+        )
+        assert created.status_code == 201
+        run_id = created.json()["run_id"]
+        payload = b"ASDS scientific attachment\x00\x01\xff"
+        uploaded = client.post(
+            f"/api/v1/lab/runs/{run_id}/binary-artifacts?filename=measurement.bin",
+            content=payload,
+            headers={"Content-Type": "application/octet-stream"},
+        )
+        assert uploaded.status_code == 201
+        metadata = uploaded.json()
+        assert metadata["filename"] == "measurement.bin"
+        assert metadata["size_bytes"] == len(payload)
+        assert metadata["sha256"] == hashlib.sha256(payload).hexdigest()
+        assert metadata["provenance"]["run_id"] == run_id
+
+        listing = client.get(f"/api/v1/lab/runs/{run_id}/binary-artifacts")
+        assert listing.status_code == 200
+        assert listing.json()[0]["artifact_id"] == metadata["artifact_id"]
+
+        downloaded = client.get(f"/api/v1/lab/binary-artifacts/{metadata['artifact_id']}")
+        assert downloaded.status_code == 200
+        assert downloaded.content == payload
+        assert downloaded.headers["x-content-sha256"] == metadata["sha256"]
+        assert downloaded.headers["x-content-type-options"] == "nosniff"
+    finally:
+        app.dependency_overrides.pop(get_lab_store, None)
+
+
+def test_binary_artifact_upload_rejects_unsafe_filename_and_empty_content(tmp_path) -> None:
+    store = LabRunStore(str(tmp_path / "binary-artifact-validation.sqlite3"))
+    app.dependency_overrides[get_lab_store] = lambda: store
+    client = TestClient(app)
+    try:
+        created = client.post(
+            "/api/v1/lab/runs",
+            json={
+                "title": "Binary attachment validation",
+                "steps": [
+                    {
+                        "step_id": "stats",
+                        "operation": "statistics",
+                        "inputs": {"values": [1, 2, 3]},
+                    }
+                ],
+            },
+        )
+        assert created.status_code == 201
+        run_id = created.json()["run_id"]
+        unsafe = client.post(
+            f"/api/v1/lab/runs/{run_id}/binary-artifacts?filename=..%2Fsecret.bin",
+            content=b"not allowed",
+            headers={"Content-Type": "application/octet-stream"},
+        )
+        assert unsafe.status_code == 422
+        empty = client.post(
+            f"/api/v1/lab/runs/{run_id}/binary-artifacts?filename=empty.bin",
+            content=b"",
+            headers={"Content-Type": "application/octet-stream"},
+        )
+        assert empty.status_code == 422
+    finally:
+        app.dependency_overrides.pop(get_lab_store, None)
