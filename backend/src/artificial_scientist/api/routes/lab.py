@@ -23,6 +23,7 @@ from artificial_scientist.lab.store import (
     LabRunStore,
 )
 
+
 def require_lab_access(x_lab_api_key: str | None = Header(default=None)) -> None:
     """Require a configured shared API key outside local development."""
     settings = get_settings()
