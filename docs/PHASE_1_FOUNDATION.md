@@ -1,6 +1,6 @@
 # Phase 1 — Core Application Foundation
 
-**Status:** Implementation started; acceptance checks pending.  
+**Status:** Acceptance checks passed on implementation commit `d5012aa586da87530f4dbfc9a9273725e48a61f1`. See the [passing pull-request CI run](https://github.com/MDJTalha/Artificial-Scientist/actions/runs/40262378875).  
 **Scope:** A minimal working API, a dashboard that checks the real API, and automated project checks.
 
 ## Delivered in this phase branch
@@ -77,15 +77,25 @@ The GitHub Actions workflow runs these checks automatically. Do not report check
 
 ## Acceptance criteria
 
-- [ ] Backend package installs cleanly on Python 3.12 and 3.13.
-- [ ] Health and readiness endpoints return their documented JSON.
-- [ ] Readiness semantics do not falsely claim that models, data sources, or compute services are available.
-- [ ] Frontend can represent checking, connected, and unavailable API states.
-- [ ] Retry initiates a fresh request.
-- [ ] Frontend type-check, unit tests, and production build pass.
-- [ ] Backend lint and automated tests pass.
-- [ ] No API credentials or private research data are committed.
-- [ ] Actual CI results and remaining limitations are recorded.
+- [x] Backend package installs cleanly on Python 3.12 and 3.13.
+- [x] Health and readiness endpoints return their documented JSON.
+- [x] Readiness semantics do not falsely claim that models, data sources, or compute services are available.
+- [x] Frontend can represent checking, connected, and unavailable API states.
+- [x] Retry initiates a fresh request.
+- [x] Frontend type-check, unit tests, and production build pass.
+- [x] Backend lint and automated tests pass.
+- [x] No API credentials or private research data are included in the Phase 1 files.
+- [x] Actual CI results and remaining limitations are recorded.
+
+## Verified CI result
+
+- [Pull-request CI run](https://github.com/MDJTalha/Artificial-Scientist/actions/runs/40262378875): passed.
+- [Push CI run](https://github.com/MDJTalha/Artificial-Scientist/actions/runs/40262374258): passed.
+- Backend: Ruff checks passed and 4 tests passed on Python 3.12; 4 tests passed on Python 3.13.
+- Frontend: TypeScript type-check passed, 6 unit tests passed, and the production build completed.
+- The test-client deprecation warning seen in the earlier run was addressed by switching the development test dependency to `httpx2`; the final run passed.
+
+The checks validate the application foundation only. They do not validate scientific accuracy, research discovery, or production deployment security.
 
 ## Explicit limitations
 
