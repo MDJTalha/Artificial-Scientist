@@ -185,9 +185,12 @@ def test_concurrent_run_saves_cannot_oversubscribe_tenant_json_artifact_quota(
 ) -> None:
     import artificial_scientist.lab.store as store_module
 
+    import sqlite3
+
     quota = 2
     workers = 6
-    store = LabRunStore(str(tmp_path / "json-quota-concurrency.sqlite3"))
+    database = str(tmp_path / "json-quota-concurrency.sqlite3")
+    store = LabRunStore(database)
     store.save(_run("Tenant existing run"), tenant_id="tenant-concurrent")
     monkeypatch.setattr(store_module, "_MAX_JSON_ARTIFACTS_PER_TENANT", quota)
     candidates = [_run(f"Concurrent run {index}") for index in range(workers)]
@@ -211,7 +214,7 @@ def test_concurrent_run_saves_cannot_oversubscribe_tenant_json_artifact_quota(
     assert total == quota
     assert len(runs) == quota
     assert len(store.list_artifacts(runs[0].run_id, tenant_id="tenant-concurrent")) == 1
-    with store._connect() as connection:
+    with sqlite3.connect(database) as connection:
         artifact_count = connection.execute(
             """
             SELECT COUNT(*)
