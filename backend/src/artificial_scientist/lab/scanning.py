@@ -43,13 +43,13 @@ def scan_binary_content(content: bytes, *, environment: str) -> str:
     try:
         with socket.create_connection((host, port), timeout=timeout) as connection:
             connection.settimeout(timeout)
-            connection.sendall(b"zINSTREAM\\0")
+            connection.sendall(b"zINSTREAM\0")
             for offset in range(0, len(content), 64 * 1024):
                 chunk = content[offset : offset + 64 * 1024]
                 connection.sendall(len(chunk).to_bytes(4, "big") + chunk)
             connection.sendall((0).to_bytes(4, "big"))
             response = bytearray()
-            while len(response) < 4096 and not response.endswith(b"\\0"):
+            while len(response) < 4096 and not response.endswith(b"\0"):
                 part = connection.recv(1024)
                 if not part:
                     break
@@ -57,7 +57,7 @@ def scan_binary_content(content: bytes, *, environment: str) -> str:
     except OSError as error:
         raise ScannerUnavailable("Malware scanner is unavailable.") from error
 
-    result = bytes(response).decode("utf-8", errors="replace").strip().rstrip("\\0")
+    result = bytes(response).decode("utf-8", errors="replace").strip().rstrip("\0")
     if result.endswith("OK"):
         return "clean"
     if " FOUND" in result:
