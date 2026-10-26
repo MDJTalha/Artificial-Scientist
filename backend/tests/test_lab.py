@@ -593,26 +593,40 @@ def test_retention_purge_requires_timezone_and_bounded_limit(tmp_path) -> None:
 
 
 def test_lab_api_requires_constant_time_key_outside_development(monkeypatch, tmp_path) -> None:
+    database_path = str(tmp_path / "authenticated-lab.sqlite3")
     monkeypatch.setattr(
         lab_routes,
         "get_settings",
         lambda: SimpleNamespace(
             environment="production",
             lab_api_key="test-secret-value-that-is-at-least-32-chars",
+            database_path=database_path,
         ),
     )
-    store = LabRunStore(str(tmp_path / "authenticated-lab.sqlite3"))
+    store = LabRunStore(database_path)
+    # A valid deployment API key authenticates the legacy principal, but it must
+    # not bypass production tenant membership and role authorization.
+    from artificial_scientist.authorization import TenantDirectory
+
+    directory = TenantDirectory(database_path)
+    principal_id = directory.register_principal(
+        "deployment-configured", "legacy-shared-api-key"
+    )
+    tenant_id = directory.create_tenant("test-tenant", "Test Tenant")
+    directory.grant_membership(principal_id, tenant_id, "researcher")
+
     app.dependency_overrides[get_lab_store] = lambda: store
     client = TestClient(app)
+    headers = {
+        "X-Lab-API-Key": "test-secret-value-that-is-at-least-32-chars",
+        "X-Tenant-ID": tenant_id,
+    }
     try:
         assert client.get("/api/v1/lab/runs").status_code == 401
         assert client.get(
             "/api/v1/lab/runs", headers={"X-Lab-API-Key": "wrong"}
         ).status_code == 401
-        accepted = client.get(
-            "/api/v1/lab/runs",
-            headers={"X-Lab-API-Key": "test-secret-value-that-is-at-least-32-chars"},
-        )
+        accepted = client.get("/api/v1/lab/runs", headers=headers)
         assert accepted.status_code == 200
     finally:
         app.dependency_overrides.pop(get_lab_store, None)
