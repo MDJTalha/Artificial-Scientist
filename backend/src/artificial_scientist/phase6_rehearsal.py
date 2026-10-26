@@ -54,7 +54,7 @@ def rehearse_legacy_claims(
         )
 
         normalized_claims = applied["claims"]
-        with sqlite3.connect(str(snapshot_path), timeout=10.0) as connection:
+        with closing(sqlite3.connect(str(snapshot_path), timeout=10.0)) as connection:
             connection.row_factory = sqlite3.Row
             after_audit_count = int(
                 connection.execute(
