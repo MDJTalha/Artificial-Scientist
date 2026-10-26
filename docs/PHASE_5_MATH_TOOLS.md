@@ -43,6 +43,10 @@ A numerical error estimate is algorithmic evidence about the calculation, not a 
 
 Uses Brent's bracketed solver. The interval must be finite and ordered; endpoint function values must be finite and have opposite signs or contain an endpoint root. The response includes root, function value, convergence status, iterations, function calls, and original bracket. The method finds a bracketed real root; it does not claim to find every root or prove uniqueness outside the bracket.
 
+### Scientific plotting
+
+`POST /api/v1/math/plot` returns an in-memory PNG image for a one-dimensional real-valued function over a finite interval. The plot endpoint uses the same allowlisted expression parser as numeric calculations, supports optional title and axis labels, and caps sampling at 1,000 points. It writes no files to the host, sets `Cache-Control: no-store` and `X-Content-Type-Options: nosniff`, and rejects undefined/non-finite samples or image output larger than 2 MiB. This is a deterministic function plot, not a charting language, arbitrary-data-file renderer, or code execution environment.
+
 ### Descriptive statistics
 
 \`POST /api/v1/math/statistics\`
@@ -98,6 +102,7 @@ Deterministic tests include:
 - Dimensional check of speed multiplied by time to produce length.
 - Reporting a mismatched expected dimension and incompatible addition.
 - API status/error contracts for each family of operations.
+- PNG rendering signature, plot sample bounds, non-finite-domain rejection, and in-memory output limit.
 
 ## Acceptance criteria
 
@@ -110,6 +115,7 @@ Deterministic tests include:
 - [ ] Statistics modes, quantile method, input bounds, and expected reference cases are documented.
 - [ ] Unit conversion accepts only allowlisted tokens and rejects incompatible dimensions.
 - [ ] Dimensional-expression validation distinguishes an invalid expression from an expected-unit mismatch.
+- [ ] The plot endpoint returns bounded PNG bytes without writing files or executing user code.
 - [ ] Known limitations remain explicit; no result is presented as a proof of scientific truth.
 
 ## Not implemented in this phase
@@ -119,7 +125,7 @@ Deterministic tests include:
 - General PDE/ODE solving, optimizers, matrix/eigenvalue APIs, arbitrary precision numerical solvers, or GPU computation.
 - Statistical hypothesis tests, Bayesian inference, causal inference, experimental design, or machine learning.
 - A complete, domain-reviewed unit ontology or automatic inference of missing units.
-- Visualization/plot generation endpoints; plotting is deferred until inputs and artifact security are defined.
+- Multi-series plotting, user-supplied datasets/files, 3D visualization, and publication-ready scientific figure workflows.
 - Sandboxed execution of arbitrary generated code.
 
 ## Libraries and external references
