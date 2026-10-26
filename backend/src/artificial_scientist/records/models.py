@@ -5,10 +5,10 @@ verify source truth, the identity of a reviewer, or whether an experiment occurr
 """
 
 from datetime import UTC, date, datetime
-from typing import Annotated, Literal
+from typing import Annotated, Literal, get_args
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
 
 
 def utc_now() -> datetime:
@@ -37,6 +37,76 @@ class Provenance(BaseModel):
     notes: str | None = Field(default=None, max_length=4000)
 
 
+ConceptType = Literal[
+    "entity",
+    "process",
+    "method",
+    "property",
+    "quantity",
+    "theory",
+    "equation",
+    "discipline",
+    "unit",
+    "dataset",
+    "instrument",
+    "phenomenon",
+    "material",
+    "organism",
+    "algorithm",
+    "model",
+    "other",
+]
+ScientificDomain = Literal[
+    "mathematics",
+    "computer_science",
+    "physics",
+    "chemistry",
+    "biology",
+    "medicine",
+    "engineering",
+    "earth_science",
+    "astronomy",
+    "social_sciences",
+    "psychology",
+    "economics",
+    "materials_science",
+    "interdisciplinary",
+    "other",
+]
+ConceptStatus = Literal["proposed", "active", "deprecated", "disputed"]
+KnowledgePredicate = Literal[
+    "broader_than",
+    "narrower_than",
+    "subclass_of",
+    "instance_of",
+    "part_of",
+    "has_part",
+    "causes",
+    "caused_by",
+    "prerequisite_of",
+    "requires",
+    "measured_by",
+    "measures",
+    "uses_method",
+    "method_for",
+    "derived_from",
+    "applied_to",
+    "has_unit",
+    "unit_of",
+    "same_as",
+    "contrasts_with",
+    "related_to",
+]
+RelationshipStatus = Literal[
+    "proposed", "source_reported", "reviewed", "disputed", "rejected"
+]
+CONCEPT_TYPES = get_args(ConceptType)
+SCIENTIFIC_DOMAINS = get_args(ScientificDomain)
+CONCEPT_STATUSES = get_args(ConceptStatus)
+KNOWLEDGE_PREDICATES = get_args(KnowledgePredicate)
+RELATIONSHIP_STATUSES = get_args(RelationshipStatus)
+
+
 RecordType = Literal[
     "research_task",
     "source",
@@ -47,6 +117,8 @@ RecordType = Literal[
     "artifact",
     "review",
     "approval_request",
+    "knowledge_concept",
+    "knowledge_relationship",
 ]
 
 
@@ -223,6 +295,59 @@ class ApprovalRequestRecord(RecordBase):
     status: Literal["requested"] = "requested"
 
 
+class KnowledgeConceptRecord(RecordBase):
+    """A versioned scientific term with its own provenance and assessment status."""
+
+    record_type: Literal["knowledge_concept"] = "knowledge_concept"
+    preferred_label: str = Field(min_length=2, max_length=250)
+    definition: str = Field(min_length=10, max_length=4000)
+    aliases: list[str] = Field(default_factory=list, max_length=100)
+    concept_type: ConceptType = "other"
+    scientific_domain: ScientificDomain = "interdisciplinary"
+    language: str = Field(default="en", pattern=r"^[a-z]{2,3}(?:-[A-Z]{2})?$")
+    status: ConceptStatus = "proposed"
+    external_identifiers: dict[str, str] = Field(default_factory=dict, max_length=20)
+    source_record_ids: list[UUID] = Field(default_factory=list, max_length=200)
+    assessment_notes: str | None = Field(default=None, max_length=4000)
+
+    @field_validator("aliases")
+    @classmethod
+    def aliases_must_be_unique_and_distinct_from_label(
+        cls, aliases: list[str], info: object
+    ) -> list[str]:
+        label = ""
+        data = getattr(info, "data", {})
+        if isinstance(data, dict):
+            candidate = data.get("preferred_label")
+            if isinstance(candidate, str):
+                label = candidate.casefold()
+        seen = {label} if label else set()
+        normalized: list[str] = []
+        for alias in aliases:
+            cleaned = " ".join(alias.split())
+            key = cleaned.casefold()
+            if key in seen:
+                raise ValueError("aliases must be unique and distinct from the preferred label")
+            if not cleaned:
+                raise ValueError("aliases must not be empty")
+            seen.add(key)
+            normalized.append(cleaned)
+        return normalized
+
+
+class KnowledgeRelationshipRecord(RecordBase):
+    """A typed, provenance-aware assertion linking two scientific concepts."""
+
+    record_type: Literal["knowledge_relationship"] = "knowledge_relationship"
+    source_concept_id: UUID
+    target_concept_id: UUID
+    predicate: KnowledgePredicate
+    evidence_source_record_ids: list[UUID] = Field(default_factory=list, max_length=200)
+    assertion_status: RelationshipStatus = "proposed"
+    confidence_score: float | None = Field(default=None, ge=0, le=1)
+    notes: str | None = Field(default=None, max_length=4000)
+
+
 RecordInput = Annotated[
     ResearchTaskRecord
     | SourceRecord
@@ -232,7 +357,9 @@ RecordInput = Annotated[
     | ExperimentRunRecord
     | ArtifactRecord
     | ReviewRecord
-    | ApprovalRequestRecord,
+    | ApprovalRequestRecord
+    | KnowledgeConceptRecord
+    | KnowledgeRelationshipRecord,
     Field(discriminator="record_type"),
 ]
 

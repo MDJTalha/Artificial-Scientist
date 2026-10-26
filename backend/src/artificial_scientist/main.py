@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from artificial_scientist.api.routes.health import router as health_router
+from artificial_scientist.api.routes.knowledge import router as knowledge_router
 from artificial_scientist.api.routes.literature import router as literature_router
 from artificial_scientist.api.routes.records import router as records_router
 from artificial_scientist.config import get_settings
@@ -29,6 +30,7 @@ app.add_middleware(
 
 app.include_router(health_router)
 app.include_router(literature_router)
+app.include_router(knowledge_router)
 app.include_router(records_router)
 
 
