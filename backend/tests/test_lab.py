@@ -787,6 +787,10 @@ def test_binary_artifact_upload_download_and_provenance(tmp_path) -> None:
         assert metadata["size_bytes"] == len(payload)
         assert metadata["sha256"] == hashlib.sha256(payload).hexdigest()
         assert metadata["provenance"]["run_id"] == run_id
+        assert metadata["provenance"]["malware_scan"]["status"] == metadata["scan_status"]
+        assert metadata["provenance"]["malware_scan"]["recorded_at"]
+        if metadata["scan_status"] == "skipped_development":
+            assert metadata["provenance"]["malware_scan"]["scanner"] is None
 
         listing = client.get(f"/api/v1/lab/runs/{run_id}/binary-artifacts")
         assert listing.status_code == 200
