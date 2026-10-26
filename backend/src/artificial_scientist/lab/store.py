@@ -254,6 +254,6 @@ class LabRunStore:
                 raise ValueError("Artifact provenance does not match the canonical run record.")
         except (json.JSONDecodeError, TypeError, ValueError) as error:
             raise RuntimeError(
-                "Stored lab artifact failed schema or integrity validation."
+                "Stored lab artifact provenance, schema, or integrity validation failed."
             ) from error
         return LabArtifactResponse(**metadata.model_dump(), content=content)
