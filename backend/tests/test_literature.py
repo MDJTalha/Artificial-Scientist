@@ -10,9 +10,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from fastapi.testclient import TestClient
+
 import httpx
 import pytest
-from fastapi.testclient import TestClient
 
 from artificial_scientist.config import get_settings
 from artificial_scientist.literature.models import LiteratureSearchRequest
