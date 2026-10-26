@@ -1,5 +1,6 @@
 """API endpoints for the controlled computational laboratory."""
 
+import asyncio
 import hashlib
 import hmac
 import io
@@ -14,6 +15,11 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, R
 from artificial_scientist.config import get_settings
 from artificial_scientist.lab.engine import run_lab
 from artificial_scientist.lab.manifest import capture_environment_manifest
+from artificial_scientist.lab.scanning import (
+    MalwareDetected,
+    ScannerUnavailable,
+    scan_binary_content,
+)
 from artificial_scientist.lab.models import (
     LabArtifactMetadata,
     LabArtifactResponse,
@@ -344,15 +350,30 @@ async def upload_lab_binary_artifact(
         if total > _MAX_BINARY_ARTIFACT_BYTES:
             raise HTTPException(status_code=413, detail="Binary artifact exceeds the 10 MiB limit.")
         chunks.append(chunk)
+    content = b"".join(chunks)
     try:
-        return store.save_binary_artifact(
+        scan_status = await asyncio.to_thread(
+            scan_binary_content,
+            content,
+            environment=get_settings().environment,
+        )
+    except MalwareDetected as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    except ScannerUnavailable as error:
+        raise HTTPException(
+            status_code=503,
+            detail="Attachment scanning is unavailable; upload was not stored.",
+        ) from error
+    try:
+        artifact = store.save_binary_artifact(
             run_id,
             filename,
             request.headers.get("content-type", "application/octet-stream")
             .split(";", 1)[0]
             .strip(),
-            b"".join(chunks),
+            content,
         )
+        return {**artifact, "scan_status": scan_status}
     except LabRunNotFound as error:
         raise HTTPException(status_code=404, detail="Lab run not found.") from error
     except ValueError as error:
