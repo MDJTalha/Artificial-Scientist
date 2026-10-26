@@ -282,15 +282,19 @@ class TenantDirectory:
                 )
         return event_id
 
-    def list_audit_events(self, tenant_id: str, limit: int = 100) -> list[dict[str, Any]]:
+    def list_audit_events(
+        self, tenant_id: str | None, limit: int = 100
+    ) -> list[dict[str, Any]]:
         if not 1 <= limit <= 500:
             raise ValueError("Audit page size must be between 1 and 500.")
+        tenant_filter = "tenant_id IS NULL" if tenant_id is None else "tenant_id=?"
+        parameters: tuple[object, ...] = (limit,) if tenant_id is None else (tenant_id, limit)
         with closing(self._connect()) as connection:
             rows = connection.execute(
-                """SELECT event_id,occurred_at,principal_id,tenant_id,action,target_type,
+                f"""SELECT event_id,occurred_at,principal_id,tenant_id,action,target_type,
                 target_id,outcome,correlation_id,metadata_json FROM asds_security_audit
-                WHERE tenant_id=? ORDER BY occurred_at DESC,event_id DESC LIMIT ?""",
-                (tenant_id, limit),
+                WHERE {tenant_filter} ORDER BY occurred_at DESC,event_id DESC LIMIT ?""",
+                parameters,
             ).fetchall()
         return [
             {**dict(row), "metadata": json.loads(row["metadata_json"])}
