@@ -70,6 +70,7 @@ def test_malformed_tenant_selector_is_bounded_and_audited(monkeypatch, tmp_path)
         headers={
             "Authorization": "Bearer signed-token",
             "X-Tenant-ID": "x" * 100_000,
+            "X-Correlation-ID": "unsafe trace id with spaces",
         },
     )
     assert response.status_code == 404
@@ -86,6 +87,14 @@ def test_malformed_tenant_selector_is_bounded_and_audited(monkeypatch, tmp_path)
     assert selector_denials
     assert all(event["tenant_id"] is None for event in selector_denials)
     assert all(event["target_id"] is None for event in selector_denials)
+    assert all(
+        event["correlation_id"] != "unsafe trace id with spaces"
+        for event in selector_denials
+    )
+    from uuid import UUID
+
+    for event in selector_denials:
+        UUID(event["correlation_id"])
 
 
 def test_configured_oidc_cannot_be_bypassed_with_legacy_api_key(monkeypatch):
