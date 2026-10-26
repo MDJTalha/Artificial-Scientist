@@ -9,7 +9,7 @@ from functools import lru_cache
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response, status
 
 from artificial_scientist.config import get_settings
 from artificial_scientist.lab.engine import run_lab
@@ -278,3 +278,88 @@ def get_lab_artifact(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Stored lab artifact failed integrity validation.",
         ) from error
+
+
+
+_MAX_BINARY_ARTIFACT_BYTES = 10 * 1024 * 1024
+
+
+@router.post("/runs/{run_id}/binary-artifacts", status_code=status.HTTP_201_CREATED)
+async def upload_lab_binary_artifact(
+    run_id: UUID,
+    request: Request,
+    store: Annotated[LabRunStore, Depends(get_lab_store)],
+    filename: str = Query(min_length=1, max_length=180),
+) -> dict[str, object]:
+    """Upload a bounded binary attachment using the request body as its bytes."""
+    content_length = request.headers.get("content-length")
+    if content_length is not None:
+        try:
+            if int(content_length) > _MAX_BINARY_ARTIFACT_BYTES:
+                raise HTTPException(status_code=413, detail="Binary artifact exceeds the 10 MiB limit.")
+        except ValueError as error:
+            raise HTTPException(status_code=400, detail="Invalid Content-Length header.") from error
+    chunks: list[bytes] = []
+    total = 0
+    async for chunk in request.stream():
+        total += len(chunk)
+        if total > _MAX_BINARY_ARTIFACT_BYTES:
+            raise HTTPException(status_code=413, detail="Binary artifact exceeds the 10 MiB limit.")
+        chunks.append(chunk)
+    try:
+        return store.save_binary_artifact(
+            run_id,
+            filename,
+            request.headers.get("content-type", "application/octet-stream").split(";", 1)[0].strip(),
+            b"".join(chunks),
+        )
+    except LabRunNotFound as error:
+        raise HTTPException(status_code=404, detail="Lab run not found.") from error
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    except RuntimeError as error:
+        raise HTTPException(
+            status_code=500, detail="Stored lab data failed integrity validation."
+        ) from error
+
+
+@router.get("/runs/{run_id}/binary-artifacts")
+def list_lab_binary_artifacts(
+    run_id: UUID,
+    store: Annotated[LabRunStore, Depends(get_lab_store)],
+) -> list[dict[str, object]]:
+    """List validated binary attachment metadata for a run."""
+    try:
+        return store.list_binary_artifacts(run_id)
+    except LabRunNotFound as error:
+        raise HTTPException(status_code=404, detail="Lab run not found.") from error
+    except RuntimeError as error:
+        raise HTTPException(
+            status_code=500, detail="Stored binary artifact failed integrity validation."
+        ) from error
+
+
+@router.get("/binary-artifacts/{artifact_id}")
+def download_lab_binary_artifact(
+    artifact_id: UUID,
+    store: Annotated[LabRunStore, Depends(get_lab_store)],
+) -> Response:
+    """Download a binary attachment after digest and provenance validation."""
+    try:
+        artifact = store.get_binary_artifact(artifact_id)
+    except LabArtifactNotFound as error:
+        raise HTTPException(status_code=404, detail="Lab binary artifact not found.") from error
+    except RuntimeError as error:
+        raise HTTPException(
+            status_code=500, detail="Stored binary artifact failed integrity validation."
+        ) from error
+    return Response(
+        content=artifact["content"],
+        media_type=str(artifact["content_type"]),
+        headers={
+            "Content-Disposition": f'attachment; filename="{artifact["filename"]}"',
+            "X-Content-SHA256": str(artifact["sha256"]),
+            "X-Content-Length": str(artifact["size_bytes"]),
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
