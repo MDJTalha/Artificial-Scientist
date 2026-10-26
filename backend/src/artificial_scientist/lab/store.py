@@ -198,7 +198,9 @@ class LabRunStore:
             provenance=json.loads(row["provenance_json"]),
         )
 
-    def begin_execution(self, run_id: UUID, request: LabRunRequest) -> dict[str, Any]:
+    def begin_execution(
+        self, run_id: UUID, request: LabRunRequest, tenant_id: str | None = None
+    ) -> dict[str, Any]:
         """Durably record an execution before starting its computational work."""
         configuration = request.model_dump(mode="json")
         request_json = self._canonical_json(configuration)
@@ -210,12 +212,12 @@ class LabRunStore:
                     """
                     INSERT INTO lab_execution_attempts (
                         run_id, status, configuration_sha256, started_at, updated_at,
-                        finished_at, failure_reason, result_sha256, request_json
-                    ) VALUES (?, 'running', ?, ?, ?, NULL, NULL, NULL, ?)
+                        finished_at, failure_reason, result_sha256, request_json, tenant_id
+                    ) VALUES (?, 'running', ?, ?, ?, NULL, NULL, NULL, ?, ?)
                     """,
-                    (str(run_id), configuration_sha256, now, now, request_json),
+                    (str(run_id), configuration_sha256, now, now, request_json, tenant_id),
                 )
-        return self.get_execution_status(run_id)
+        return self.get_execution_status(run_id, tenant_id=tenant_id)
 
     def fail_execution(self, run_id: UUID) -> None:
         """Mark an execution failed without storing sensitive exception details."""
@@ -237,17 +239,21 @@ class LabRunStore:
                     ),
                 )
 
-    def get_execution_status(self, run_id: UUID) -> dict[str, Any]:
-        """Return safe execution metadata without exposing stored request data."""
+    def get_execution_status(
+        self, run_id: UUID, tenant_id: str | None = None
+    ) -> dict[str, Any]:
+        """Return safe execution metadata, optionally scoped to a tenant."""
+        query = (
+            "SELECT run_id, status, configuration_sha256, started_at, updated_at, "
+            "finished_at, failure_reason, result_sha256 FROM lab_execution_attempts "
+            "WHERE run_id = ?"
+        )
+        parameters: tuple[object, ...] = (str(run_id),)
+        if tenant_id is not None:
+            query += " AND tenant_id = ?"
+            parameters += (tenant_id,)
         with closing(self._connect()) as connection:
-            row = connection.execute(
-                """
-                SELECT run_id, status, configuration_sha256, started_at, updated_at,
-                       finished_at, failure_reason, result_sha256
-                FROM lab_execution_attempts WHERE run_id = ?
-                """,
-                (str(run_id),),
-            ).fetchone()
+            row = connection.execute(query, parameters).fetchone()
         if row is None:
             raise LabExecutionNotFound(str(run_id))
         return dict(row)
@@ -308,7 +314,7 @@ class LabRunStore:
                     recovered += 1
         return recovered
 
-    def save(self, run: LabRunResponse) -> LabRunResponse:
+    def save(self, run: LabRunResponse, tenant_id: str | None = None) -> LabRunResponse:
         """Atomically save a run and its immutable JSON result artifact."""
         self._verify_result_hash(run)
         run_payload = self._canonical_json(run.model_dump(mode="json"))
@@ -334,8 +340,8 @@ class LabRunStore:
                     """
                     INSERT INTO lab_runs (
                         run_id, status, configuration_sha256, result_sha256,
-                        created_at, payload_json
-                    ) VALUES (?, ?, ?, ?, ?, ?)
+                        created_at, payload_json, tenant_id
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         str(run.run_id),
@@ -344,6 +350,7 @@ class LabRunStore:
                         run.result_sha256,
                         run.started_at,
                         run_payload,
+                        tenant_id,
                     ),
                 )
                 connection.execute(
@@ -369,7 +376,7 @@ class LabRunStore:
                     UPDATE lab_execution_attempts
                     SET status = ?, updated_at = ?, finished_at = ?,
                         result_sha256 = ?, failure_reason = NULL
-                    WHERE run_id = ?
+                    WHERE run_id = ? AND tenant_id IS ?
                     """,
                     (
                         run.status,
@@ -377,6 +384,7 @@ class LabRunStore:
                         terminal_at,
                         run.result_sha256,
                         str(run.run_id),
+                        tenant_id,
                     ),
                 )
         return run
@@ -471,12 +479,14 @@ class LabRunStore:
                 )
         return purged
 
-    def get(self, run_id: UUID) -> LabRunResponse:
+    def get(self, run_id: UUID, tenant_id: str | None = None) -> LabRunResponse:
+        query = "SELECT payload_json FROM lab_runs WHERE run_id = ?"
+        parameters: tuple[object, ...] = (str(run_id),)
+        if tenant_id is not None:
+            query += " AND tenant_id = ?"
+            parameters += (tenant_id,)
         with closing(self._connect()) as connection:
-            row = connection.execute(
-                "SELECT payload_json FROM lab_runs WHERE run_id = ?",
-                (str(run_id),),
-            ).fetchone()
+            row = connection.execute(query, parameters).fetchone()
         if row is None:
             raise LabRunNotFound(str(run_id))
         try:
@@ -487,14 +497,28 @@ class LabRunStore:
             raise RuntimeError("Stored lab run failed schema or integrity validation.") from error
         return run
 
-    def list_runs(self, limit: int = 20, offset: int = 0) -> tuple[list[LabRunResponse], int]:
-        with closing(self._connect()) as connection:
-            total = int(connection.execute("SELECT COUNT(*) FROM lab_runs").fetchone()[0])
-            rows = connection.execute(
+    def list_runs(
+        self, limit: int = 20, offset: int = 0, tenant_id: str | None = None
+    ) -> tuple[list[LabRunResponse], int]:
+        if tenant_id is None:
+            count_query = "SELECT COUNT(*) FROM lab_runs"
+            rows_query = (
                 "SELECT payload_json FROM lab_runs "
-                "ORDER BY created_at DESC, run_id LIMIT ? OFFSET ?",
-                (limit, offset),
-            ).fetchall()
+                "ORDER BY created_at DESC, run_id LIMIT ? OFFSET ?"
+            )
+            count_parameters: tuple[object, ...] = ()
+            rows_parameters: tuple[object, ...] = (limit, offset)
+        else:
+            count_query = "SELECT COUNT(*) FROM lab_runs WHERE tenant_id = ?"
+            rows_query = (
+                "SELECT payload_json FROM lab_runs WHERE tenant_id = ? "
+                "ORDER BY created_at DESC, run_id LIMIT ? OFFSET ?"
+            )
+            count_parameters = (tenant_id,)
+            rows_parameters = (tenant_id, limit, offset)
+        with closing(self._connect()) as connection:
+            total = int(connection.execute(count_query, count_parameters).fetchone()[0])
+            rows = connection.execute(rows_query, rows_parameters).fetchall()
         runs: list[LabRunResponse] = []
         for row in rows:
             try:
