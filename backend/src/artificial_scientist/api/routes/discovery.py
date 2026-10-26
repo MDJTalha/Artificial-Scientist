@@ -11,7 +11,7 @@ from artificial_scientist.discovery import (
     HypothesisCandidate,
     assess_candidates,
 )
-from artificial_scientist.records.models import HypothesisRecord, RecordEnvelope
+from artificial_scientist.records.models import HypothesisRecord
 from artificial_scientist.records.store import (
     InvalidRelationship,
     RecordConflict,
