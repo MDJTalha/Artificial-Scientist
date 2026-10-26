@@ -1,9 +1,10 @@
 """FastAPI application entry point."""
 
+from uuid import uuid4
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
-from uuid import uuid4
 
 from artificial_scientist.api.routes.health import router as health_router
 from artificial_scientist.api.routes.knowledge import router as knowledge_router
