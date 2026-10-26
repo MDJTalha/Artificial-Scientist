@@ -1,5 +1,7 @@
 """Adversarial tenant-isolation tests for durable execution-attempt records."""
 
+from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier
 from uuid import uuid4
 
 import pytest
@@ -64,6 +66,7 @@ def test_failure_update_cannot_mutate_another_tenants_attempt(tmp_path) -> None:
     store.fail_execution(run_id, tenant_id="tenant-a")
     assert store.get_execution_status(run_id, tenant_id="tenant-a")["status"] == "failed"
 
+
 def test_tenant_failure_update_cannot_mutate_unowned_legacy_attempt(tmp_path) -> None:
     store = LabRunStore(str(tmp_path / "execution-legacy-failure.sqlite3"))
     run_id = uuid4()
@@ -76,6 +79,7 @@ def test_tenant_failure_update_cannot_mutate_unowned_legacy_attempt(tmp_path) ->
     assert store.get_execution_status(run_id)["status"] == "running"
     with pytest.raises(LabExecutionNotFound):
         store.get_execution_status(run_id, tenant_id="tenant-a")
+
 
 def test_tenant_wide_lab_run_quota_is_enforced_atomically(tmp_path, monkeypatch) -> None:
     import artificial_scientist.lab.store as store_module
@@ -91,3 +95,38 @@ def test_tenant_wide_lab_run_quota_is_enforced_atomically(tmp_path, monkeypatch)
     other_tenant = store.begin_execution(uuid4(), _request(), tenant_id="tenant-b")
     assert other_tenant["status"] == "running"
 
+
+
+
+def test_concurrent_run_creation_cannot_oversubscribe_tenant_quota(
+    tmp_path, monkeypatch
+) -> None:
+    import artificial_scientist.lab.store as store_module
+
+    quota = 3
+    workers = 8
+    monkeypatch.setattr(store_module, "_MAX_RUNS_PER_TENANT", quota)
+    store = LabRunStore(str(tmp_path / "execution-tenant-concurrency.sqlite3"))
+    barrier = Barrier(workers)
+
+    def attempt(index: int) -> bool:
+        barrier.wait(timeout=5)
+        try:
+            store.begin_execution(
+                uuid4(),
+                _request(),
+                tenant_id="tenant-concurrent",
+            )
+        except ValueError as exc:
+            if "Tenant has reached its lab run quota" not in str(exc):
+                raise
+            return False
+        return True
+
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        outcomes = list(executor.map(attempt, range(workers)))
+
+    assert sum(outcomes) == quota
+    runs, total = store.list_runs(tenant_id="tenant-concurrent")
+    assert total == 0  # Reservations live in execution-attempt records pre-result.
+    assert len(runs) == 0
