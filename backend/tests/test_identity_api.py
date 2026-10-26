@@ -499,6 +499,21 @@ def test_negative_content_length_is_rejected_before_scanning(monkeypatch, tmp_pa
         assert empty_upload.json()["detail"] == (
             "Binary artifacts must be between 1 byte and 10 MiB."
         )
+
+        invalid_media_type = TestClient(app).post(
+            f"/api/v1/lab/runs/{run.run_id}/binary-artifacts?filename=probe.bin",
+            content=b"not-empty",
+            headers={
+                "Authorization": "Bearer signed-token",
+                "X-Tenant-ID": tenant_id,
+                "Content-Type": "not a valid media type",
+                "Content-Length": "9",
+            },
+        )
+        assert invalid_media_type.status_code == 422
+        assert invalid_media_type.json()["detail"] == (
+            "Invalid binary artifact content type."
+        )
     finally:
         app.dependency_overrides.pop(get_lab_store, None)
 
