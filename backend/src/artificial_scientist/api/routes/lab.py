@@ -12,6 +12,11 @@ from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response, status
 
+from artificial_scientist.authorization import (
+    AuthorizationDenied,
+    TenantDirectory,
+    stable_principal_id,
+)
 from artificial_scientist.config import get_settings
 from artificial_scientist.identity import (
     AuthenticatedPrincipal,
@@ -49,6 +54,11 @@ def require_lab_access(
     """Require configured OIDC identity or the legacy deployment-level API key."""
     settings = get_settings()
     if settings.environment.lower() == "development":
+        request.state.authenticated_principal = AuthenticatedPrincipal(
+            subject="local-development-principal",
+            issuer="artificial-scientist-development",
+            audience="artificial-scientist-lab",
+        )
         return
 
     oidc_values = (
@@ -131,6 +141,34 @@ router = APIRouter(
 def get_lab_store() -> LabRunStore:
     """Create the SQLite store for persisted lab-run records."""
     return LabRunStore(get_settings().database_path)
+
+
+def require_tenant_access(request: Request, action: str) -> str | None:
+    """Resolve a tenant selector only after server-side principal membership checks.
+
+    Development remains deliberately unscoped for backwards-compatible local testing.
+    Production requests require a validated OIDC principal and active tenant membership.
+    """
+    settings = get_settings()
+    if settings.environment.lower() == "development":
+        return None
+    principal = getattr(request.state, "authenticated_principal", None)
+    tenant_id = request.headers.get("x-tenant-id", "").strip()
+    if principal is None or not tenant_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Authenticated tenant membership is required.",
+        )
+    principal_id = stable_principal_id(principal.issuer, principal.subject)
+    directory = TenantDirectory(settings.database_path)
+    try:
+        directory.authorize(principal_id, tenant_id, action)
+    except (AuthorizationDenied, ValueError) as error:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Requested tenant resource is not available.",
+        ) from error
+    return tenant_id
 
 
 @router.post("/runs", response_model=LabRunResponse, status_code=status.HTTP_201_CREATED)
