@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import math
 import re
 from typing import Any, Literal
 from uuid import UUID
@@ -88,5 +87,6 @@ class LabRunResponse(BaseModel):
     limitations: list[str] = [
         "Run output is returned to the caller and is not yet durably stored as an artifact.",
         "Wall-clock duration is measured, not enforced as a hard process timeout.",
-        "This service is not an operating-system sandbox and must remain on trusted local infrastructure.",
+        "This service is not an operating-system sandbox and must remain on "
+        "trusted local infrastructure.",
     ]
