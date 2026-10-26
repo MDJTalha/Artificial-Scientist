@@ -19,7 +19,7 @@ from artificial_scientist.lab.engine import run_lab
 from artificial_scientist.lab.execution import LabExecutionTimeout, _stop_process, run_isolated
 from artificial_scientist.lab.integrity import result_digest
 from artificial_scientist.lab.models import LabRunRequest
-from artificial_scientist.lab.store import LabArtifactNotFound, LabRunStore
+from artificial_scientist.lab.store import LabArtifactNotFound, LabRunNotFound, LabRunStore
 from artificial_scientist.main import LabRequestBodyLimitMiddleware, app
 
 
