@@ -7,6 +7,7 @@ endpoint. It deliberately does not implement login, issue tokens, or infer tenan
 from __future__ import annotations
 
 from dataclasses import dataclass
+from urllib.parse import urlsplit
 
 import jwt
 from jwt import PyJWKClient, PyJWTError
@@ -37,12 +38,35 @@ def validate_oidc_bearer_token(
     jwks_url: str,
 ) -> AuthenticatedPrincipal:
     """Validate a signed OIDC access token using only RS256 and configured trust values."""
-    if not issuer or not audience or not jwks_url:
+    if (
+        not isinstance(issuer, str)
+        or not issuer.strip()
+        or not isinstance(audience, str)
+        or not audience.strip()
+        or not isinstance(jwks_url, str)
+        or not jwks_url.strip()
+    ):
         raise IdentityConfigurationError(
             "OIDC issuer, audience, and JWKS URL must all be configured."
         )
-    if not jwks_url.startswith("https://"):
-        raise IdentityConfigurationError("OIDC JWKS URL must use HTTPS.")
+
+    try:
+        parsed_jwks_url = urlsplit(jwks_url)
+        # Accessing .port also validates that any explicit port is numeric and in range.
+        _ = parsed_jwks_url.port
+    except ValueError as error:
+        raise IdentityConfigurationError("OIDC JWKS URL is invalid.") from error
+    if (
+        parsed_jwks_url.scheme.lower() != "https"
+        or not parsed_jwks_url.hostname
+        or parsed_jwks_url.username is not None
+        or parsed_jwks_url.password is not None
+        or parsed_jwks_url.fragment
+        or any(character.isspace() for character in jwks_url)
+    ):
+        raise IdentityConfigurationError(
+            "OIDC JWKS URL must be a valid HTTPS URL without credentials or fragments."
+        )
 
     try:
         key_client = PyJWKClient(jwks_url, timeout=5, cache_jwk_set=True)
