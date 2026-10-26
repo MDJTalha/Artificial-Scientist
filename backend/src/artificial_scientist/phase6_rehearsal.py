@@ -104,7 +104,11 @@ def rehearse_legacy_claims(
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--database", required=True, help="Existing SQLite database file.")
-    parser.add_argument("--manifest", required=True, help='JSON file with exactly {"claims": [...]}')
+    parser.add_argument(
+        "--manifest",
+        required=True,
+        help='JSON file with exactly {"claims": [...]}' ,
+    )
     parser.add_argument("--operator-principal-id", required=True, help="Existing operator UUID.")
     args = parser.parse_args()
     try:
