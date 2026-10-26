@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+credentials/
+
+# Scientific data, caches, and generated artifacts (track selected fixtures explicitly)
+data/raw/
+data/private/
+datasets/
+cache/
+.cache/
+artifacts/
+experiments/runs/
+*.sqlite
+*.sqlite3
+*.db
+
+# Frontend
+node_modules/
+.vite/
+coverage/
+.next/
+out/
+
+# Editors and operating systems
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Local logs
+*.log
+logs/
