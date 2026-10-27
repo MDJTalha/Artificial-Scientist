@@ -83,11 +83,16 @@ export default function App() {
   }
   useEffect(() => { void checkHealth() }, [retryKey])
   const loadRecords = async () => {
+    // A navigation change invalidates the request epoch. Do not let an older
+    // records response mutate the records panel after the user has moved away.
+    const epoch = actionEpoch.current
     const query = new URLSearchParams({ limit: '20', offset: '0' })
     if (recordQuery.trim()) query.set('record_type', recordQuery.trim())
     const data = asObject(await request('/api/v1/records?' + query.toString()))
-    setRecords(Array.isArray(data.items) ? data.items.map(asObject) : [])
-    setRecordTotal(typeof data.total === 'number' ? data.total : null)
+    if (epoch === actionEpoch.current) {
+      setRecords(Array.isArray(data.items) ? data.items.map(asObject) : [])
+      setRecordTotal(typeof data.total === 'number' ? data.total : null)
+    }
     return data
   }
   const loadKnowledge = async () => request('/api/v1/knowledge/concepts?' + new URLSearchParams({ limit: '20', ...(conceptQuery.trim() ? { query: conceptQuery.trim() } : {}) }))
