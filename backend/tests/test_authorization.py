@@ -95,7 +95,6 @@ def test_unknown_membership_role_is_rejected(tmp_path):
         directory.grant_membership(principal, tenant, "owner")
 
 
-
 @pytest.mark.parametrize(
     "metadata",
     [
