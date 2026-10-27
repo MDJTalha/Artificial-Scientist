@@ -41,7 +41,7 @@ test('literature form reports a real mocked provider error accessibly', async ({
     })
   })
   await page.goto('/')
-  await page.getByRole('button', { name: /Literature search/ }).click()
+  await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: /Literature search/ }).click()
   await page.getByRole('textbox', { name: 'Research query' }).fill('test query for science')
   await page.getByRole('button', { name: /Search scholarly sources/ }).click()
   await expect(page.getByRole('alert')).toContainText('HTTP 503')
@@ -62,8 +62,8 @@ test('record listing displays server data and preserves an empty/error distincti
   await page.goto('/')
   await page.getByRole('button', { name: /Research records/ }).first().click()
   await page.getByRole('button', { name: 'Load records' }).click()
-  await expect(page.getByText('Verified test record')).toBeVisible()
-  await expect(page.getByText('1 TOTAL')).toBeVisible()
+  await expect(page.getByRole('row', { name: /Verified test record/ })).toBeVisible()
+  await expect(page.getByText('1 TOTAL', { exact: true })).toBeVisible()
 })
 
 test('critical and serious accessibility rules have no violations on primary sections', async ({ page }) => {
