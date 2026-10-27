@@ -106,7 +106,7 @@ export default function App() {
   return <div className="app-shell">
     <a className="skip-link" href="#main-content">Skip to main content</a>
     <aside className="sidebar">
-      <a className="brand" href="#overview" onClick={e => { e.preventDefault(); setSection('overview') }} aria-label="Artificial Scientist command center">
+      <a className="brand" href="#overview" onClick={e => { e.preventDefault(); setSection('overview') }}>
         <span className="brand-mark" aria-hidden="true"><i /><i /><i /></span>
         <span className="brand-copy"><strong>ARTIFICIAL</strong><strong>SCIENTIST</strong><small>AUTONOMOUS DISCOVERY SYSTEM</small></span>
       </a>
