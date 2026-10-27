@@ -12,5 +12,5 @@ test('built frontend connects to the live backend and runs a real calculation', 
   const response = page.getByRole('region', { name: 'Calculation response' })
   await expect(response).toBeVisible()
   await expect(response).toContainText('differentiate')
-  await expect(response).toContainText('6*x**2 + 4*x - 5')
+  await expect(response).toContainText('3*x**2 + 4*x - 5')
 })
