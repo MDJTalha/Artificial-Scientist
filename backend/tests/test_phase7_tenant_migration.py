@@ -2,7 +2,7 @@
 
 import sqlite3
 
-from artificial_scientist.records.store import RecordStore, SCHEMA_VERSION
+from artificial_scientist.records.store import SCHEMA_VERSION, RecordStore
 
 
 def test_schema_v3_has_nullable_tenant_columns(tmp_path):
