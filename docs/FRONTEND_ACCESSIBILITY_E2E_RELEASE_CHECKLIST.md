@@ -4,9 +4,9 @@ This checklist separates repository/CI evidence from checks that require a real 
 
 ## 1. Automated checks (GitHub Actions)
 
-- [x] Frontend typecheck, unit tests, and production build passed on commit `3c20312d4ba55611fc1886a722449419eb50f028` (re-run CI after any subsequent changes).
+- [x] Frontend typecheck, unit tests, production build, Playwright browser checks, and backend tests passed on implementation commit `cee0be1e7082b7778d0505f8014731cc6181ec5e`. Re-run CI after this checklist update; this documentation commit is not verified until its own run succeeds.
 - [x] Browser-based Playwright end-to-end suite runs against the built frontend; selected API responses are mocked, so this is not a live-backend integration test.
-- [x] axe-core accessibility scans run across the six primary workspace sections; no serious/critical violations remained on commit `3c20312d4ba55611fc1886a722449419eb50f028`.
+- [x] axe-core accessibility scans run across the six primary workspace sections; no serious/critical violations remained on implementation commit `cee0be1e7082b7778d0505f8014731cc6181ec5e`.
 - [x] Playwright failure screenshots/traces and test-results are configured for upload as a 14-day CI artifact; successful-run evidence is limited to the CI logs and test summary.
 
 ## 2. Keyboard-only and screen-reader smoke test
@@ -81,4 +81,4 @@ These cannot be completed from a source-code PR alone.
 
 ## Evidence status
 
-Automated repository CI passed on commit `3c20312d4ba55611fc1886a722449419eb50f028` (frontend checks and backend tests on Python 3.12 and 3.13). Any subsequent commit must pass CI again. No evidence is available here of a live integrated environment, a production deployment, physical-device testing, or an independent assistive-technology audit. Those remain **unverified**, not passed.
+Automated repository CI passed on implementation commit `cee0be1e7082b7778d0505f8014731cc6181ec5e`: frontend checks (including Playwright E2E) and backend tests on Python 3.12 and 3.13 all succeeded. The current checklist-only commit must pass its own CI run before it is considered verified. No evidence is available here of a completed Windows Chrome/NVDA manual run, a production deployment, physical-device testing, or an independent assistive-technology audit. Those remain **unverified**, not passed.
