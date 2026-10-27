@@ -17,7 +17,7 @@ const tools = [
   { title: 'Symbolic mathematics', detail: 'Simplify, differentiate, integrate, solve and substitute expressions.', method: 'POST', path: '/api/v1/math/symbolic', sample: { operation: 'differentiate', expression: 'x^3 + 2*x^2 - 5*x', variable: 'x' } },
   { title: 'Descriptive statistics', detail: 'Summarise a numeric sample with validated statistical measures.', method: 'POST', path: '/api/v1/math/statistics', sample: { values: [2, 4, 4, 4, 5, 5, 7, 9] } },
   { title: 'Numerical integration', detail: 'Integrate a bounded function and inspect its error estimate.', method: 'POST', path: '/api/v1/math/numeric/integrate', sample: { expression: 'x^2', variable: 'x', lower: 0, upper: 1 } },
-  { title: 'Unit conversion', detail: 'Convert compatible units from the server allowlist.', method: 'POST', path: '/api/v1/math/units/convert', sample: { value: 100, from_unit: 'cm', to_unit: 'm' } },
+  { title: 'Unit conversion', detail: 'Convert compatible units from the server allowlist.', method: 'POST', path: '/api/v1/math/units/convert', sample: { value: 100, source_unit: 'cm', target_unit: 'm' } },
 ]
 const pretty = (value: unknown) => JSON.stringify(value, null, 2)
 const asObject = (value: unknown): JsonRecord => typeof value === 'object' && value !== null ? value as JsonRecord : { result: value }
