@@ -1,0 +1,88 @@
+import { expect, test } from '@playwright/test'
+import AxeBuilder from '@axe-core/playwright'
+
+test.beforeEach(async ({ page }) => {
+  await page.route('**/api/v1/health', async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ status: 'ok', service: 'Artificial Scientist', version: '0.1.0' }),
+    })
+  })
+})
+
+test('keyboard users can skip navigation and reach the main workspace', async ({ page }) => {
+  await page.goto('/')
+  const skipLink = page.getByRole('link', { name: 'Skip to main content' })
+  await page.keyboard.press('Tab')
+  await expect(skipLink).toBeFocused()
+  await expect(skipLink).toBeVisible()
+  await page.keyboard.press('Enter')
+  await expect(page.locator('#main-content')).toBeFocused()
+})
+
+test('navigation exposes the active section and keyboard-operable controls', async ({ page }) => {
+  await page.goto('/')
+  const navigation = page.getByRole('navigation', { name: 'Main navigation' })
+  const literature = navigation.getByRole('button', { name: /Literature search/ })
+  await literature.focus()
+  await expect(literature).toBeFocused()
+  await page.keyboard.press('Enter')
+  await expect(literature).toHaveAttribute('aria-current', 'page')
+  await expect(page.getByRole('heading', { name: 'Search the literature' })).toBeVisible()
+})
+
+test('literature form reports a real mocked provider error accessibly', async ({ page }) => {
+  await page.route('**/api/v1/literature/search', async route => {
+    await route.fulfill({
+      status: 503,
+      contentType: 'application/json',
+      body: JSON.stringify({ detail: 'Provider temporarily unavailable' }),
+    })
+  })
+  await page.goto('/')
+  await page.getByRole('button', { name: /Literature search/ }).click()
+  await page.getByRole('textbox', { name: 'Research query' }).fill('test query for science')
+  await page.getByRole('button', { name: /Search scholarly sources/ }).click()
+  await expect(page.getByRole('alert')).toContainText('HTTP 503')
+  await expect(page.getByRole('alert')).toContainText('Provider temporarily unavailable')
+})
+
+test('record listing displays server data and preserves an empty/error distinction', async ({ page }) => {
+  await page.route('**/api/v1/records?**', async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        items: [{ id: 'record-1', record_type: 'research_task', created_at: '2026-01-01T00:00:00Z', payload: { title: 'Verified test record' } }],
+        total: 1,
+      }),
+    })
+  })
+  await page.goto('/')
+  await page.getByRole('button', { name: /Research records/ }).first().click()
+  await page.getByRole('button', { name: 'Load records' }).click()
+  await expect(page.getByText('Verified test record')).toBeVisible()
+  await expect(page.getByText('1 TOTAL')).toBeVisible()
+})
+
+test('critical and serious accessibility rules have no violations on primary sections', async ({ page }) => {
+  await page.goto('/')
+  for (const section of ['overview', 'literature', 'records', 'knowledge', 'math', 'lab']) {
+    if (section !== 'overview') {
+      const buttonNames: Record<string, RegExp> = {
+        literature: /Literature search/,
+        records: /Research records/,
+        knowledge: /Knowledge graph/,
+        math: /Mathematics lab/,
+        lab: /Controlled lab/,
+      }
+      await page.getByRole('button', { name: buttonNames[section] }).first().click()
+    }
+    const results = await new AxeBuilder({ page })
+      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+      .analyze()
+    const serious = results.violations.filter(v => v.impact === 'critical' || v.impact === 'serious')
+    expect(serious, `Accessibility violations in ${section}: ${JSON.stringify(serious.map(v => ({ id: v.id, nodes: v.nodes.map(n => n.target) }))) }`).toEqual([])
+  }
+})
