@@ -36,9 +36,24 @@ Test at minimum:
 - [ ] Portrait and landscape on a real mobile device if one is available.
 - [ ] No horizontal page overflow, clipped navigation, inaccessible controls, or overlapping fixed elements.
 
-## 4. End-to-end user journeys (must use a running API)
+## 4. Browser E2E checks versus integrated API checks
 
-Start the backend using the repository's current setup instructions and run the frontend with its configured API base URL. Do not use fabricated responses.
+The automated Playwright suite currently intercepts selected API requests with deterministic fixtures. It verifies browser interactions, keyboard access, error rendering, and serious/critical axe findings; **it does not prove that the frontend works against a running backend**. Keep these as separate evidence categories.
+
+### Windows Chrome manual integrated run (requires a running API)
+
+Once the repository is checked out on the Windows PC, open two PowerShell terminals from the repository root. In terminal 1, follow `backend/README.md` to create/activate the virtual environment, install `backend` with its dev extras, configure any required environment variables, and start the API. In terminal 2:
+
+```powershell
+cd frontend
+npm install
+$env:VITE_API_BASE_URL = 'http://127.0.0.1:8000'
+npm run dev
+```
+
+Open the local Vite URL printed in the terminal in Chrome. Use the API URL actually configured by the backend if it differs from `127.0.0.1:8000`. Do not paste secrets into screenshots or chat.
+
+Start the backend using the repository's current setup instructions and run the frontend with its configured API base URL. Do not use fabricated responses for the integrated manual checks.
 
 - [ ] Initial load: health endpoint displays connected when healthy and unavailable when backend is stopped.
 - [ ] Literature: submit a valid query; inspect provider response; verify empty/error/loading states; persistence checkbox behavior is truthful.
