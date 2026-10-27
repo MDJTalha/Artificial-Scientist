@@ -86,3 +86,33 @@ test('critical and serious accessibility rules have no violations on primary sec
     expect(serious, `Accessibility violations in ${section}: ${JSON.stringify(serious.map(v => ({ id: v.id, nodes: v.nodes.map(n => n.target) }))) }`).toEqual([])
   }
 })
+
+
+test('workspace remains within common mobile, tablet, and desktop viewports', async ({ page }) => {
+  await page.goto('/')
+  for (const viewport of [
+    { width: 320, height: 720 },
+    { width: 390, height: 844 },
+    { width: 768, height: 1024 },
+    { width: 1280, height: 720 },
+    { width: 1440, height: 900 },
+  ]) {
+    await page.setViewportSize(viewport)
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+  }
+})
+
+test('successful API responses announce completion in a persistent live region', async ({ page }) => {
+  await page.route('**/api/v1/knowledge/vocabulary', async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ terms: ['hypothesis', 'evidence'] }),
+    })
+  })
+  await page.goto('/')
+  await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: /Knowledge graph/ }).click()
+  await page.getByRole('button', { name: 'View supported vocabulary' }).click()
+  await expect(page.getByRole('status').filter({ hasText: 'Request completed' })).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Knowledge API response' })).toBeVisible()
+})
