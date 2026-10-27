@@ -144,6 +144,11 @@ class LabRequestBodyLimitMiddleware:
         max_body_bytes = (
             DISCOVERY_BODY_LIMIT_BYTES if is_discovery_post else self.max_body_bytes
         )
+        too_large_detail = (
+            "Request body exceeds the endpoint size limit."
+            if is_discovery_post
+            else f"Lab run request body exceeds the {max_body_bytes}-byte limit."
+        )
 
         headers = {
             key.lower(): value
@@ -154,10 +159,10 @@ class LabRequestBodyLimitMiddleware:
             try:
                 declared_length = int(content_length)
             except ValueError:
-                await self._too_large(send)
+                await self._too_large(send, too_large_detail)
                 return
             if declared_length < 0 or declared_length > max_body_bytes:
-                await self._too_large(send)
+                await self._too_large(send, too_large_detail)
                 return
 
         body_chunks: list[bytes] = []
@@ -170,7 +175,7 @@ class LabRequestBodyLimitMiddleware:
             chunk = message.get("body", b"")
             body_size += len(chunk)
             if body_size > max_body_bytes:
-                await self._too_large(send)
+                await self._too_large(send, too_large_detail)
                 return
             body_chunks.append(chunk)
             more_body = message.get("more_body", False)
@@ -192,8 +197,10 @@ class LabRequestBodyLimitMiddleware:
         await self.app(scope, replay_body, send)
 
     @staticmethod
-    async def _too_large(send: Send) -> None:
-        body = b'{"detail":"Request body exceeds the endpoint size limit."}'
+    async def _too_large(send: Send, detail: str) -> None:
+        import json
+
+        body = json.dumps({"detail": detail}, separators=(",", ":")).encode("utf-8")
         await send(
             {
                 "type": "http.response.start",
