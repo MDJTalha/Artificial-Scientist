@@ -1,5 +1,7 @@
 """Tenant directory, role matrix, and audit-event regression tests."""
 
+from uuid import uuid4
+
 import pytest
 
 from artificial_scientist.authorization import (
@@ -9,6 +11,9 @@ from artificial_scientist.authorization import (
     stable_principal_id,
     stable_tenant_id,
 )
+from artificial_scientist.lab.engine import run_lab
+from artificial_scientist.lab.models import LabRunRequest
+from artificial_scientist.lab.store import LabExecutionNotFound, LabRunNotFound, LabRunStore
 
 
 def test_principal_and_tenant_ids_are_stable_and_opaque():
@@ -139,3 +144,53 @@ def test_audit_accepts_bounded_operational_metadata(tmp_path):
         "route": "/api/v1/lab/runs",
         "attempt": 2,
     }
+
+
+
+def test_tenant_scoped_run_store_hides_foreign_and_legacy_records(tmp_path):
+    store = LabRunStore(str(tmp_path / "tenant-scoped-runs.sqlite3"))
+    request = LabRunRequest(
+        title="Tenant ownership boundary",
+        steps=[
+            {
+                "step_id": "stats",
+                "operation": "statistics",
+                "inputs": {"values": [1, 2, 3]},
+            }
+        ],
+    )
+    tenant_a = "tenant-a"
+    tenant_b = "tenant-b"
+    owned_run = run_lab(request)
+    store.save(owned_run, tenant_id=tenant_a)
+
+    assert store.get(owned_run.run_id, tenant_id=tenant_a).run_id == owned_run.run_id
+    with pytest.raises(LabRunNotFound):
+        store.get(owned_run.run_id, tenant_id=tenant_b)
+    assert store.list_runs(tenant_id=tenant_b) == ([], 0)
+    assert store.list_runs(tenant_id=tenant_a)[1] == 1
+
+    legacy_run = run_lab(request)
+    store.save(legacy_run)
+    with pytest.raises(LabRunNotFound):
+        store.get(legacy_run.run_id, tenant_id=tenant_a)
+    assert store.list_runs(tenant_id=tenant_a)[1] == 1
+
+
+def test_tenant_scoped_execution_status_hides_foreign_attempts(tmp_path):
+    store = LabRunStore(str(tmp_path / "tenant-scoped-attempts.sqlite3"))
+    run_id = uuid4()
+    request = LabRunRequest(
+        title="Tenant execution status boundary",
+        steps=[
+            {
+                "step_id": "stats",
+                "operation": "statistics",
+                "inputs": {"values": [1, 2, 3]},
+            }
+        ],
+    )
+    store.begin_execution(run_id, request, tenant_id="tenant-a")
+    assert store.get_execution_status(run_id, tenant_id="tenant-a")["run_id"] == str(run_id)
+    with pytest.raises(LabExecutionNotFound):
+        store.get_execution_status(run_id, tenant_id="tenant-b")
