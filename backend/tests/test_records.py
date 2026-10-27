@@ -346,3 +346,48 @@ def test_record_and_audit_writes_roll_back_together(store: RecordStore) -> None:
     assert audit_events == []
     assert record_count == 0
     assert event_count == 0
+
+
+
+def test_legacy_hypothesis_payload_preserves_checksum_after_schema_additions(
+    store: RecordStore,
+) -> None:
+    """Older valid payloads remain byte-equivalent to the checksum returned by the API."""
+    import hashlib
+    from datetime import UTC, datetime
+
+    from artificial_scientist.records.models import HypothesisRecord
+
+    record = HypothesisRecord(
+        title="Legacy hypothesis",
+        hypothesis="A legacy hypothesis payload remains verifiable after schema additions.",
+        falsification_criteria=["The predefined effect is not observed."],
+    )
+    payload = record.model_dump(mode="json")
+    payload.pop("predictions")
+    payload.pop("discriminating_test")
+    payload_json = json.dumps(
+        payload,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        allow_nan=False,
+    )
+    checksum = hashlib.sha256(payload_json.encode("utf-8")).hexdigest()
+    created_at = datetime.now(UTC).isoformat()
+
+    with sqlite3.connect(store.path) as connection:
+        connection.execute(
+            """
+            INSERT INTO research_records
+                (id, record_type, schema_version, created_at, content_sha256, payload_json)
+            VALUES (?, 'hypothesis', ?, ?, ?, ?)
+            """,
+            (str(record.id), record.schema_version, created_at, checksum, payload_json),
+        )
+
+    fetched = store.get(record.id)
+    assert fetched.content_sha256 == checksum
+    assert fetched.payload == payload
+    assert "predictions" not in fetched.payload
+    assert "discriminating_test" not in fetched.payload
