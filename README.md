@@ -79,6 +79,7 @@ Run one command at a time from the repository root:
     .\\.venv\\Scripts\\Activate.ps1
     python -m pip install --upgrade pip
     pip install -e ".[dev]"
+    $env:ARTIFICIAL_SCIENTIST_ENV = "development"
     python -m uvicorn artificial_scientist.main:app --reload
 
 API: http://127.0.0.1:8000  
