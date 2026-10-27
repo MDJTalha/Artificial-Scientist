@@ -19,6 +19,11 @@ from artificial_scientist.records.store import (
 )
 
 
+@pytest.fixture(autouse=True)
+def opt_in_to_development_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ARTIFICIAL_SCIENTIST_ENV", "development")
+
+
 @pytest.fixture
 def store(tmp_path) -> RecordStore:
     return RecordStore(tmp_path / "research-test.sqlite3")

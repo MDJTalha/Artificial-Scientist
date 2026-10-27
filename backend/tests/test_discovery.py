@@ -25,6 +25,11 @@ from artificial_scientist.records.models import ClaimRecord, HypothesisRecord, S
 from artificial_scientist.records.store import InvalidRelationship, RecordStore
 
 
+@pytest.fixture(autouse=True)
+def opt_in_to_development_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ARTIFICIAL_SCIENTIST_ENV", "development")
+
+
 def candidate(
     title: str = "Hypothesis A",
     statement: str = "Increasing input temperature increases reaction rate under fixed pressure.",
