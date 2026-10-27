@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { getStatusPresentation, isHealthyResponse, type ServiceStatus } from './lib/status'
 
 type JsonRecord = Record<string, unknown>
@@ -23,7 +23,7 @@ const pretty = (value: unknown) => JSON.stringify(value, null, 2)
 const asObject = (value: unknown): JsonRecord => typeof value === 'object' && value !== null ? value as JsonRecord : { result: value }
 function ErrorNotice({ message }: { message: string }) { return <div className="notice notice-error" role="alert">{message}</div> }
 function DataView({ data }: { data: unknown }) { return <pre className="json-view">{pretty(data)}</pre> }
-function App() {
+export default function App() {
   const [section, setSection] = useState<Section>('overview')
   const [status, setStatus] = useState<ServiceStatus>('checking')
   const [health, setHealth] = useState<HealthResponse | null>(null)
@@ -89,7 +89,6 @@ function App() {
     const value = await runAction(() => request('/api/v1/records', { method: 'POST', body: recordInput }))
     if (value) { try { await loadRecords() } catch { /* The create response remains visible if the refresh fails. */ } }
   }
-  const currentResult = useMemo(() => result === null ? null : asObject(result), [result])
   return <div className="app-shell">
     <aside className="sidebar">
       <a className="brand" href="#overview" onClick={e => { e.preventDefault(); setSection('overview') }} aria-label="Artificial Scientist command center">
