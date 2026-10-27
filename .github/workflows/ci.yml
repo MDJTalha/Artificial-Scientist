@@ -10,6 +10,8 @@ on:
       - phase-4-knowledge-graph
       - phase-5-mathematical-tools
       - phase-6-controlled-lab
+      - phase-frontend-research-workspace
+      - phase-frontend-accessibility-e2e
   pull_request:
     branches:
       - main
@@ -19,6 +21,8 @@ on:
       - phase-4-knowledge-graph
       - phase-5-mathematical-tools
       - phase-6-controlled-lab
+      - phase-frontend-research-workspace
+      - phase-frontend-accessibility-e2e
   workflow_dispatch:
 
 permissions:
@@ -62,6 +66,14 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
+      - name: Set up Python for live API integration tests
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
+      - name: Install backend for live API integration tests
+        run: python -m pip install -e "../backend[dev]"
       - name: Set up Node.js
         uses: actions/setup-node@v7
         with:
@@ -74,3 +86,19 @@ jobs:
         run: npm test
       - name: Build production assets
         run: npm run build
+      - name: Install browser test dependencies
+        run: npm install --no-save --no-audit --no-fund @playwright/test @axe-core/playwright
+      - name: Install Chromium for end-to-end tests
+        run: npx playwright install --with-deps chromium
+      - name: Run browser end-to-end and accessibility checks
+        run: npx playwright test
+      - name: Upload browser test evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: frontend-playwright-evidence
+          path: |
+            frontend/test-results/
+            frontend/playwright-report/
+          if-no-files-found: ignore
+          retention-days: 14
