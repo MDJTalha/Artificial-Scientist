@@ -118,3 +118,23 @@ test('successful API responses announce completion in a persistent live region',
   await expect(page.getByRole('status').filter({ hasText: 'Request completed' })).toHaveCSS('width', '1px')
   await expect(page.getByRole('region', { name: 'Knowledge API response' })).toBeVisible()
 })
+
+
+test('skip-link target keeps a visible focus indicator and navigation works with Space', async ({ page }) => {
+  await page.goto('/')
+  const skipLink = page.getByRole('link', { name: 'Skip to main content' })
+  await page.keyboard.press('Tab')
+  await expect(skipLink).toBeFocused()
+  await page.keyboard.press('Enter')
+  const main = page.locator('#main-content')
+  await expect(main).toBeFocused()
+  await expect(main).toHaveCSS('outline-style', 'solid')
+  await expect(main).toHaveCSS('outline-width', '3px')
+
+  const navigation = page.getByRole('navigation', { name: 'Main navigation' })
+  const knowledge = navigation.getByRole('button', { name: /Knowledge graph/ })
+  await knowledge.focus()
+  await page.keyboard.press('Space')
+  await expect(knowledge).toHaveAttribute('aria-current', 'page')
+  await expect(page.getByRole('heading', { name: 'Knowledge graph' })).toBeVisible()
+})
