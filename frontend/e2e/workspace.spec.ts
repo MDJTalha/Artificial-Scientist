@@ -49,6 +49,13 @@ test('literature form reports a real mocked provider error accessibly', async ({
 })
 
 test('record listing displays server data and preserves an empty/error distinction', async ({ page }) => {
+  await page.route('**/api/v1/records/record-1', async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ id: 'record-1', record_type: 'research_task', created_at: '2026-01-01T00:00:00Z', content_sha256: 'a'.repeat(64), payload: { title: 'Verified test record' }, schema_version: 1 }),
+    })
+  })
   await page.route('**/api/v1/records?**', async route => {
     await route.fulfill({
       status: 200,
@@ -64,6 +71,9 @@ test('record listing displays server data and preserves an empty/error distincti
   await page.getByRole('button', { name: 'Load records' }).click()
   await expect(page.getByRole('row', { name: /Verified test record/ })).toBeVisible()
   await expect(page.getByText('1 TOTAL', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Verify record' }).click()
+  await expect(page.getByRole('region', { name: 'Latest API response' })).toContainText('content_sha256')
+  await expect(page.getByRole('region', { name: 'Latest API response' })).toContainText('Verified test record')
 })
 
 test('critical and serious accessibility rules have no violations on primary sections', async ({ page }) => {
