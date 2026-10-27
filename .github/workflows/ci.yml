@@ -10,6 +10,8 @@ on:
       - phase-4-knowledge-graph
       - phase-5-mathematical-tools
       - phase-6-controlled-lab
+      - phase-frontend-research-workspace
+      - phase-frontend-accessibility-e2e
   pull_request:
     branches:
       - main
@@ -19,6 +21,8 @@ on:
       - phase-4-knowledge-graph
       - phase-5-mathematical-tools
       - phase-6-controlled-lab
+      - phase-frontend-research-workspace
+      - phase-frontend-accessibility-e2e
   workflow_dispatch:
 
 permissions:
