@@ -78,3 +78,9 @@ jobs:
         run: npm test
       - name: Build production assets
         run: npm run build
+      - name: Install browser test dependencies
+        run: npm install --no-save --no-audit --no-fund @playwright/test @axe-core/playwright
+      - name: Install Chromium for end-to-end tests
+        run: npx playwright install --with-deps chromium
+      - name: Run browser end-to-end and accessibility checks
+        run: npx playwright test
