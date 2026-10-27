@@ -5,7 +5,7 @@
 
 ## Security problem
 
-The current lab router uses a single shared `X-Lab-API-Key` outside development. That gate proves possession of one deployment secret; it does not establish a user, organization, role, or ownership relationship. Run IDs are UUIDs, but unguessable identifiers are not authorization. Until tenant ownership is implemented, the lab must be treated as a trusted single-deployment service and must not be exposed as a multi-customer SaaS API.
+The lab router supports OIDC bearer-token validation when OIDC is configured, with a shared `X-Lab-API-Key` fallback only when no OIDC settings are supplied. That legacy key proves possession of one deployment secret; it does not establish a user, organization, role, or ownership relationship. Run IDs are UUIDs, but unguessable identifiers are not authorization. Tenant-scoped persistence is implemented for run and execution-attempt records and associated artifact lookups, but the design remains incomplete until adversarial route coverage, quotas, explicit local-development controls, and deployment evidence are in place.
 
 ## Decisions
 
@@ -25,14 +25,14 @@ The current lab router uses a single shared `X-Lab-API-Key` outside development.
 - [x] Add provider-neutral OIDC bearer-token validation using maintained PyJWT/JWKS support; configure issuer, audience, and HTTPS JWKS URL explicitly. This validates identity claims but does not implement a provider-specific login flow.
 - [ ] Select and document the production identity provider and verify its access-token format, key rotation, and deployment configuration.
 - [x] Add SQLite persistence primitives for immutable principal IDs, tenants, explicit memberships, supported roles, and security audit events.
-- [ ] Add schema migration and legacy-record ownership tests; wire these records into protected run/artifact storage before claiming tenant isolation.
+- [x] Add nullable `tenant_id` columns to run and execution-attempt records via backward-compatible SQLite schema migration; legacy records remain unowned (`NULL`) and are excluded from tenant-scoped queries. Additional adversarial migration tests remain required.
 - [x] Enforce configured OIDC bearer validation on the lab router; when any OIDC setting is configured, partial configuration fails closed and the legacy shared API key cannot bypass OIDC.
 - [x] Propagate the validated identity into request context; add an explicit role/action matrix that denies unknown roles and actions.
 - [x] Resolve validated request identity to a stable principal ID and require active tenant membership and action permission on run, execution-status, JSON artifact, binary artifact, verification, and export routes.
-- [ ] Add tenant ownership to run and execution-attempt records; define a reviewed legacy-data migration.
+- [x] Add tenant ownership to run and execution-attempt records; legacy rows are not automatically assigned to any tenant. A reviewed operator-controlled claim/migration workflow is still not implemented.
 - [x] Add tenant filters to run lists/reads, execution-status reads, JSON artifact lists/reads, binary artifact lists/reads, and export/verification route storage calls.
 - [ ] Add transactional per-tenant quotas and tests for concurrent uploads and run creation.
-- [ ] Add security audit events without recording secrets or raw request payloads.
+- [x] Add the tenant-directory audit-event persistence primitive, bounded metadata validation, and allowed/denied membership audit events. Route-level correlation and complete audit coverage for exports, uploads, role changes, and retention are still outstanding.
 - [ ] Expand negative cross-tenant tests across every object endpoint, including UUID substitution for export, verification, execution status, uploads, and downloads.
 - [ ] Verify behavior in CI and conduct an independent security review before exposing untrusted or multi-tenant traffic.
 
@@ -60,10 +60,10 @@ Set all three environment variables to enable OIDC validation for the lab API:
 
 The validator accepts signed RS256 tokens only, validates issuer, audience, expiry and issued-at claims, and requires `sub`, `iss`, `aud`, `iat`, and `exp`. A missing or partial OIDC configuration fails closed outside development. Once any OIDC setting is supplied, the shared API key cannot be used as a fallback. The JWKS endpoint must use HTTPS.
 
-This is an incremental authorization implementation, not a claim of production SaaS readiness. In production-like environments, each protected route requires a validated principal, an `X-Tenant-ID` selector, an active membership, and permission for the requested action. The tenant header selects a tenant but never grants access by itself. Run and artifact storage calls are tenant-scoped, and unknown or unowned object IDs return not-found responses. Development mode uses a fixed local-only principal and intentionally leaves storage unscoped for backwards-compatible local testing; do not expose development mode to untrusted traffic. End-to-end verification is still in progress, and production rollout remains blocked on CI, expanded negative tests, tenant quotas, provider-specific configuration review, and independent security review.
+This is an incremental authorization implementation, not a claim of production SaaS readiness. In production-like environments, each protected route requires a validated principal, an `X-Tenant-ID` selector, an active membership, and permission for the requested action. The tenant header selects a tenant but never grants access by itself. Run and artifact storage calls are tenant-scoped, and unknown or unowned object IDs return not-found responses. Development mode uses a fixed local-only principal and intentionally leaves storage unscoped for backwards-compatible local testing; do not expose development mode to untrusted traffic. The latest CI run on commit `1f82096d96879c920ea790eccabc8af185d9e062` passed all three jobs (Python 3.12, Python 3.13, and frontend checks). Production rollout remains blocked on expanded negative tests, tenant quotas, explicit development-mode controls, provider-specific configuration review, and independent security review.
 
 ## Tenant-directory foundation added
 
 The current branch adds `artificial_scientist.authorization.TenantDirectory`, which persists opaque principal IDs derived from the trusted issuer/subject pair, tenant records, explicit active memberships, and append-only-style security audit events. The supported roles are `tenant_admin`, `researcher`, `viewer`, and `auditor`; unknown roles/actions deny by default. Membership checks record allowed and denied outcomes without recording credentials or scientific payloads.
 
-This is an initial persistence primitive, not a completed migration or enforcement layer. Existing lab tables still do not carry tenant ownership, and protected store methods are not yet scoped by tenant. Do not expose this branch to multiple customers until that integration and the cross-tenant negative tests are complete.
+This is an incremental implementation, not a completed security boundary. The run and execution-attempt tables now carry nullable tenant ownership, and tenant-aware store methods scope run reads/lists, execution status, JSON artifacts, binary artifacts, and related run operations. Legacy rows remain unowned and are excluded from tenant-scoped queries; no automatic ownership is inferred. Do not expose this branch to multiple customers until endpoint-by-endpoint cross-tenant negative tests, quotas, explicit development-mode controls, production provider configuration, and independent security review are complete.
