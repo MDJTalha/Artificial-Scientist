@@ -617,7 +617,7 @@ def test_lab_api_requires_constant_time_key_outside_development(monkeypatch, tmp
         # establish tenant membership. A forbidden response proves the key was
         # accepted (invalid keys return 401) without weakening tenant isolation.
         assert accepted.status_code == 403
-        assert accepted.json()["detail"] == "Authenticated tenant membership required."
+        assert accepted.json()["detail"] == "Authenticated tenant membership is required."
     finally:
         app.dependency_overrides.pop(get_lab_store, None)
 
