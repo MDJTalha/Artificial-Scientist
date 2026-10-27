@@ -140,30 +140,6 @@ class RecordStore:
                 )
                 """
             )
-            # Schema v3 adds nullable tenant ownership columns. Existing rows are
-            # deliberately left NULL: a migration must never guess tenant ownership.
-            # Production API access remains fail-closed until scoped operations and
-            # an explicit, audited legacy-data assignment workflow are deployed.
-            for table in ("research_records", "audit_events", "source_identity"):
-                columns = {
-                    str(row["name"])
-                    for row in connection.execute(f"PRAGMA table_info({table})").fetchall()
-                }
-                if "tenant_id" not in columns:
-                    connection.execute(f"ALTER TABLE {table} ADD COLUMN tenant_id TEXT")
-
-            connection.execute(
-                """
-                CREATE INDEX IF NOT EXISTS idx_research_records_tenant_type_created
-                ON research_records(tenant_id, record_type, created_at DESC)
-                """
-            )
-            connection.execute(
-                """
-                CREATE INDEX IF NOT EXISTS idx_audit_events_tenant_occurred
-                ON audit_events(tenant_id, occurred_at DESC)
-                """
-            )
             connection.execute(
                 """
                 CREATE INDEX IF NOT EXISTS idx_research_records_type_created
@@ -198,6 +174,30 @@ class RecordStore:
                     record_id TEXT NOT NULL UNIQUE
                         REFERENCES research_records(id) ON DELETE RESTRICT
                 )
+                """
+            )
+            # Schema v3 adds nullable tenant ownership columns. Existing rows are
+            # deliberately left NULL: a migration must never guess tenant ownership.
+            # Production API access remains fail-closed until scoped operations and
+            # an explicit, audited legacy-data assignment workflow are deployed.
+            for table in ("research_records", "audit_events", "source_identity"):
+                columns = {
+                    str(row["name"])
+                    for row in connection.execute(f"PRAGMA table_info({table})").fetchall()
+                }
+                if "tenant_id" not in columns:
+                    connection.execute(f"ALTER TABLE {table} ADD COLUMN tenant_id TEXT")
+
+            connection.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_research_records_tenant_type_created
+                ON research_records(tenant_id, record_type, created_at DESC)
+                """
+            )
+            connection.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_audit_events_tenant_occurred
+                ON audit_events(tenant_id, occurred_at DESC)
                 """
             )
             connection.execute(
