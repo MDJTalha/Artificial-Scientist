@@ -4,10 +4,10 @@ This checklist separates repository/CI evidence from checks that require a real 
 
 ## 1. Automated checks (GitHub Actions)
 
-- [ ] Frontend typecheck, unit tests, production build pass on the final PR commit.
-- [ ] Add and run a browser-based end-to-end suite against the built frontend and a running backend.
-- [ ] Add an automated accessibility scan (axe-core or equivalent) for each primary workspace section; triage all serious/critical findings.
-- [ ] Keep screenshots, browser/version, viewport, run SHA, and test results as CI artifacts where possible.
+- [x] Frontend typecheck, unit tests, and production build passed on commit `3c20312d4ba55611fc1886a722449419eb50f028` (re-run CI after any subsequent changes).
+- [x] Browser-based Playwright end-to-end suite runs against the built frontend; selected API responses are mocked, so this is not a live-backend integration test.
+- [x] axe-core accessibility scans run across the six primary workspace sections; no serious/critical violations remained on commit `3c20312d4ba55611fc1886a722449419eb50f028`.
+- [x] Playwright failure screenshots/traces and test-results are configured for upload as a 14-day CI artifact; successful-run evidence is limited to the CI logs and test summary.
 
 ## 2. Keyboard-only and screen-reader smoke test
 
@@ -81,4 +81,4 @@ These cannot be completed from a source-code PR alone.
 
 ## Evidence status
 
-At the time this checklist was added, repository CI had passed for the previous frontend commit, but no evidence was available here of a live integrated environment, a production deployment, physical-device testing, or an independent assistive-technology audit. Those remain **unverified**, not passed.
+Automated repository CI passed on commit `3c20312d4ba55611fc1886a722449419eb50f028` (frontend checks and backend tests on Python 3.12 and 3.13). Any subsequent commit must pass CI again. No evidence is available here of a live integrated environment, a production deployment, physical-device testing, or an independent assistive-technology audit. Those remain **unverified**, not passed.
