@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from artificial_scientist.api.routes.discovery import router as discovery_router
 from artificial_scientist.api.routes.health import router as health_router
 from artificial_scientist.api.routes.knowledge import router as knowledge_router
 from artificial_scientist.api.routes.lab import router as lab_router
@@ -17,6 +18,7 @@ from artificial_scientist.config import get_settings
 
 settings = get_settings()
 LAB_RUN_BODY_LIMIT_BYTES = 64 * 1024
+DISCOVERY_BODY_LIMIT_BYTES = 1024 * 1024
 
 
 class LabSecurityAuditMiddleware:
@@ -118,21 +120,35 @@ class LabSecurityAuditMiddleware:
 
 
 class LabRequestBodyLimitMiddleware:
-    """Bound lab-run request bodies before JSON parsing and model validation."""
+    """Bound computational and discovery request bodies before JSON parsing."""
 
     def __init__(self, app: ASGIApp, max_body_bytes: int = LAB_RUN_BODY_LIMIT_BYTES) -> None:
         self.app = app
         self.max_body_bytes = max_body_bytes
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        path = scope.get("path", "")
         is_lab_run_post = (
             scope["type"] == "http"
             and scope.get("method") == "POST"
-            and scope.get("path") == "/api/v1/lab/runs"
+            and path == "/api/v1/lab/runs"
         )
-        if not is_lab_run_post:
+        is_discovery_post = (
+            scope["type"] == "http"
+            and scope.get("method") == "POST"
+            and path.startswith("/api/v1/discovery/")
+        )
+        if not (is_lab_run_post or is_discovery_post):
             await self.app(scope, receive, send)
             return
+        max_body_bytes = (
+            DISCOVERY_BODY_LIMIT_BYTES if is_discovery_post else self.max_body_bytes
+        )
+        too_large_detail = (
+            "Request body exceeds the endpoint size limit."
+            if is_discovery_post
+            else f"Lab run request body exceeds the {max_body_bytes}-byte limit."
+        )
 
         headers = {
             key.lower(): value
@@ -143,10 +159,10 @@ class LabRequestBodyLimitMiddleware:
             try:
                 declared_length = int(content_length)
             except ValueError:
-                await self._too_large(send)
+                await self._too_large(send, too_large_detail)
                 return
-            if declared_length < 0 or declared_length > self.max_body_bytes:
-                await self._too_large(send)
+            if declared_length < 0 or declared_length > max_body_bytes:
+                await self._too_large(send, too_large_detail)
                 return
 
         body_chunks: list[bytes] = []
@@ -158,8 +174,8 @@ class LabRequestBodyLimitMiddleware:
                 return
             chunk = message.get("body", b"")
             body_size += len(chunk)
-            if body_size > self.max_body_bytes:
-                await self._too_large(send)
+            if body_size > max_body_bytes:
+                await self._too_large(send, too_large_detail)
                 return
             body_chunks.append(chunk)
             more_body = message.get("more_body", False)
@@ -181,8 +197,10 @@ class LabRequestBodyLimitMiddleware:
         await self.app(scope, replay_body, send)
 
     @staticmethod
-    async def _too_large(send: Send) -> None:
-        body = b'{"detail":"Lab run request body exceeds the 65536-byte limit."}'
+    async def _too_large(send: Send, detail: str) -> None:
+        import json
+
+        body = json.dumps({"detail": detail}, separators=(",", ":")).encode("utf-8")
         await send(
             {
                 "type": "http.response.start",
@@ -200,8 +218,9 @@ app = FastAPI(
     title=settings.app_name,
     version=settings.app_version,
     description=(
-        "Research-first software foundation. Scientific research engines and "
-        "autonomous discovery capabilities are not implemented yet."
+        "Research-first scientific system with traceable records, literature metadata, "
+        "bounded mathematics, controlled computation, and structured hypothesis assessment. "
+        "Automated truth verification and autonomous scientific discovery are not claimed."
     ),
 )
 app.add_middleware(LabRequestBodyLimitMiddleware)
@@ -216,6 +235,7 @@ app.add_middleware(
 )
 
 app.include_router(health_router)
+app.include_router(discovery_router)
 app.include_router(literature_router)
 app.include_router(math_tools_router)
 app.include_router(lab_router)

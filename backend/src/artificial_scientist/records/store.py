@@ -589,6 +589,85 @@ class RecordStore:
             payload=record.model_dump(mode="json"),
         )
 
+    def create_many(self, records: list[RecordBase]) -> list[RecordEnvelope]:
+        """Atomically persist a bounded batch and its audit events in one transaction."""
+        if not records:
+            raise ValueError("records must not be empty")
+        if len(records) > 10:
+            raise ValueError("a record batch may contain at most 10 items")
+
+        prepared = [
+            (record, _canonical_payload(record), _utc_iso())
+            for record in records
+        ]
+        envelopes: list[RecordEnvelope] = []
+        try:
+            with closing(self._connect()) as connection:
+                connection.execute("BEGIN IMMEDIATE")
+                for record, payload_json, created_at in prepared:
+                    record_id = str(record.id)
+                    if isinstance(record, SourceRecord):
+                        identity_key = source_identity_key(record)
+                        duplicate = connection.execute(
+                            "SELECT record_id FROM source_identity WHERE identity_key = ?",
+                            (identity_key,),
+                        ).fetchone()
+                        if duplicate is not None:
+                            raise DuplicateSource(UUID(str(duplicate["record_id"])))
+                    self._validate_relationships(connection, record)
+                    connection.execute(
+                        """
+                        INSERT INTO research_records
+                            (id, record_type, schema_version, created_at, content_sha256,
+                             payload_json)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            record_id,
+                            record.record_type,
+                            record.schema_version,
+                            created_at,
+                            _sha256_text(payload_json),
+                            payload_json,
+                        ),
+                    )
+                    if isinstance(record, SourceRecord):
+                        connection.execute(
+                            "INSERT INTO source_identity(identity_key, record_id) VALUES (?, ?)",
+                            (source_identity_key(record), record_id),
+                        )
+                    connection.execute(
+                        """
+                        INSERT INTO audit_events
+                            (event_id, occurred_at, action, actor, record_id, record_type,
+                             content_sha256)
+                        VALUES (?, ?, 'record.created', 'local-api-client', ?, ?, ?)
+                        """,
+                        (
+                            str(uuid4()),
+                            created_at,
+                            record_id,
+                            record.record_type,
+                            _sha256_text(payload_json),
+                        ),
+                    )
+                    envelopes.append(
+                        RecordEnvelope(
+                            id=record.id,
+                            record_type=record.record_type,
+                            schema_version=record.schema_version,
+                            created_at=datetime.fromisoformat(created_at),
+                            content_sha256=_sha256_text(payload_json),
+                            payload=record.model_dump(mode="json"),
+                        )
+                    )
+                connection.commit()
+        except sqlite3.IntegrityError as exc:
+            if "research_records.id" in str(exc) or "UNIQUE constraint failed" in str(exc):
+                raise RecordConflict("A record in the batch conflicts with existing data.") from exc
+            raise RecordStoreError("Could not persist the record batch and audit events.") from exc
+        return envelopes
+
     @staticmethod
     def _row_to_envelope(row: sqlite3.Row) -> RecordEnvelope:
         payload_json = str(row["payload_json"])
@@ -604,7 +683,7 @@ class RecordStore:
         if model_type is None:
             raise RecordIntegrityError(f"Unknown stored record type '{record_type}'.")
         try:
-            validated_record = model_type.model_validate_json(payload_json)
+            model_type.model_validate_json(payload_json)
         except Exception as exc:
             raise RecordIntegrityError(
                 f"Stored record {row['id']} no longer matches its declared schema."
@@ -616,7 +695,9 @@ class RecordStore:
             schema_version=int(row["schema_version"]),
             created_at=datetime.fromisoformat(str(row["created_at"])),
             content_sha256=expected_hash,
-            payload=validated_record.model_dump(mode="json"),
+            # Preserve the exact validated JSON fields covered by the stored digest.
+            # This keeps older records stable when optional model fields are added later.
+            payload=json.loads(payload_json),
         )
 
     def get(self, record_id: UUID) -> RecordEnvelope:
