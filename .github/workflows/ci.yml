@@ -1,3 +1,6 @@
+Here’s the workflow with the YAML indentation and escaped underscores corrected:
+
+```yaml
 name: Continuous Integration
 
 on:
@@ -19,7 +22,7 @@ on:
       - phase-4-knowledge-graph
       - phase-5-mathematical-tools
       - phase-6-controlled-lab
-  workflow_dispatch:
+  workflow_dispatch: {}
 
 permissions:
   contents: read
@@ -74,3 +77,4 @@ jobs:
         run: npm test
       - name: Build production assets
         run: npm run build
+```
