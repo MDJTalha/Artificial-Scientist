@@ -84,3 +84,13 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Run browser end-to-end and accessibility checks
         run: npx playwright test
+      - name: Upload browser test evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: frontend-playwright-evidence
+          path: |
+            frontend/test-results/
+            frontend/playwright-report/
+          if-no-files-found: ignore
+          retention-days: 14
