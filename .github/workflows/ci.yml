@@ -10,6 +10,14 @@ on:
       - phase-4-knowledge-graph
       - phase-5-mathematical-tools
       - phase-6-controlled-lab
+      - phase-6-execution-tenant-tests
+      - phase-6-step1-sandbox-release-gate
+      - phase-6-step2-sandbox-regressions
+      - phase-6-step3-oidc-provider-evidence
+      - phase-6-step4-migration-recovery
+      - phase-6-step5-operational-acceptance
+      - phase-6-fix-tenant-auth-ci
+      - phase-6-ci-trigger-coverage
   pull_request:
     branches:
       - main
@@ -19,6 +27,14 @@ on:
       - phase-4-knowledge-graph
       - phase-5-mathematical-tools
       - phase-6-controlled-lab
+      - phase-6-execution-tenant-tests
+      - phase-6-step1-sandbox-release-gate
+      - phase-6-step2-sandbox-regressions
+      - phase-6-step3-oidc-provider-evidence
+      - phase-6-step4-migration-recovery
+      - phase-6-step5-operational-acceptance
+      - phase-6-fix-tenant-auth-ci
+      - phase-6-ci-trigger-coverage
   workflow_dispatch:
 
 permissions:
@@ -74,3 +90,5 @@ jobs:
         run: npm test
       - name: Build production assets
         run: npm run build
+
+# Phase 6 branch filters intentionally include the active stacked implementation branches.
