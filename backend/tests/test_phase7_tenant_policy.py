@@ -23,7 +23,10 @@ from artificial_scientist.records.tenant_policy import (
     ],
 )
 def test_role_matrix_is_explicit(role, expected):
-    assert {action for action in RECORD_ACTIONS if record_role_allows(role, action)} == set(expected)
+    allowed = {
+        action for action in RECORD_ACTIONS if record_role_allows(role, action)
+    }
+    assert allowed == set(expected)
 
 
 @pytest.mark.parametrize("role", ["unknown", "", "admin", "service"])
