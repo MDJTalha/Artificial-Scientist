@@ -29,7 +29,7 @@ from artificial_scientist.records.models import (
     SourceRecord,
 )
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 MODEL_BY_TYPE: dict[str, type[RecordBase]] = {
     "research_task": ResearchTaskRecord,
     "source": SourceRecord,
@@ -131,12 +131,37 @@ class RecordStore:
                 """
                 CREATE TABLE IF NOT EXISTS research_records (
                     id TEXT PRIMARY KEY,
+                    tenant_id TEXT,
                     record_type TEXT NOT NULL,
                     schema_version INTEGER NOT NULL,
                     created_at TEXT NOT NULL,
                     content_sha256 TEXT NOT NULL,
                     payload_json TEXT NOT NULL
                 )
+                """
+            )
+            # Schema v3 adds nullable tenant ownership columns. Existing rows are
+            # deliberately left NULL: a migration must never guess tenant ownership.
+            # Production API access remains fail-closed until scoped operations and
+            # an explicit, audited legacy-data assignment workflow are deployed.
+            for table in ("research_records", "audit_events", "source_identity"):
+                columns = {
+                    str(row["name"])
+                    for row in connection.execute(f"PRAGMA table_info({table})").fetchall()
+                }
+                if "tenant_id" not in columns:
+                    connection.execute(f"ALTER TABLE {table} ADD COLUMN tenant_id TEXT")
+
+            connection.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_research_records_tenant_type_created
+                ON research_records(tenant_id, record_type, created_at DESC)
+                """
+            )
+            connection.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_audit_events_tenant_occurred
+                ON audit_events(tenant_id, occurred_at DESC)
                 """
             )
             connection.execute(
@@ -149,6 +174,7 @@ class RecordStore:
                 """
                 CREATE TABLE IF NOT EXISTS audit_events (
                     event_id TEXT PRIMARY KEY,
+                    tenant_id TEXT,
                     occurred_at TEXT NOT NULL,
                     action TEXT NOT NULL CHECK(action = 'record.created'),
                     actor TEXT NOT NULL CHECK(actor = 'local-api-client'),
@@ -168,6 +194,7 @@ class RecordStore:
                 """
                 CREATE TABLE IF NOT EXISTS source_identity (
                     identity_key TEXT PRIMARY KEY,
+                    tenant_id TEXT,
                     record_id TEXT NOT NULL UNIQUE
                         REFERENCES research_records(id) ON DELETE RESTRICT
                 )
