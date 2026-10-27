@@ -12,6 +12,12 @@ def test_schema_v3_has_nullable_tenant_columns(tmp_path):
         assert connection.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
         assert SCHEMA_VERSION == 3
         for table in ("research_records", "audit_events", "source_identity"):
-            columns = {row[1] for row in connection.execute(f"PRAGMA table_info({table})")}
+            columns = {
+                row[1]
+                for row in connection.execute(f"PRAGMA table_info({table})")
+            }
             assert "tenant_id" in columns
-            assert connection.execute(f"SELECT COUNT(*) FROM {table} WHERE tenant_id IS NOT NULL").fetchone()[0] == 0
+            count = connection.execute(
+                f"SELECT COUNT(*) FROM {table} WHERE tenant_id IS NOT NULL"
+            ).fetchone()[0]
+            assert count == 0
