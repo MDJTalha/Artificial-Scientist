@@ -15,6 +15,7 @@ from pydantic import ValidationError
 
 from artificial_scientist.api.routes import lab as lab_routes
 from artificial_scientist.api.routes.lab import get_lab_store
+from artificial_scientist.config import get_settings
 from artificial_scientist.lab import execution as lab_execution
 from artificial_scientist.lab import scanning as lab_scanning
 from artificial_scientist.lab import store as lab_store_module
@@ -29,6 +30,11 @@ from artificial_scientist.lab.store import (
     LabRunStore,
 )
 from artificial_scientist.main import LabRequestBodyLimitMiddleware, app
+
+
+@pytest.fixture(autouse=True)
+def opt_in_to_development_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ARTIFICIAL_SCIENTIST_ENV", "development")
 
 
 def _slow_lab_worker() -> dict[str, object]:
@@ -165,6 +171,21 @@ def test_lab_api_returns_structured_run_response() -> None:
     assert payload["status"] == "completed"
     assert payload["steps"][0]["output"]["mean"] == pytest.approx(2.5)
     assert len(payload["configuration_sha256"]) == 64
+
+
+def test_missing_environment_defaults_to_protected_lab_access(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("ARTIFICIAL_SCIENTIST_ENV")
+    monkeypatch.delenv("ARTIFICIAL_SCIENTIST_LAB_API_KEY", raising=False)
+    monkeypatch.delenv("ARTIFICIAL_SCIENTIST_OIDC_ISSUER", raising=False)
+    monkeypatch.delenv("ARTIFICIAL_SCIENTIST_OIDC_AUDIENCE", raising=False)
+    monkeypatch.delenv("ARTIFICIAL_SCIENTIST_OIDC_JWKS_URL", raising=False)
+
+    assert get_settings().environment == "production"
+    response = TestClient(app).get("/api/v1/lab/runs")
+    assert response.status_code == 503
+    assert response.json()["detail"] == "Lab API authentication is not configured."
 
 
 
@@ -663,6 +684,17 @@ def test_lab_api_requires_constant_time_key_outside_development(monkeypatch, tmp
         assert client.get(
             "/api/v1/lab/runs", headers={"X-Lab-API-Key": "wrong"}
         ).status_code == 401
+        denied_without_tenant = client.get(
+            "/api/v1/lab/runs",
+            headers={"X-Lab-API-Key": "test-secret-value-that-is-at-least-32-chars"},
+        )
+        # A valid deployment key authenticates the request but does not select
+        # an authorized tenant.
+        assert denied_without_tenant.status_code == 403
+        assert (
+            denied_without_tenant.json()["detail"]
+            == "Authenticated tenant membership is required."
+        )
         accepted = client.get("/api/v1/lab/runs", headers=headers)
         assert accepted.status_code == 200
     finally:
