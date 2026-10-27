@@ -4,7 +4,8 @@ import pytest
 
 from artificial_scientist.lab.engine import run_lab
 from artificial_scientist.lab.models import LabRunRequest
-from artificial_scientist.lab.store import LabRunNotFound, LabRunStore
+from artificial_scientist.lab.store import LabExecutionNotFound, LabRunNotFound, LabRunStore
+from uuid import uuid4
 
 from artificial_scientist.authorization import (
     AuthorizationDenied,
@@ -178,7 +179,7 @@ def test_tenant_scoped_run_store_hides_foreign_and_legacy_records(tmp_path):
 
 def test_tenant_scoped_execution_status_hides_foreign_attempts(tmp_path):
     store = LabRunStore(str(tmp_path / "tenant-scoped-attempts.sqlite3"))
-    run_id = __import__("uuid").uuid4()
+    run_id = uuid4()
     request = LabRunRequest(
         title="Tenant execution status boundary",
         steps=[
@@ -191,6 +192,5 @@ def test_tenant_scoped_execution_status_hides_foreign_attempts(tmp_path):
     )
     store.begin_execution(run_id, request, tenant_id="tenant-a")
     assert store.get_execution_status(run_id, tenant_id="tenant-a")["run_id"] == str(run_id)
-    with pytest.raises(Exception) as error:
+    with pytest.raises(LabExecutionNotFound):
         store.get_execution_status(run_id, tenant_id="tenant-b")
-    assert error.type.__name__ == "LabExecutionNotFound"
