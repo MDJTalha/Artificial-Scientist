@@ -136,5 +136,5 @@ test('skip-link target keeps a visible focus indicator and navigation works with
   await knowledge.focus()
   await page.keyboard.press('Space')
   await expect(knowledge).toHaveAttribute('aria-current', 'page')
-  await expect(page.locator('#main-content').getByRole('heading', { name: 'Knowledge graph' })).toBeVisible()
+  await expect(page.locator('#main-content').getByRole('heading', { level: 1, name: 'Knowledge graph' })).toBeVisible()
 })
