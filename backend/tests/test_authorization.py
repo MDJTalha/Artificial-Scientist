@@ -1,11 +1,8 @@
 """Tenant directory, role matrix, and audit-event regression tests."""
 
-import pytest
-
-from artificial_scientist.lab.engine import run_lab
-from artificial_scientist.lab.models import LabRunRequest
-from artificial_scientist.lab.store import LabExecutionNotFound, LabRunNotFound, LabRunStore
 from uuid import uuid4
+
+import pytest
 
 from artificial_scientist.authorization import (
     AuthorizationDenied,
@@ -14,6 +11,9 @@ from artificial_scientist.authorization import (
     stable_principal_id,
     stable_tenant_id,
 )
+from artificial_scientist.lab.engine import run_lab
+from artificial_scientist.lab.models import LabRunRequest
+from artificial_scientist.lab.store import LabExecutionNotFound, LabRunNotFound, LabRunStore
 
 
 def test_principal_and_tenant_ids_are_stable_and_opaque():
