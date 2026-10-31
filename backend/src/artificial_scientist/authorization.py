@@ -27,7 +27,8 @@ _LAB_ACTIONS = frozenset({
 })
 _RECORD_ACTIONS = frozenset({
     "record:create", "record:read", "record:list", "record:search",
-    "record:audit:read", "discovery:decompose", "discovery:generate", "discovery:prior-work-screen",
+    "record:audit:read", "discovery:decompose", "discovery:generate",
+    "discovery:prior-work-screen",
     "discovery:assess", "autonomy:workflow:create", "autonomy:workflow:read",
     "autonomy:workflow:write", "autonomy:workflow:approve",
 })
