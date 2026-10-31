@@ -20,6 +20,8 @@ on:
       - phase-6-step1-sandbox-release-gate
       - phase-6-fix-tenant-auth-ci
       - phase-6-execution-tenant-tests
+      - phase-7-hypothesis-discovery
+      - phase-8-14-complete
   pull_request:
     branches:
       - main
@@ -29,6 +31,11 @@ on:
       - phase-4-knowledge-graph
       - phase-5-mathematical-tools
       - phase-6-controlled-lab
+      - phase-6-execution-tenant-tests
+      - phase-7-hypothesis-discovery
+      - phase-7-tenant-scoped-record-store
+      - phase-7-security-complete
+      - phase-8-14-complete
   workflow_dispatch:
 
 permissions:
@@ -51,7 +58,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v7
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: "${{ matrix.python-version }}"
           cache: pip
           cache-dependency-path: backend/pyproject.toml
       - name: Install package and test tools

@@ -44,6 +44,16 @@ def _slow_lab_worker() -> dict[str, object]:
     return {"completed": True}
 
 
+def _multiline_error_lab_worker() -> dict[str, object]:
+    raise ValueError("line one\nline two")
+
+
+def _crash_lab_worker() -> dict[str, object]:
+    import os
+
+    os._exit(7)
+
+
 def test_lab_executes_allowlisted_steps_and_returns_trace_hashes() -> None:
     request = LabRunRequest(
         title="Reference derivative",
@@ -453,6 +463,33 @@ def test_worker_cleanup_escalates_from_terminate_to_kill() -> None:
     assert process.join_calls == [2, 2]
 
 
+@pytest.mark.parametrize(
+    "timeout_seconds", [0, -1, float("nan"), float("inf"), -float("inf")]
+)
+def test_isolated_lab_worker_rejects_invalid_deadlines(timeout_seconds: float) -> None:
+    from artificial_scientist.lab.execution import LabExecutionError
+
+    with pytest.raises(LabExecutionError, match="finite positive number"):
+        run_isolated(_slow_lab_worker, (), timeout_seconds=timeout_seconds)
+
+
+def test_isolated_worker_reports_unexpected_child_exit() -> None:
+    from artificial_scientist.lab.execution import LabExecutionError
+
+    with pytest.raises(LabExecutionError, match="exited without a result"):
+        run_isolated(_crash_lab_worker, (), timeout_seconds=2)
+
+
+def test_isolated_worker_normalizes_multiline_error_messages() -> None:
+    from artificial_scientist.lab.execution import LabExecutionError
+
+    with pytest.raises(LabExecutionError) as error:
+        run_isolated(_multiline_error_lab_worker, (), timeout_seconds=2)
+
+    assert "line one line two" in str(error.value)
+    assert "\n" not in str(error.value)
+
+
 def test_isolated_lab_worker_respects_deadline() -> None:
     import time
 
@@ -614,31 +651,52 @@ def test_retention_purge_requires_timezone_and_bounded_limit(tmp_path) -> None:
 
 
 def test_lab_api_requires_constant_time_key_outside_development(monkeypatch, tmp_path) -> None:
+    database_path = str(tmp_path / "authenticated-lab.sqlite3")
     monkeypatch.setattr(
         lab_routes,
         "get_settings",
         lambda: SimpleNamespace(
             environment="production",
             lab_api_key="test-secret-value-that-is-at-least-32-chars",
+            database_path=database_path,
         ),
     )
-    store = LabRunStore(str(tmp_path / "authenticated-lab.sqlite3"))
+    store = LabRunStore(database_path)
+    # A valid deployment API key authenticates the legacy principal, but it must
+    # not bypass production tenant membership and role authorization.
+    from artificial_scientist.authorization import TenantDirectory
+
+    directory = TenantDirectory(database_path)
+    principal_id = directory.register_principal(
+        "deployment-configured", "legacy-shared-api-key"
+    )
+    tenant_id = directory.create_tenant("test-tenant", "Test Tenant")
+    directory.grant_membership(principal_id, tenant_id, "researcher")
+
     app.dependency_overrides[get_lab_store] = lambda: store
     client = TestClient(app)
+    headers = {
+        "X-Lab-API-Key": "test-secret-value-that-is-at-least-32-chars",
+        "X-Tenant-ID": tenant_id,
+    }
     try:
         assert client.get("/api/v1/lab/runs").status_code == 401
         assert client.get(
             "/api/v1/lab/runs", headers={"X-Lab-API-Key": "wrong"}
         ).status_code == 401
-        accepted = client.get(
+        denied_without_tenant = client.get(
             "/api/v1/lab/runs",
             headers={"X-Lab-API-Key": "test-secret-value-that-is-at-least-32-chars"},
         )
-        # The legacy shared key authenticates the deployment, but it does not
-        # establish tenant membership. A forbidden response proves the key was
-        # accepted (invalid keys return 401) without weakening tenant isolation.
-        assert accepted.status_code == 403
-        assert accepted.json()["detail"] == "Authenticated tenant membership is required."
+        # A valid deployment key authenticates the request but does not select
+        # an authorized tenant.
+        assert denied_without_tenant.status_code == 403
+        assert (
+            denied_without_tenant.json()["detail"]
+            == "Authenticated tenant membership is required."
+        )
+        accepted = client.get("/api/v1/lab/runs", headers=headers)
+        assert accepted.status_code == 200
     finally:
         app.dependency_overrides.pop(get_lab_store, None)
 
@@ -1120,4 +1178,31 @@ def test_clamav_scanner_rejects_detected_malware(monkeypatch) -> None:
         lambda *_args, **_kwargs: InfectedConnection(),
     )
     with pytest.raises(lab_scanning.MalwareDetected):
+        lab_scanning.scan_binary_content(b"test sample", environment="production")
+
+
+def test_clamav_scanner_rejects_invalid_utf8_response(monkeypatch) -> None:
+    class InvalidEncodingConnection:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def settimeout(self, _timeout):
+            return None
+
+        def sendall(self, _data):
+            return None
+
+        def recv(self, _size):
+            return b"stream: " + bytes([0xFF]) + b" OK\0"
+
+    monkeypatch.setenv("ARTIFICIAL_SCIENTIST_CLAMAV_HOST", "scanner.internal")
+    monkeypatch.setattr(
+        lab_scanning.socket,
+        "create_connection",
+        lambda *_args, **_kwargs: InvalidEncodingConnection(),
+    )
+    with pytest.raises(lab_scanning.ScannerUnavailable, match="invalid response"):
         lab_scanning.scan_binary_content(b"test sample", environment="production")

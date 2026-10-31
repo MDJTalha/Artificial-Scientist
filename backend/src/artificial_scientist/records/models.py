@@ -209,6 +209,8 @@ class HypothesisRecord(RecordBase):
     assumptions: list[str] = Field(default_factory=list, max_length=100)
     alternative_explanations: list[str] = Field(default_factory=list, max_length=100)
     falsification_criteria: list[str] = Field(min_length=1, max_length=100)
+    predictions: list[str] = Field(default_factory=list, max_length=100)
+    discriminating_test: str | None = Field(default=None, max_length=4000)
     source_record_ids: list[UUID] = Field(default_factory=list, max_length=200)
     claim_record_ids: list[UUID] = Field(default_factory=list, max_length=200)
     supersedes_id: UUID | None = None

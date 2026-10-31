@@ -1,11 +1,11 @@
 # Phase 6 — Identity, Authorization, and Tenant-Isolation Design
 
-**Status: OIDC validation, tenant directory, tenant membership checks on lab routes, and tenant-scoped run/artifact persistence are implemented on the working branch; complete adversarial coverage, quotas, production identity-provider verification, and independent security review remain outstanding.**  
+**Status: OIDC validation, tenant directory, tenant membership checks on lab routes, and tenant-scoped run/artifact persistence are implemented on the working branch. Tenant-wide binary and JSON artifact count/byte quotas and lab-run count quotas use serialized SQLite transactions. CI passed on commit `fe4d3ccf7cbb74632d05656ef60aba5b3e6619f4`; every subsequent code change must be re-verified. Complete adversarial coverage, production identity-provider verification, migration rehearsal, and independent security review remain outstanding.**  
 **Scope:** controlled-lab runs, execution attempts, JSON artifacts, binary attachments, exports, and retention records.
 
 ## Security problem
 
-The lab router supports OIDC bearer-token validation when OIDC is configured, with a shared `X-Lab-API-Key` fallback only when no OIDC settings are supplied. That legacy key proves possession of one deployment secret; it does not establish a user, organization, role, or ownership relationship. Run IDs are UUIDs, but unguessable identifiers are not authorization. Tenant-scoped persistence is implemented for run and execution-attempt records and associated artifact lookups, but the design remains incomplete until adversarial route coverage, quotas, explicit local-development controls, and deployment evidence are in place.
+The router supports configured OIDC bearer validation and tenant membership authorization, while retaining the legacy `X-Lab-API-Key` path only when no OIDC settings are supplied. A shared API key proves possession of one deployment secret; it does not establish an individual user, organization, role, or ownership relationship. Run IDs are UUIDs, but unguessable identifiers are not authorization. Tenant-scoped controls are implemented, but production exposure remains blocked on provider-specific verification, deployment hardening, independent security review, and the separate OS sandbox review.
 
 ## Decisions
 
@@ -25,16 +25,58 @@ The lab router supports OIDC bearer-token validation when OIDC is configured, wi
 - [x] Add provider-neutral OIDC bearer-token validation using maintained PyJWT/JWKS support; configure issuer, audience, and HTTPS JWKS URL explicitly. This validates identity claims but does not implement a provider-specific login flow.
 - [ ] Select and document the production identity provider and verify its access-token format, key rotation, and deployment configuration.
 - [x] Add SQLite persistence primitives for immutable principal IDs, tenants, explicit memberships, supported roles, and security audit events.
-- [x] Add nullable `tenant_id` columns to run and execution-attempt records via backward-compatible SQLite schema migration; legacy records remain unowned (`NULL`) and are excluded from tenant-scoped queries. Additional adversarial migration tests remain required.
+- [x] Add additive schema-migration and legacy-record ownership regression tests; legacy records remain unowned and are excluded from tenant-scoped run/artifact storage. A production migration rehearsal and review remain open.
 - [x] Enforce configured OIDC bearer validation on the lab router; when any OIDC setting is configured, partial configuration fails closed and the legacy shared API key cannot bypass OIDC.
 - [x] Propagate the validated identity into request context; add an explicit role/action matrix that denies unknown roles and actions.
 - [x] Resolve validated request identity to a stable principal ID and require active tenant membership and action permission on run, execution-status, JSON artifact, binary artifact, verification, and export routes.
-- [x] Add tenant ownership to run and execution-attempt records; legacy rows are not automatically assigned to any tenant. A reviewed operator-controlled claim/migration workflow is still not implemented.
+- [x] Add nullable tenant ownership columns to run and execution-attempt records; legacy rows remain unowned rather than being assigned arbitrarily.
+- [x] Add an explicit dry-run-first, operator-authorized, conflict-rejecting legacy ownership claim tool with transactional audit records and regression tests; production rollout still requires an operator-run migration rehearsal and review.
 - [x] Add tenant filters to run lists/reads, execution-status reads, JSON artifact lists/reads, binary artifact lists/reads, and export/verification route storage calls.
-- [ ] Add transactional per-tenant quotas and tests for concurrent uploads and run creation.
-- [x] Add the tenant-directory audit-event persistence primitive, bounded metadata validation, and allowed/denied membership audit events. Route-level correlation and complete audit coverage for exports, uploads, role changes, and retention are still outstanding.
-- [ ] Expand negative cross-tenant tests across every object endpoint, including UUID substitution for export, verification, execution status, uploads, and downloads.
+- [x] Add transactionally enforced per-tenant binary-attachment count and byte caps, with regression tests across multiple runs.
+- [x] Add a tenant-wide lab-run count cap with a serialized reservation transaction and regression coverage. Only live run records and active execution reservations consume slots; failed/interrupted attempts and retention-purged runs release the live quota.
+- [x] Add transactionally enforced per-tenant JSON artifact count and byte budgets with regression tests.
+- [x] Add concurrency stress tests for binary uploads, run creation, and tenant-wide JSON artifact reservations; a purged or failed run no longer consumes a live run slot, and run-quota exhaustion is returned as HTTP 429. CI must pass on the latest commit before the branch is considered verified.
+- [x] Keep stale execution recovery tenant-scoped: a persisted run is reconciled only when its ownership matches the execution attempt; mismatches are marked interrupted rather than cross-reconciled. Persist tenant-scoped lab request outcomes (allowed, denied, failed) with principal, tenant, action, object target, correlation ID, route, method, and HTTP status; all HTTP 4xx responses, including quota rejection, are classified as denied, and 5xx as failed. Correlation IDs from clients are restricted to a conservative 1–128 character ASCII alphabet; invalid values are replaced with server-generated UUIDs. Audit metadata excludes credentials and request payloads. Authentication failures occurring before tenant resolution are recorded as anonymous request events. Audit persistence failure blocks the response.
+- [x] Add negative cross-tenant API tests for run reads, execution status, verification, exports, JSON artifact listing/read, binary artifact listing/download, and binary upload before scanning; execution-recovery reconciliation also checks tenant ownership. UUID substitution is exercised with another tenant's run and artifact identifiers. Binary upload rejects malformed or negative `Content-Length` values before scanning, compares oversized decimal lengths without converting attacker-controlled giant integers, rejects empty bodies before invoking the malware scanner, and validates the declared filename and media type before reading or scanning the upload. The isolated execution helper also rejects zero, negative, NaN, and infinite worker deadlines before starting a process, with regression coverage. Invalid correlation IDs are replaced with server-generated UUIDs before audit persistence. Additional adversarial review remains required before production rollout.
+- [x] Validate tenant selectors as canonical UUIDs before opening the tenant directory or persisting selector data. Malformed or oversized selectors are denied and audited as unscoped request events, preventing attacker-controlled tenant-header values from being stored in the audit database. Regression test covers a 100,000-character selector.
 - [ ] Verify behavior in CI and conduct an independent security review before exposing untrusted or multi-tenant traffic.
+
+## Legacy ownership claim procedure
+
+The branch now includes `artificial_scientist.legacy_claim.claim_legacy_runs`, with a CLI entry point in `backend/src/artificial_scientist/legacy_claim.py`. It is intentionally separate from normal API traffic.
+
+- Prepare a reviewed JSON manifest containing only explicit `run_id` and existing `tenant_id` UUID pairs.
+- Run in dry-run mode first. The command refuses to initialize a missing database and verifies that every referenced run/attempt and tenant exists.
+- Applying requires `--apply` and an existing internal `--operator-principal-id`. Conflicting ownership rejects the whole operation; it never overwrites a different tenant assignment.
+- Run and execution-attempt ownership updates and the corresponding `legacy:claim` audit events are committed in one SQLite transaction. Re-running a matching claim is safe and records an audit event.
+- Review the dry-run output and backup the database before applying. This is an operator tool, not a self-service tenant endpoint.
+
+Example manifest:
+
+```json
+{
+  "claims": [
+    {
+      "run_id": "00000000-0000-4000-8000-000000000001",
+      "tenant_id": "00000000-0000-4000-8000-000000000002"
+    }
+  ]
+}
+```
+
+Dry-run:
+
+```powershell
+python -m artificial_scientist.legacy_claim --database .\\data\\lab.sqlite3 --manifest .\\legacy-claims.json
+```
+
+Apply only after reviewing the dry-run and taking a backup:
+
+```powershell
+python -m artificial_scientist.legacy_claim --database .\\data\\lab.sqlite3 --manifest .\\legacy-claims.json --apply --operator-principal-id 00000000-0000-4000-8000-000000000003
+```
+
+The claim tool does not automatically assign owners to records without a manifest entry. Retention records for already-deleted runs are not claimable by this workflow and require a separate reviewed retention-evidence migration.
 
 ## Minimum acceptance tests
 
@@ -58,12 +100,16 @@ Set all three environment variables to enable OIDC validation for the lab API:
 - `ARTIFICIAL_SCIENTIST_OIDC_AUDIENCE`: expected API audience.
 - `ARTIFICIAL_SCIENTIST_OIDC_JWKS_URL`: HTTPS JSON Web Key Set URL.
 
-The validator accepts signed RS256 tokens only, validates issuer, audience, expiry and issued-at claims, and requires `sub`, `iss`, `aud`, `iat`, and `exp`. A missing or partial OIDC configuration fails closed outside development. Once any OIDC setting is supplied, the shared API key cannot be used as a fallback. The JWKS endpoint must use HTTPS.
+The validator accepts signed RS256 tokens only, validates issuer, audience, expiry and issued-at claims, and requires `sub`, `iss`, `aud`, `iat`, and `exp`. A missing or partial OIDC configuration fails closed outside development. Once any OIDC setting is supplied, the shared API key cannot be used as a fallback. The JWKS endpoint must use HTTPS, include a valid hostname, and contain no embedded credentials or URL fragment. Malformed URLs, invalid ports, whitespace in the URL, and blank issuer/audience configuration are rejected before token validation. Validated subject and issuer claim lengths are bounded; the exact issuer and audience must still match the configured trust values.
 
-This is an incremental authorization implementation, not a claim of production SaaS readiness. If `ARTIFICIAL_SCIENTIST_ENV` is unset, the application defaults to `production`; protected lab routes therefore require configured authentication and fail closed when it is missing. For local development only, explicitly set `ARTIFICIAL_SCIENTIST_ENV=development`. In production-like environments, each protected route requires a validated principal, an `X-Tenant-ID` selector, an active membership, and permission for the requested action. The tenant header selects a tenant but never grants access by itself. Run and artifact storage calls are tenant-scoped, and unknown or unowned object IDs return not-found responses. Development mode uses a fixed local-only principal and intentionally leaves storage unscoped for backwards-compatible local testing; do not expose development mode to untrusted traffic. Production rollout remains blocked on expanded negative tests, tenant quotas, provider-specific configuration review, and independent security review.
+This is an incremental authorization implementation, not a claim of production SaaS readiness. If `ARTIFICIAL_SCIENTIST_ENV` is unset, the application defaults to `production`; protected lab routes therefore require configured authentication and fail closed when it is missing. For local development only, explicitly set `ARTIFICIAL_SCIENTIST_ENV=development`. In production-like environments, each protected route requires a validated principal, an `X-Tenant-ID` selector, an active membership, and permission for the requested action. The tenant header selects a tenant but never grants access by itself. Run and artifact storage calls are tenant-scoped, and unknown or unowned object IDs return not-found responses. Development mode uses a fixed local-only principal and intentionally leaves storage unscoped for backwards-compatible local testing; do not expose development mode to untrusted traffic. Tenant quota enforcement, concurrent run/upload regression tests, request-outcome auditing, and the explicit legacy-claim tool passed CI on commit `fe4d3ccf7cbb74632d05656ef60aba5b3e6619f4`; the current CI run must pass after the tenant-selector validation changes before the branch is considered verified. Production rollout remains blocked on complete adversarial endpoint coverage, a reviewed migration rehearsal, provider-specific identity configuration and key-rotation verification, independent security review, and the separate OS-level execution sandbox review.
+
+## Safe migration rehearsal
+
+The command `python -m artificial_scientist.phase6_rehearsal --database PATH --manifest claims.json --operator-principal-id UUID` runs the explicit legacy-claim workflow against a temporary SQLite snapshot created with SQLite's backup API. It performs dry-run validation, applies claims only to the snapshot, and verifies ownership plus operator audit events. The source database is never the apply target. The manifest format is exactly `{"claims":[{"run_id":"...","tenant_id":"..."}]}`. This rehearses application logic and data invariants; it does not replace a production backup/restore drill, an operator-approved maintenance window, or independent review of a real deployment.
 
 ## Tenant-directory foundation added
 
 The current branch adds `artificial_scientist.authorization.TenantDirectory`, which persists opaque principal IDs derived from the trusted issuer/subject pair, tenant records, explicit active memberships, and append-only-style security audit events. The supported roles are `tenant_admin`, `researcher`, `viewer`, and `auditor`; unknown roles/actions deny by default. Membership checks record allowed and denied outcomes without recording credentials or scientific payloads.
 
-This is an incremental implementation, not a completed security boundary. The run and execution-attempt tables now carry nullable tenant ownership, and tenant-aware store methods scope run reads/lists, execution status, JSON artifacts, binary artifacts, and related run operations. Legacy rows remain unowned and are excluded from tenant-scoped queries; no automatic ownership is inferred. Do not expose this branch to multiple customers until endpoint-by-endpoint cross-tenant negative tests, quotas, explicit development-mode controls, production provider configuration, and independent security review are complete.
+This is an incremental authorization and persistence layer, not a completed migration or enforcement layer. The run and execution-attempt tables have nullable tenant ownership, and tenant-aware store methods scope run reads/lists, execution status, JSON artifacts, binary artifacts, and related run operations. Legacy rows remain unowned, are excluded from tenant-scoped queries, and are never assigned automatically. Production migration rehearsal and review, complete cross-tenant endpoint coverage, production identity-provider verification, and independent security review remain open. Tenant-wide binary/JSON artifact and lab-run count quotas, concurrency regressions, request-outcome auditing, and legacy-claim regressions passed CI on commit `fe4d3ccf7cbb74632d05656ef60aba5b3e6619f4`; newer changes classify all client-error responses as denied, reject invalid scanner response encodings, reject malformed or oversized tenant selectors before audit persistence, and require canonical non-negative ASCII decimal `Content-Length` values for binary uploads. A negative-length regression test confirms rejection before malware scanning. CI must pass on the latest commit before verification is refreshed. Do not expose this branch to multiple customers until those controls and reviews are complete.
