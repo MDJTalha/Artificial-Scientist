@@ -7,8 +7,10 @@ from artificial_scientist.autonomy.collaboration import CollaborationEngine
 from artificial_scientist.autonomy.writing import ScientificWriter
 from artificial_scientist.autonomy.governance import GovernanceEngine
 from artificial_scientist.autonomy.domains import DomainRegistry
+from artificial_scientist.autonomy.engine import ScientificAutonomyEngine
+from artificial_scientist.autonomy.store import AutonomyStore
 
 __all__ = [
     "WorkflowEngine", "IndependentVerifier", "ResearchMemory",
-    "CollaborationEngine", "ScientificWriter", "GovernanceEngine", "DomainRegistry",
+    "CollaborationEngine", "ScientificWriter", "GovernanceEngine", "DomainRegistry", "ScientificAutonomyEngine", "AutonomyStore",
 ]
