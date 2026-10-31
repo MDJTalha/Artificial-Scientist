@@ -62,7 +62,10 @@ def scan_binary_content(content: bytes, *, environment: str) -> str:
     # happens to end in "OK" must never be treated as a successful scan.
     if not raw_response.endswith(b"\0"):
         raise ScannerUnavailable("Malware scanner returned an incomplete response.")
-    result = raw_response[:-1].decode("utf-8", errors="strict").strip()
+    try:
+        result = raw_response[:-1].decode("utf-8", errors="strict").strip()
+    except UnicodeDecodeError as error:
+        raise ScannerUnavailable("Malware scanner returned an invalid response.") from error
     if result.endswith(": OK"):
         return "clean"
     if result.endswith(" FOUND"):

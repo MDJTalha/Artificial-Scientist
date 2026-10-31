@@ -21,10 +21,17 @@ from uuid import NAMESPACE_URL, uuid4, uuid5
 _SUBJECT_MAX = 255
 _TENANT_NAME_MAX = 120
 _ALLOWED_ROLES = frozenset({"tenant_admin", "researcher", "viewer", "auditor"})
-_ALLOWED_ACTIONS = frozenset({
+_LAB_ACTIONS = frozenset({
     "run:create", "run:list", "run:read", "run:verify", "run:export",
     "artifact:read", "artifact:upload", "membership:manage", "retention:purge",
 })
+_RECORD_ACTIONS = frozenset({
+    "record:create", "record:read", "record:list", "record:search",
+    "record:audit:read", "discovery:decompose", "discovery:prior-work-screen",
+    "discovery:assess", "autonomy:workflow:create", "autonomy:workflow:read",
+    "autonomy:workflow:write", "autonomy:workflow:approve",
+})
+_ALLOWED_ACTIONS = _LAB_ACTIONS | _RECORD_ACTIONS
 
 
 class AuthorizationDenied(PermissionError):
@@ -58,11 +65,27 @@ def stable_tenant_id(external_key: str) -> str:
 
 
 def role_allows(role: str, action: str) -> bool:
-    """Return explicit role permissions; unknown roles and actions deny by default."""
+    """Return explicit least-privilege permissions for lab and research APIs."""
     if role not in _ALLOWED_ROLES or action not in _ALLOWED_ACTIONS:
         return False
     if role == "tenant_admin":
         return action != "retention:purge"
+    if action in _RECORD_ACTIONS:
+        if role == "researcher":
+            return action in {
+                "record:create", "record:read", "record:list", "record:search",
+                "discovery:decompose", "discovery:prior-work-screen", "discovery:assess",
+                "autonomy:workflow:create", "autonomy:workflow:read", "autonomy:workflow:write",
+                "autonomy:workflow:approve",
+            }
+        if role == "viewer":
+            return action in {
+                "record:read", "record:list", "record:search",
+                "discovery:decompose", "discovery:prior-work-screen", "autonomy:workflow:read",
+            }
+        if role == "auditor":
+            return action in {"record:read", "record:list", "record:audit:read"}
+        return False
     if role == "researcher":
         return action in {
             "run:create", "run:list", "run:read", "run:verify", "run:export",
@@ -282,15 +305,19 @@ class TenantDirectory:
                 )
         return event_id
 
-    def list_audit_events(self, tenant_id: str, limit: int = 100) -> list[dict[str, Any]]:
+    def list_audit_events(
+        self, tenant_id: str | None, limit: int = 100
+    ) -> list[dict[str, Any]]:
         if not 1 <= limit <= 500:
             raise ValueError("Audit page size must be between 1 and 500.")
+        tenant_filter = "tenant_id IS NULL" if tenant_id is None else "tenant_id=?"
+        parameters: tuple[object, ...] = (limit,) if tenant_id is None else (tenant_id, limit)
         with closing(self._connect()) as connection:
             rows = connection.execute(
-                """SELECT event_id,occurred_at,principal_id,tenant_id,action,target_type,
+                f"""SELECT event_id,occurred_at,principal_id,tenant_id,action,target_type,
                 target_id,outcome,correlation_id,metadata_json FROM asds_security_audit
-                WHERE tenant_id=? ORDER BY occurred_at DESC,event_id DESC LIMIT ?""",
-                (tenant_id, limit),
+                WHERE {tenant_filter} ORDER BY occurred_at DESC,event_id DESC LIMIT ?""",
+                parameters,
             ).fetchall()
         return [
             {**dict(row), "metadata": json.loads(row["metadata_json"])}
