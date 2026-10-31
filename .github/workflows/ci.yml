@@ -87,6 +87,11 @@ jobs:
           python-version: "3.12"
       - name: Validate release-gate policy
         run: python scripts/validate_release_evidence.py
+      - name: Install scientific evaluation dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .
       - name: Run deterministic scientific reproducibility smoke benchmark
         run: python scripts/scientific_eval.py
       - name: Compile production validation helpers
