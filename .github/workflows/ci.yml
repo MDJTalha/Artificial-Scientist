@@ -67,6 +67,8 @@ jobs:
         run: npm run typecheck
       - name: Run unit tests
         run: npm test
+      - name: Install isolated E2E tooling
+        run: npm install --no-save --no-audit --no-fund @playwright/test@1.56.1 @axe-core/playwright@4.11.0
       - name: Build production assets
         run: npm run build
       - name: Install Chromium for E2E
