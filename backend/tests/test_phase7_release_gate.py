@@ -4,8 +4,8 @@ from dataclasses import replace
 
 from fastapi.testclient import TestClient
 
-import artificial_scientist.main as main
 import artificial_scientist.api.routes.records as records_routes
+import artificial_scientist.main as main
 
 
 def test_production_research_routes_require_configured_oidc(monkeypatch) -> None:
