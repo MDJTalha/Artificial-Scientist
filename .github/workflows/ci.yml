@@ -47,7 +47,39 @@ jobs:
       - name: Check code style
         run: ruff check src tests
       - name: Run tests
-        run: pytest
+        id: backend-tests
+        env:
+          PYTHON_VERSION: ${{ matrix.python-version }}
+        shell: bash
+        run: |
+          set +e
+          pytest 2>&1 | tee backend-test.log
+          status=${PIPESTATUS[0]}
+          exit ${status}
+      - name: Publish backend test diagnostics to PR
+        if: failure()
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const fs = require('fs')
+            const version = process.env.PYTHON_VERSION
+            const logPath = 'backend/backend-test.log'
+            const log = fs.existsSync(logPath) ? fs.readFileSync(logPath, 'utf8') : 'backend-test.log was not produced'
+            const body = [
+              '### Backend test diagnostic — Python ' + version,
+              '',
+              'Temporary CI diagnostic for the release-hardening run.',
+              '',
+              'BACKEND-TEST-LOG',
+              log.slice(-16000),
+            ].join('\n')
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body,
+            })
+
 
   frontend:
     name: Frontend checks
