@@ -412,7 +412,6 @@ class RecordStore:
             }:
                 self._validate_acyclic_relationship(connection, record, tenant_id=tenant_id)
 
-    @staticmethod
     def _validate_acyclic_relationship(
         self,
         connection: sqlite3.Connection,
@@ -541,9 +540,10 @@ class RecordStore:
         else:
             incident_clause = f"({source_clause} OR {target_clause})"
         conditions = ["record_type = 'knowledge_relationship'", incident_clause, "tenant_id IS ?"]
-        parameters: list[object] = [str(concept_id), tenant_id]
+        parameters: list[object] = [str(concept_id)]
         if direction == "both":
             parameters.append(str(concept_id))
+        parameters.append(tenant_id)
         if predicate:
             conditions.append("json_extract(payload_json, '$.predicate') = ?")
             parameters.append(predicate)
@@ -607,8 +607,8 @@ class RecordStore:
                     """
                     INSERT INTO audit_events
                         (
-                            event_id, occurred_at, action, actor, record_id,
-                            record_type, content_sha256
+                            event_id, tenant_id, occurred_at, action, actor,
+                            record_id, record_type, content_sha256
                         )
                     VALUES (?, ?, ?, 'record.created', 'local-api-client', ?, ?, ?)
                     """,
