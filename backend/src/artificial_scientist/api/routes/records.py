@@ -4,7 +4,7 @@ from functools import lru_cache
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
 
 from artificial_scientist.authorization import (
     AuthorizationDenied,
