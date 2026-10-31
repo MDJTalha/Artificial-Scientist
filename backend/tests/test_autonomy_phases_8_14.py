@@ -1,3 +1,5 @@
+import pytest
+
 from artificial_scientist.autonomy.collaboration import AgentRole, CollaborationEngine
 from artificial_scientist.autonomy.domains import DomainRegistry, DomainSpec
 from artificial_scientist.autonomy.engine import ScientificAutonomyEngine
@@ -104,8 +106,6 @@ def test_end_to_end_autonomy_is_governed():
 
 
 def test_domain_registry_rejects_invalid_definitions():
-    import pytest
-
     domains = DomainRegistry()
     with pytest.raises(ValueError, match="risk class"):
         domains.register(DomainSpec("x", "unknown", ("solver",), ("case",)))
