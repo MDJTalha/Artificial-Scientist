@@ -28,11 +28,17 @@ Implemented: versionable benchmark cases, adversarial/security categories, missi
 
 ## Phase 14 — Multidisciplinary expansion
 
-Implemented: domain registry with tool allowlists, validation-case requirements, expert-review gates, risk classes, and a hard block on physical actions in this software boundary.
+Implemented: domain registry with bounded domain names, explicit risk classes, non-empty unique tool allowlists, required validation cases, expert-review gates, and a hard block on physical actions in this software boundary. Domain registration rejects malformed or duplicated definitions before they become available. Authorization requires successful validation and expert approval whenever the domain requires it.
+
+The domain registry is intentionally a software governance boundary. It does not certify scientific competence in a domain; every registered domain still needs versioned validation cases and qualified expert review before operational expansion.
 
 ## Cross-phase safety invariant
 
 No phase enables unrestricted agent-generated code execution, bypasses Phase 6 isolation, silently mutates scientific history, treats agreement as evidence, or submits work externally without authorization.
+
+## Phase 14 acceptance evidence
+
+The repository tests cover missing validation, missing expert approval, physical-action rejection, malformed domain definitions, duplicate registration, bounded identifiers, and invalid risk classes. The registry does not expose a physical-action transport.
 
 ## Integration boundary
 

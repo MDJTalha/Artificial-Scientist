@@ -69,7 +69,7 @@ Six equally weighted checks contribute to completeness: explicit assumptions, al
 - Novelty assessment is provisional. The endpoint does not itself run a literature search or guarantee that a hypothesis is novel.
 - Lexical similarity can miss paraphrases and can flag unrelated wording; a human should review every duplicate warning.
 - Candidate persistence uses one SQLite transaction for the whole batch; a validation or write failure rolls back every candidate and its audit event.
-- The existing research-record API is not tenant-scoped. Do not expose Phase 7 or the general records API to untrusted multi-tenant traffic until the Phase 6 identity and authorization release gates are independently satisfied.
+- Research-record, discovery, and knowledge-graph access is tenant-scoped in the integrated main branch. Protected routes require authenticated tenant membership outside development, and evidence references are resolved within the caller's tenant. Production exposure remains subject to the separate live OIDC, operational, and independent-security release gates.
 - Scientific validity requires domain-expert review, a documented literature-search protocol, and subsequent Phase 8 experiment planning and Phase 9 independent analysis.
 
 ## CI acceptance
@@ -81,4 +81,4 @@ Phase 7 code acceptance requires the latest branch SHA to pass frontend type-che
 
 Discovery POST requests are capped at 1 MiB before JSON parsing. The guard enforces both declared `Content-Length` and streamed body size, so chunked requests cannot bypass the limit. Requests above the limit receive HTTP 413 and are not passed to Pydantic or route handlers. Regression coverage verifies rejection of an oversized body.
 
-This limit is a resource-abuse guard, not authentication, rate limiting, or a substitute for an upstream proxy/server request limit. Deployments should also configure reverse-proxy body limits, connection/timeouts, per-principal rate limits, and monitoring. The general research-record endpoints remain outside tenant-scoped authorization; do not treat this phase as safe for untrusted multi-tenant production until that separate security gap is closed and independently reviewed.
+This limit is a resource-abuse guard, not authentication, rate limiting, or a substitute for an upstream proxy/server request limit. Deployments should also configure reverse-proxy body limits, connection/timeouts, per-principal rate limits, and monitoring. Tenant-scoped authorization and cross-tenant negative tests are implemented for the integrated research-record/discovery paths. Do not treat repository tests as a substitute for live deployment validation or independent security review.
