@@ -11,6 +11,7 @@ from artificial_scientist.api.routes.literature import get_literature_service
 from artificial_scientist.api.routes.records import get_record_store
 from artificial_scientist.discovery import (
     DiscoveryAssessmentRequest,
+    HypothesisGenerationRequest,
     ResearchQuestionDecompositionRequest,
     assess_candidates,
     decompose_research_question,
@@ -165,6 +166,29 @@ def test_near_duplicate_hypotheses_are_flagged() -> None:
     result = assess_candidates(request)
     assert result.assessments[1].near_duplicate_of == "First hypothesis"
     assert result.overall_status == "needs_revision"
+
+
+def test_api_generates_bounded_hypotheses_without_persisting_records() -> None:
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/discovery/generate",
+            json={
+                "research_question": "How does temperature affect reaction rate?",
+                "independent_variable": "temperature",
+                "dependent_variable": "reaction rate",
+                "system_or_population": "the reaction system",
+                "context": "fixed pressure",
+            },
+        )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert len(body["candidates"]) == 3
+    assert all(
+        item["review_status"] == "requires_human_review"
+        for item in body["candidates"]
+    )
+    assert body["candidates"][0]["candidate"]["source_record_ids"] == []
+
 
 
 def test_api_persists_hypotheses_with_predictions_and_test(store: RecordStore) -> None:
