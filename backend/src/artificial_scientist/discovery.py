@@ -413,24 +413,36 @@ def generate_hypotheses(request: HypothesisGenerationRequest) -> HypothesisGener
 
     candidates: list[GeneratedHypothesis] = []
     for title, statement in templates:
-        direction = "increases" if " increases " in statement else "decreases" if " decreases " in statement else "does not materially change"
+        if " increases " in statement:
+            direction = "increases"
+        elif " decreases " in statement:
+            direction = "decreases"
+        else:
+            direction = "does not materially change"
         predictions = [
             f"Measured {dv} follows the stated direction across a predefined {iv} range."
             if direction != "does not materially change"
-            else f"Measured {dv} remains within a predefined equivalence or uncertainty bound across the {iv} range."
+            else (
+                f"Measured {dv} remains within a predefined equivalence or "
+                f"uncertainty bound across the {iv} range."
+            )
         ]
         falsification = [
-            f"The observed {dv} change is opposite to the stated direction beyond the predefined uncertainty bound."
-            if direction != "does not materially change"
-            else f"The observed {dv} change exceeds the predefined equivalence or uncertainty bound."
+            (
+                f"The observed {dv} change is opposite to the stated direction "
+                "beyond the predefined uncertainty bound."
+                if direction != "does not materially change"
+                else f"The observed {dv} change exceeds the predefined equivalence "
+                "or uncertainty bound."
+            )
         ]
         alternatives = [
             f"A confounder correlated with {iv} explains the observed change in {dv}.",
-            f"Measurement or selection effects account for the apparent relationship.",
+            "Measurement or selection effects account for the apparent relationship.",
         ]
         assumptions = [
             f"{system} is defined consistently across observations.",
-            f"Relevant confounders and measurement procedures are controlled or recorded.",
+            "Relevant confounders and measurement procedures are controlled or recorded.",
         ]
         test = (
             f"Randomize or stratify {iv} where appropriate, measure {dv} with blinded analysis, "
@@ -456,8 +468,11 @@ def generate_hypotheses(request: HypothesisGenerationRequest) -> HypothesisGener
         candidates=candidates,
         limitations=[
             "Candidates are deterministic templates, not model-derived scientific discoveries.",
-            "No evidence, literature result, causal claim, novelty claim, or truth probability is inferred.",
-            "Generated candidates must be assessed against prior work, domain constraints, and expert review.",
-            "The default set is intentionally small; complex mechanisms and interactions require explicit human specification.",
+            "No evidence, literature result, causal claim, novelty claim, or truth "
+            "probability is inferred.",
+            "Generated candidates must be assessed against prior work, domain "
+            "constraints, and expert review.",
+            "The default set is intentionally small; complex mechanisms and "
+            "interactions require explicit human specification.",
         ],
     )
