@@ -458,6 +458,7 @@ class RecordStore:
         concept_status: str | None = None,
         limit: int = 20,
         offset: int = 0,
+        tenant_id: str | None = None,
     ) -> tuple[list[RecordEnvelope], int]:
         """Search concept labels, definitions, and aliases with server-side pagination."""
         if not 1 <= limit <= 100:
@@ -467,6 +468,9 @@ class RecordStore:
 
         conditions = ["record_type = 'knowledge_concept'"]
         parameters: list[object] = []
+        conditions.append("tenant_id IS NULL" if tenant_id is None else "tenant_id = ?")
+        if tenant_id is not None:
+            parameters.append(tenant_id)
         if query and query.strip():
             pattern = f"%{' '.join(query.split()).casefold()}%"
             conditions.append(
@@ -518,6 +522,7 @@ class RecordStore:
         predicate: str | None = None,
         limit: int = 100,
         offset: int = 0,
+        tenant_id: str | None = None,
     ) -> tuple[list[RecordEnvelope], int]:
         """List graph assertions incident to a concept, with direction preserved."""
         if direction not in {"incoming", "outgoing", "both"}:
@@ -537,6 +542,9 @@ class RecordStore:
             incident_clause = f"({source_clause} OR {target_clause})"
         conditions = ["record_type = 'knowledge_relationship'", incident_clause]
         parameters: list[object] = [str(concept_id)]
+        conditions.append("tenant_id IS NULL" if tenant_id is None else "tenant_id = ?")
+        if tenant_id is not None:
+            parameters.append(tenant_id)
         if direction == "both":
             parameters.append(str(concept_id))
         if predicate:
