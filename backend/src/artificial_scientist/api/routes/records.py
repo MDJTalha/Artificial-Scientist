@@ -69,7 +69,11 @@ def require_record_access(
             status_code=503, detail="OIDC authentication configuration is invalid."
         ) from error
     except InvalidIdentityError as error:
-        raise HTTPException(status_code=401, detail="Bearer token validation failed.", headers={"WWW-Authenticate":"Bearer"}) from error
+        raise HTTPException(
+            status_code=401,
+            detail="Bearer token validation failed.",
+            headers={"WWW-Authenticate": "Bearer"},
+        ) from error
     except (AuthorizationDenied, ValueError) as error:
         raise HTTPException(
             status_code=404, detail="Requested tenant resource is not available."
