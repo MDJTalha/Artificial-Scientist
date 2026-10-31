@@ -75,7 +75,8 @@ def role_allows(role: str, action: str) -> bool:
         if role == "researcher":
             return action in {
                 "record:create", "record:read", "record:list", "record:search",
-                "discovery:decompose", "discovery:generate", "discovery:prior-work-screen", "discovery:assess",
+                "discovery:decompose", "discovery:generate", "discovery:prior-work-screen",
+                "discovery:assess",
                 "autonomy:workflow:create", "autonomy:workflow:read", "autonomy:workflow:write",
                 "autonomy:workflow:approve",
             }
