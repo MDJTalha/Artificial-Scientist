@@ -28,15 +28,18 @@ class MemoryError(ValueError):
 
 
 class ResearchMemory:
-    def __init__(self, store: AutonomyStore | None = None):
+    def __init__(self, store: AutonomyStore | None = None, *, tenant_id: str | None = None):
+        if store is not None and not tenant_id:
+            raise MemoryError("tenant_id is required for persistent memory")
         self.store = store
+        self.tenant_id = tenant_id
         self._items: dict[str, list[MemoryVersion]] = {}
         if store:
             self._load_persisted()
 
     def _load_persisted(self) -> None:
-        for key in self.store.memory_keys():
-            for row in self.store.memory_history(key):
+        for key in self.store.memory_keys(tenant_id=self.tenant_id):
+            for row in self.store.memory_history(key, tenant_id=self.tenant_id):
                 self._items.setdefault(key, []).append(
                     MemoryVersion(
                         key=row["key_name"],
@@ -76,7 +79,8 @@ class ResearchMemory:
         )
         if self.store:
             persisted_version = self.store.memory_put(
-                key, value, status, tuple(evidence), digest, item.supersedes
+                key, value, status, tuple(evidence), digest, item.supersedes,
+                tenant_id=self.tenant_id,
             )
             if persisted_version != item.version:
                 raise MemoryError("persistent memory version diverged")
