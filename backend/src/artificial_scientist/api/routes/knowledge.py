@@ -5,7 +5,6 @@ from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from artificial_scientist.api.routes.records import record_access
 
 from artificial_scientist.api.routes.records import get_record_store, record_access
 from artificial_scientist.knowledge.schemas import (
@@ -147,6 +146,7 @@ def get_concept(
 def create_relationship(
     record: KnowledgeRelationshipRecord,
     store: Annotated[RecordStore, Depends(get_record_store)],
+    tenant_id: Annotated[str | None, Depends(record_access("record:create"))],
 ) -> RecordEnvelope:
     """Create a typed, evidence-linkable relationship between two existing concepts."""
     try:
