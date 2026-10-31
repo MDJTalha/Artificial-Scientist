@@ -248,6 +248,15 @@ class RecordStore:
                     ) from exc
                 connection.execute(
                     "INSERT OR IGNORE INTO source_identity("
+                    "identity_key, tenant_id, record_id) VALUES (?, ?, ?)",
+                    (
+                        source_identity_key(source_record),
+                        source_row["tenant_id"],
+                        str(source_record.id),
+                    ),
+                )
+            connection.execute(
+                    "INSERT OR IGNORE INTO source_identity("
                         identity_key, tenant_id, record_id
                     ) VALUES (?, ?, ?)",
                     (
@@ -599,9 +608,17 @@ class RecordStore:
                             id, tenant_id, record_type, schema_version, created_at,
                             content_sha256, payload_json
                         )
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
                     """,
-                    (record_id, tenant_id, record.record_type, record.schema_version,
-                     created_at, content_sha256, payload_json),
+                    (
+                        record_id,
+                        tenant_id,
+                        record.record_type,
+                        record.schema_version,
+                        created_at,
+                        content_sha256,
+                        payload_json,
+                    ),
                 )
                 if isinstance(record, SourceRecord):
                     connection.execute(
@@ -612,9 +629,12 @@ class RecordStore:
                 connection.execute(
                     """
                     INSERT INTO audit_events
-                        (event_id, tenant_id, occurred_at, action, actor, record_id,
-                         record_type, content_sha256)
+                        (
+                            event_id, tenant_id, occurred_at, action, actor, record_id,
+                            record_type, content_sha256
+                        )
                     VALUES (?, ?, ?, 'record.created', 'local-api-client', ?, ?, ?)
+                    """,
                     (
                         str(uuid4()),
                         tenant_id,
@@ -630,8 +650,11 @@ class RecordStore:
                 raise RecordConflict(f"Record {record.id} already exists.") from exc
             raise RecordStoreError("Could not persist the record and audit event.") from exc
         return RecordEnvelope(
-            id=record.id,\n            record_type=record.record_type,\n            schema_version=record.schema_version,
-            created_at=datetime.fromisoformat(created_at), content_sha256=content_sha256,
+            id=record.id,
+            record_type=record.record_type,
+            schema_version=record.schema_version,
+            created_at=datetime.fromisoformat(created_at),
+            content_sha256=content_sha256,
             payload=record.model_dump(mode="json"),
         )
 
@@ -663,31 +686,53 @@ class RecordStore:
                     connection.execute(
                         """
                         INSERT INTO research_records
-                            (id, tenant_id, record_type, schema_version, created_at,
-                             content_sha256, payload_json)
+                            (
+                                id, tenant_id, record_type, schema_version, created_at,
+                                content_sha256, payload_json
+                            )
                         VALUES (?, ?, ?, ?, ?, ?, ?)
                         """,
-                        (record_id, tenant_id, record.record_type, record.schema_version,
-                         created_at, digest, payload_json),
+                        (
+                            record_id,
+                            tenant_id,
+                            record.record_type,
+                            record.schema_version,
+                            created_at,
+                            digest,
+                            payload_json,
+                        ),
                     )
                     if isinstance(record, SourceRecord):
                         connection.execute(
-                            "INSERT INTO source_identity("\n                            "identity_key, tenant_id, record_id) VALUES (?, ?, ?)",
+                            "INSERT INTO source_identity("
+                            "identity_key, tenant_id, record_id) VALUES (?, ?, ?)",
                             (lookup_key, tenant_id, record_id),
                         )
                     connection.execute(
                         """
                         INSERT INTO audit_events
-                            (event_id, tenant_id, occurred_at, action, actor, record_id,
-                             record_type, content_sha256)
+                            (
+                                event_id, tenant_id, occurred_at, action, actor, record_id,
+                                record_type, content_sha256
+                            )
                         VALUES (?, ?, ?, 'record.created', 'local-api-client', ?, ?, ?)
                         """,
-                        (\n                            str(uuid4()),\n                            tenant_id,\n                            created_at,\n                            record_id,\n                            record.record_type,\n                            digest,\n                        ),
+                        (
+                            str(uuid4()),
+                            tenant_id,
+                            created_at,
+                            record_id,
+                            record.record_type,
+                            digest,
+                        ),
                     )
                     envelopes.append(
                         RecordEnvelope(
-                            id=record.id,\n                            record_type=record.record_type,\n                            schema_version=record.schema_version,
-                            created_at=datetime.fromisoformat(created_at), content_sha256=digest,
+                            id=record.id,
+                            record_type=record.record_type,
+                            schema_version=record.schema_version,
+                            created_at=datetime.fromisoformat(created_at),
+                            content_sha256=digest,
                             payload=record.model_dump(mode="json"),
                         )
                     )
@@ -781,10 +826,16 @@ class RecordStore:
             params.append(record_type)
         where = " WHERE " + " AND ".join(conditions)
         with self._connect() as connection:
-            total = int(\n                connection.execute(\n                    "SELECT COUNT(*) FROM research_records" + where,\n                    tuple(params),\n                ).fetchone()[0]\n            )
+            total = int(
+                connection.execute(
+                    "SELECT COUNT(*) FROM research_records" + where,
+                    tuple(params),
+                ).fetchone()[0]
+            )
             rows = connection.execute(
-                "SELECT * FROM research_records" + where +
-                " ORDER BY created_at DESC, id ASC LIMIT ? OFFSET ?",
+                "SELECT * FROM research_records"
+                + where
+                + " ORDER BY created_at DESC, id ASC LIMIT ? OFFSET ?",
                 (*params, limit, offset),
             ).fetchall()
         return [self._row_to_envelope(row) for row in rows], total
@@ -800,21 +851,29 @@ class RecordStore:
         tenant_clause = "tenant_id IS NULL" if tenant_id is None else "tenant_id = ?"
         base_params: tuple[object, ...] = () if tenant_id is None else (tenant_id,)
         with self._connect() as connection:
-            total = int(connection.execute(
-                "SELECT COUNT(*) FROM audit_events WHERE " + tenant_clause, base_params
-            ).fetchone()[0])
+            total = int(
+                connection.execute(
+                    "SELECT COUNT(*) FROM audit_events WHERE " + tenant_clause,
+                    base_params,
+                ).fetchone()[0]
+            )
             rows = connection.execute(
-                """\n                SELECT event_id, occurred_at, action, actor, record_id,\n                       record_type, content_sha256
-                   FROM audit_events WHERE """ + tenant_clause +
-                " ORDER BY occurred_at DESC, event_id ASC LIMIT ? OFFSET ?",
+                """
+                SELECT event_id, occurred_at, action, actor, record_id,
+                       record_type, content_sha256
+                FROM audit_events WHERE """
+                + tenant_clause
+                + " ORDER BY occurred_at DESC, event_id ASC LIMIT ? OFFSET ?",
                 (*base_params, limit, offset),
             ).fetchall()
         events = [
             AuditEventEnvelope(
                 event_id=UUID(str(row["event_id"])),
                 occurred_at=datetime.fromisoformat(str(row["occurred_at"])),
-                action="record.created", actor="local-api-client",
-                record_id=UUID(str(row["record_id"])), record_type=row["record_type"],
+                action="record.created",
+                actor="local-api-client",
+                record_id=UUID(str(row["record_id"])),
+                record_type=row["record_type"],
                 content_sha256=str(row["content_sha256"]),
             )
             for row in rows
