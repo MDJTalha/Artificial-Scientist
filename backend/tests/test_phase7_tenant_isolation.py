@@ -5,6 +5,7 @@ from pathlib import Path
 from uuid import uuid4
 
 import pytest
+from fastapi.testclient import TestClient
 
 from artificial_scientist.api.routes import records as records_routes
 from artificial_scientist.api.routes.records import get_record_store
