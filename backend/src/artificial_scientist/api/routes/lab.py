@@ -26,6 +26,7 @@ from artificial_scientist.identity import (
     validate_oidc_bearer_token,
 )
 from artificial_scientist.lab.engine import run_lab
+from artificial_scientist.lab.execution_adapter import ExecutionAdapterUnavailable
 from artificial_scientist.lab.manifest import capture_environment_manifest
 from artificial_scientist.lab.models import (
     LabArtifactMetadata,
@@ -258,6 +259,12 @@ def create_lab_run(
         # Persistence can fail independently (for example, a tenant storage quota).
         # Mark the reservation failed rather than leaving a false "running" status.
         return store.save(run, tenant_id=tenant_id)
+    except ExecutionAdapterUnavailable as error:
+        store.fail_execution(run_id, tenant_id=tenant_id)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="No reviewed lab execution sandbox is configured.",
+        ) from error
     except Exception:
         store.fail_execution(run_id, tenant_id=tenant_id)
         raise
