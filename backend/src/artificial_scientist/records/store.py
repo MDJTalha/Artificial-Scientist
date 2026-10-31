@@ -96,6 +96,11 @@ def _sha256_text(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
+def _tenant_identity_key(record: SourceRecord, tenant_id: str | None) -> str:
+    identity = source_identity_key(record)
+    return identity if tenant_id is None else f"tenant:{tenant_id}:{identity}"
+
+
 class RecordStore:
     """Append-only SQLite store. Record and audit-event writes are transactional."""
 
@@ -368,16 +373,24 @@ class RecordStore:
         return references
 
     def _validate_relationships(
-        self, connection: sqlite3.Connection, record: RecordBase
+        self,
+        connection: sqlite3.Connection,
+        record: RecordBase,
+        *,
+        tenant_id: str | None = None,
     ) -> None:
         for reference_id, allowed_types, field_name in self._references(record):
             row = connection.execute(
-                "SELECT record_type FROM research_records WHERE id = ?",
-                (str(reference_id),),
+                "SELECT record_type, tenant_id FROM research_records WHERE id = ?",
+                (str(reference_id),)
             ).fetchone()
             if row is None:
                 raise InvalidRelationship(
                     f"{field_name} references record {reference_id}, which does not exist."
+                )
+            if tenant_id is not None and row["tenant_id"] != tenant_id:
+                raise InvalidRelationship(
+                    f"{field_name} references a record that is not available in this tenant."
                 )
             actual_type = str(row["record_type"])
             if actual_type not in allowed_types:
@@ -545,7 +558,7 @@ class RecordStore:
             ).fetchall()
         return [self._row_to_envelope(row) for row in rows], total
 
-    def create(self, record: RecordBase) -> RecordEnvelope:
+    def create(self, record: RecordBase, *, tenant_id: str | None = None) -> RecordEnvelope:
         """Atomically persist a validated record and its server-generated audit event."""
         payload_json = _canonical_payload(record)
         content_sha256 = _sha256_text(payload_json)
@@ -556,22 +569,23 @@ class RecordStore:
             with self._connect() as connection:
                 connection.execute("BEGIN IMMEDIATE")
                 if isinstance(record, SourceRecord):
-                    identity_key = source_identity_key(record)
+                    identity_key = _tenant_identity_key(record, tenant_id)
                     duplicate = connection.execute(
                         "SELECT record_id FROM source_identity WHERE identity_key = ?",
                         (identity_key,),
                     ).fetchone()
                     if duplicate is not None:
                         raise DuplicateSource(UUID(str(duplicate["record_id"])))
-                self._validate_relationships(connection, record)
+                self._validate_relationships(connection, record, tenant_id=tenant_id)
                 connection.execute(
                     """
                     INSERT INTO research_records
-                        (id, record_type, schema_version, created_at, content_sha256, payload_json)
-                    VALUES (?, ?, ?, ?, ?, ?)
+                        (id, tenant_id, record_type, schema_version, created_at, content_sha256, payload_json)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         record_id,
+                        tenant_id,
                         record.record_type,
                         record.schema_version,
                         created_at,
@@ -581,8 +595,8 @@ class RecordStore:
                 )
                 if isinstance(record, SourceRecord):
                     connection.execute(
-                        "INSERT INTO source_identity(identity_key, record_id) VALUES (?, ?)",
-                        (source_identity_key(record), record_id),
+                        "INSERT INTO source_identity(identity_key, tenant_id, record_id) VALUES (?, ?, ?)",
+                        (identity_key, tenant_id, record_id),
                     )
                 connection.execute(
                     """
@@ -591,10 +605,11 @@ class RecordStore:
                             event_id, occurred_at, action, actor, record_id,
                             record_type, content_sha256
                         )
-                    VALUES (?, ?, 'record.created', 'local-api-client', ?, ?, ?)
+                    VALUES (?, ?, ?, 'record.created', 'local-api-client', ?, ?, ?)
                     """,
                     (
                         str(uuid4()),
+                        tenant_id,
                         created_at,
                         record_id,
                         record.record_type,
