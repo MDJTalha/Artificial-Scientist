@@ -10,6 +10,16 @@ on:
       - phase-4-knowledge-graph
       - phase-5-mathematical-tools
       - phase-6-controlled-lab
+      - phase-7-tenant-scoped-record-store
+      - phase-7-record-isolation-release-gate
+      - phase-7-security-complete
+      - phase-6-step5-operational-acceptance
+      - phase-6-step4-migration-recovery
+      - phase-6-step3-oidc-provider-evidence
+      - phase-6-step2-sandbox-regressions
+      - phase-6-step1-sandbox-release-gate
+      - phase-6-fix-tenant-auth-ci
+      - phase-6-execution-tenant-tests
   pull_request:
     branches:
       - main
