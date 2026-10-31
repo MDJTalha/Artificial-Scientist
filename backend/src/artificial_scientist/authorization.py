@@ -28,7 +28,8 @@ _LAB_ACTIONS = frozenset({
 _RECORD_ACTIONS = frozenset({
     "record:create", "record:read", "record:list", "record:search",
     "record:audit:read", "discovery:decompose", "discovery:prior-work-screen",
-    "discovery:assess",
+    "discovery:assess", "autonomy:workflow:create", "autonomy:workflow:read",
+    "autonomy:workflow:write", "autonomy:workflow:approve",
 })
 _ALLOWED_ACTIONS = _LAB_ACTIONS | _RECORD_ACTIONS
 
@@ -74,11 +75,13 @@ def role_allows(role: str, action: str) -> bool:
             return action in {
                 "record:create", "record:read", "record:list", "record:search",
                 "discovery:decompose", "discovery:prior-work-screen", "discovery:assess",
+                "autonomy:workflow:create", "autonomy:workflow:read", "autonomy:workflow:write",
+                "autonomy:workflow:approve",
             }
         if role == "viewer":
             return action in {
                 "record:read", "record:list", "record:search",
-                "discovery:decompose", "discovery:prior-work-screen",
+                "discovery:decompose", "discovery:prior-work-screen", "autonomy:workflow:read",
             }
         if role == "auditor":
             return action in {"record:read", "record:list", "record:audit:read"}
