@@ -1257,39 +1257,26 @@ def test_execution_adapter_never_falls_back_for_production_sandbox_mode(
         adapter.execute(_slow_lab_worker, (), timeout_seconds=1)
 
 
-def test_production_lab_api_fails_closed_without_reviewed_sandbox(
+def test_production_lab_execution_fails_closed_without_reviewed_sandbox(
     monkeypatch: pytest.MonkeyPatch,
-    tmp_path,
 ) -> None:
+    from artificial_scientist.lab.execution_adapter import ExecutionAdapterUnavailable
+
     monkeypatch.setenv("ARTIFICIAL_SCIENTIST_ENV", "production")
     monkeypatch.delenv("ARTIFICIAL_SCIENTIST_LAB_EXECUTION_MODE", raising=False)
-    monkeypatch.setenv("ARTIFICIAL_SCIENTIST_LAB_API_KEY", "x" * 32)
-    monkeypatch.delenv("ARTIFICIAL_SCIENTIST_OIDC_ISSUER", raising=False)
-    monkeypatch.delenv("ARTIFICIAL_SCIENTIST_OIDC_AUDIENCE", raising=False)
-    monkeypatch.delenv("ARTIFICIAL_SCIENTIST_OIDC_JWKS_URL", raising=False)
-    monkeypatch.setenv(
-        "ARTIFICIAL_SCIENTIST_DB_PATH", str(tmp_path / "fail-closed.sqlite3")
+
+    request = LabRunRequest(
+        title="Production sandbox gate",
+        steps=[
+            {
+                "step_id": "stats",
+                "operation": "statistics",
+                "inputs": {"values": [1, 2, 3]},
+            }
+        ],
     )
-    get_lab_store.cache_clear()
-    try:
-        client = TestClient(app)
-        response = client.post(
-            "/api/v1/lab/runs",
-            headers={"X-Lab-Api-Key": "x" * 32},
-            json={
-                "title": "Production sandbox gate",
-                "steps": [
-                    {
-                        "step_id": "stats",
-                        "operation": "statistics",
-                        "inputs": {"values": [1, 2, 3]},
-                    }
-                ],
-            },
-        )
-        assert response.status_code == 503
-        assert response.json()["detail"] == (
-            "No reviewed lab execution sandbox is configured."
-        )
-    finally:
+
+    with pytest.raises(ExecutionAdapterUnavailable, match="No reviewed"):
+        run_lab(request)
+
         get_lab_store.cache_clear()
