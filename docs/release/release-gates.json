@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "repository": "MDJTalha/Artificial-Scientist",
+  "policy": {
+    "external_gates_must_not_be_marked_complete_without_evidence": true,
+    "repository_ci_is_not_production_certification": true
+  },
+  "gates": [
+    {
+      "id": "repo-ci",
+      "name": "Repository CI",
+      "class": "repository",
+      "status": "required",
+      "evidence_required": ["commit", "workflow_run", "outcome"]
+    },
+    {
+      "id": "backend-tests",
+      "name": "Backend tests on supported Python versions",
+      "class": "repository",
+      "status": "required",
+      "evidence_required": ["python_3_12", "python_3_13", "pytest_outcome"]
+    },
+    {
+      "id": "frontend-verification",
+      "name": "Frontend type-check, unit tests and production build",
+      "class": "repository",
+      "status": "required",
+      "evidence_required": ["typecheck", "tests", "build"]
+    },
+    {
+      "id": "phase6-os-sandbox",
+      "name": "Reviewed OS-level sandbox deployment",
+      "class": "external",
+      "status": "external_required",
+      "evidence_required": ["target_runtime", "adversarial_results", "independent_signoff"]
+    },
+    {
+      "id": "phase6-oidc",
+      "name": "Live OIDC/JWKS provider verification",
+      "class": "external",
+      "status": "external_required",
+      "evidence_required": ["provider", "rotation_test", "unknown_key_refresh", "claims_validation"]
+    },
+    {
+      "id": "phase6-recovery",
+      "name": "Production migration and recovery rehearsal",
+      "class": "external",
+      "status": "external_required",
+      "evidence_required": ["sanitized_snapshot", "backup_restore", "rollback", "ownership_reconciliation"]
+    },
+    {
+      "id": "independent-security-review",
+      "name": "Independent security review",
+      "class": "external",
+      "status": "external_required",
+      "evidence_required": ["reviewer", "scope", "findings", "signoff"]
+    },
+    {
+      "id": "operational-validation",
+      "name": "Operational deployment validation",
+      "class": "external",
+      "status": "external_required",
+      "evidence_required": ["tls", "secrets", "least_privilege", "monitoring", "backup_restore", "incident_response"]
+    },
+    {
+      "id": "scientific-evaluation",
+      "name": "Scientific validity and replication evaluation",
+      "class": "external",
+      "status": "external_required",
+      "evidence_required": ["benchmark_protocol", "replication", "domain_expert_review", "integrity_assessment"]
+    }
+  ]
+}
