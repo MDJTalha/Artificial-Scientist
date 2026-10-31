@@ -57,10 +57,10 @@ class DomainRegistry:
             validation_cases=validation_cases,
             expert_required=spec.expert_required,
         )
-        self._domains[name] = normalized
+        self._domains[name.casefold()] = normalized
 
     def get(self, name: str) -> DomainSpec:
-        return self._domains[name]
+        return self._domains[name.strip().casefold()]
 
     def authorize(
         self,
