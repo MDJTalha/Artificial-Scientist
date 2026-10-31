@@ -1206,3 +1206,82 @@ def test_clamav_scanner_rejects_invalid_utf8_response(monkeypatch) -> None:
     )
     with pytest.raises(lab_scanning.ScannerUnavailable, match="invalid response"):
         lab_scanning.scan_binary_content(b"test sample", environment="production")
+
+
+
+def test_execution_adapter_fails_closed_outside_development(monkeypatch: pytest.MonkeyPatch) -> None:
+    from artificial_scientist.lab.execution_adapter import (
+        ExecutionAdapterUnavailable,
+        get_execution_adapter,
+    )
+
+    monkeypatch.setenv("ARTIFICIAL_SCIENTIST_ENV", "production")
+    monkeypatch.delenv("ARTIFICIAL_SCIENTIST_LAB_EXECUTION_MODE", raising=False)
+
+    with pytest.raises(ExecutionAdapterUnavailable, match="No reviewed"):
+        get_execution_adapter()
+
+
+def test_execution_adapter_allows_only_explicit_local_process_in_development(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from artificial_scientist.lab.execution_adapter import (
+        LocalDevelopmentExecutionAdapter,
+        get_execution_adapter,
+    )
+
+    monkeypatch.setenv("ARTIFICIAL_SCIENTIST_ENV", "development")
+    monkeypatch.setenv("ARTIFICIAL_SCIENTIST_LAB_EXECUTION_MODE", "local-process")
+    adapter = get_execution_adapter()
+    assert isinstance(adapter, LocalDevelopmentExecutionAdapter)
+    assert adapter.name == "local-process-development"
+
+
+def test_execution_adapter_never_falls_back_for_production_sandbox_mode(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from artificial_scientist.lab.execution_adapter import (
+        ReviewedSandboxExecutionAdapter,
+        get_execution_adapter,
+    )
+
+    monkeypatch.setenv("ARTIFICIAL_SCIENTIST_ENV", "production")
+    monkeypatch.setenv("ARTIFICIAL_SCIENTIST_LAB_EXECUTION_MODE", "sandbox:unreviewed-placeholder")
+    adapter = get_execution_adapter()
+    assert isinstance(adapter, ReviewedSandboxExecutionAdapter)
+    with pytest.raises(Exception, match="no reviewed sandbox implementation"):
+        adapter.execute(_slow_lab_worker, (), timeout_seconds=1)
+
+
+def test_production_lab_api_fails_closed_without_reviewed_sandbox(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+) -> None:
+    monkeypatch.setenv("ARTIFICIAL_SCIENTIST_ENV", "production")
+    monkeypatch.delenv("ARTIFICIAL_SCIENTIST_LAB_EXECUTION_MODE", raising=False)
+    monkeypatch.setenv("ARTIFICIAL_SCIENTIST_LAB_API_KEY", "x" * 32)
+    monkeypatch.delenv("ARTIFICIAL_SCIENTIST_OIDC_ISSUER", raising=False)
+    monkeypatch.delenv("ARTIFICIAL_SCIENTIST_OIDC_AUDIENCE", raising=False)
+    monkeypatch.delenv("ARTIFICIAL_SCIENTIST_OIDC_JWKS_URL", raising=False)
+    monkeypatch.setenv("ARTIFICIAL_SCIENTIST_DB_PATH", str(tmp_path / "fail-closed.sqlite3"))
+    get_lab_store.cache_clear()
+    try:
+        client = TestClient(app)
+        response = client.post(
+            "/api/v1/lab/runs",
+            headers={"X-Lab-Api-Key": "x" * 32},
+            json={
+                "title": "Production sandbox gate",
+                "steps": [
+                    {
+                        "step_id": "stats",
+                        "operation": "statistics",
+                        "inputs": {"values": [1, 2, 3]},
+                    }
+                ],
+            },
+        )
+        assert response.status_code == 503
+        assert response.json()["detail"] == "No reviewed lab execution sandbox is configured."
+    finally:
+        get_lab_store.cache_clear()
