@@ -1,9 +1,9 @@
 # Phase 6 — Completion and Release-Gate Matrix
 
-**Working branch:** phase-6-execution-adapter-fail-closed  
+**Integrated branch:** main (`5c645834ef2895ab90404099073d312faee2a0e7`)  
 **Scope:** tenant-aware controlled computational lab, identity, authorization, quotas, audit, migration safety, and process-execution controls.
 
-This matrix is the authoritative checklist for Phase 6. “Implemented” means code and regression coverage exist on this branch; it does not mean production deployment, independent security assurance, or a full operating-system sandbox has been certified.
+This matrix is the repository-side checklist for Phase 6. “Implemented” means code and regression coverage exist in the integrated main branch; it does not mean production deployment, independent security assurance, or a full operating-system sandbox has been certified.
 
 ## Implementation checklist
 
@@ -19,14 +19,14 @@ This matrix is the authoritative checklist for Phase 6. “Implemented” means 
 | Scanner boundary | Invalid ClamAV response encoding is rejected as scanner unavailable | backend/tests/test_lab.py |
 | Worker isolation | Spawned allowlisted worker, finite positive timeout, POSIX CPU/address-space/file-size/open-file/core limits where supported, terminate-then-kill cleanup, pipe closure, bounded worker error, controlled handling of abrupt child exit | backend/src/artificial_scientist/lab/execution.py, backend/tests/test_lab.py |\n| Execution boundary selection | Deployment-neutral adapter interface; local subprocess mode is development-only; production-like environments fail closed when no reviewed OS sandbox adapter is configured | backend/src/artificial_scientist/lab/execution_adapter.py, backend/tests/test_lab.py |
 | Tenant-aware recovery | Interrupted attempts reconcile only against a run with matching tenant ownership | backend/tests/test_tenant_execution_attempts.py |
-| Legacy ownership | Explicit manifest only; dry-run by default; UUID and duplicate validation; existing tenant/run checks; conflicting ownership aborts atomically; operator principal required for apply; audit written in transaction | backend/src/artificial_scientist/legacy_claim.py, backend/tests/test_legacy_claim.py |
+| Legacy ownership | Explicit manifest only; dry-run by default; UUID and duplicate validation; existing tenant/run checks; conflicting ownership aborts atomically; operator principal required for apply; audit written in transaction | backend/src/artificial_scientist/records/legacy_claim.py, backend/tests/test_phase7_legacy_claim.py |
 | Migration rehearsal | Consistent SQLite snapshot, dry-run, apply to temporary copy only, ownership and operator-audit verification; source remains unclaimed | backend/src/artificial_scientist/phase6_rehearsal.py, backend/tests/test_phase6_rehearsal.py |
 | Legacy schema safety | Additive schema migration leaves unknown historical ownership unassigned and tenant-inaccessible | backend/tests/test_tenant_scoped_store.py |
 | Documentation | Authorization model, roles, tenant IDs, audit, upload constraints, quotas, legacy-claim procedure, sandbox limitations, and rehearsal command | docs/PHASE_6_AUTHORIZATION_MODEL.md |
 
 ## CI acceptance criteria
 
-The current phase branch is considered code-verified only when the latest commit has all required CI jobs green:
+The integrated main branch is considered code-verified only when the latest commit has all required CI jobs green:
 - Frontend type-check, unit tests, and production build.
 - Backend Ruff checks and complete test suite on Python 3.12.
 - Backend Ruff checks and complete test suite on Python 3.13.
