@@ -9,6 +9,7 @@ from artificial_scientist.autonomy.governance import (
     Decision,
     GovernanceEngine,
 )
+from artificial_scientist.autonomy.store import AutonomyStore
 from artificial_scientist.autonomy.verification import IndependentVerifier
 from artificial_scientist.autonomy.workflow import WorkflowEngine, WorkflowState
 
@@ -23,8 +24,16 @@ class AutonomyResult:
 class ScientificAutonomyEngine:
     """Coordinate planning, verification, and governance without bypassing approvals."""
 
-    def __init__(self, governance_cases: list[BenchmarkCase]):
-        self.workflow = WorkflowEngine()
+    def __init__(
+        self,
+        governance_cases: list[BenchmarkCase],
+        *,
+        store: AutonomyStore | None = None,
+        tenant_id: str | None = None,
+    ):
+        if store is not None and not tenant_id:
+            raise ValueError("tenant_id is required when autonomy persistence is enabled")
+        self.workflow = WorkflowEngine(store=store, tenant_id=tenant_id)
         self.verifier = IndependentVerifier()
         self.governance = GovernanceEngine(governance_cases)
 
@@ -72,8 +81,9 @@ class ScientificAutonomyEngine:
         self.workflow.transition(
             workflow_id, target, actor="governance", reason=decision.decision.value
         )
+        workflow = self.workflow.get(workflow_id)
         return AutonomyResult(
-            self.workflow.get(workflow_id).state.value,
+            workflow.state.value,
             verification.passed,
             decision.decision.value,
         )
