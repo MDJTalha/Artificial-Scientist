@@ -12,7 +12,6 @@ from artificial_scientist.lab.execution_adapter import (
 )
 
 
-
 def test_docker_adapter_rejects_non_allowlisted_callable(monkeypatch):
     monkeypatch.setattr("shutil.which", lambda _: "/usr/bin/docker")
     adapter = DockerSandboxExecutionAdapter("example/asds-sandbox:latest")
