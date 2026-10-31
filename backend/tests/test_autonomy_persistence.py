@@ -38,3 +38,14 @@ def test_memory_versions_are_append_only(tmp_path):
     history = store.memory_history("claim")
     assert [row["version"] for row in history] == [1, 2]
     assert history[1]["supersedes_version"] == 1
+
+
+def test_research_memory_recovers_after_restart(tmp_path):
+    from artificial_scientist.autonomy.memory import ResearchMemory
+
+    database = tmp_path / "memory-recovery.sqlite3"
+    first = ResearchMemory(AutonomyStore(database))
+    first.put("hypothesis", {"value": "A"}, evidence=("record:1",))
+    second = ResearchMemory(AutonomyStore(database))
+    assert second.current("hypothesis").value == {"value": "A"}
+    assert second.current("hypothesis").version == 1
