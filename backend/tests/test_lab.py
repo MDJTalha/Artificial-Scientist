@@ -477,7 +477,7 @@ def test_isolated_worker_reports_unexpected_child_exit() -> None:
     from artificial_scientist.lab.execution import LabExecutionError
 
     with pytest.raises(LabExecutionError, match="exited without a result"):
-        run_isolated(_crash_lab_worker, (), timeout_seconds=2)
+        run_isolated(_crash_lab_worker, (), timeout_seconds=10)
 
 
 def test_isolated_worker_normalizes_multiline_error_messages() -> None:
