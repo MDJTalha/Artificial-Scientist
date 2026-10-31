@@ -4,7 +4,7 @@
 **Repository:** `MDJTalha/Artificial-Scientist`  
 **Verified baseline:** `main` commit `b28b6bdaffa4851a2dec390460706e100302d138` is the merged Phase 0/6/7/14 hardening baseline; post-merge CI run 1114 succeeded.
 
-**Release-hardening branch:** `phase-release-verification-hardening` adds the final repository-side authorization matrix, concurrency/race, migration/recovery, frontend accessibility/E2E, release-evidence and documentation controls. Branch-head verification is complete at commit `3b4539dec1e4d2c01f1e05ae1987545d8207d2c2`; GitHub Actions run **1228** passed all backend, frontend and release-gate jobs.
+**Release-hardening branch:** `phase-release-verification-hardening` adds the final repository-side authorization matrix, concurrency/race, migration/recovery, frontend accessibility/E2E, release-evidence and documentation controls. Branch-head verification is complete at commit `20681adc2520464a6735628bd0ddf78a3cfa9f61`; GitHub Actions run **1231** passed all backend, frontend and release-gate jobs.
 
 This document is the current repository evidence snapshot. Older phase documents may contain historical branch names or earlier implementation descriptions; this snapshot takes precedence for the present integration state.
 
@@ -87,6 +87,6 @@ The previously open repository-side hardening items are implemented on `phase-re
 - machine-readable release policy and populated evidence matrix;
 - synchronized status/evidence documentation.
 
-These items are **repository-verified** by branch-head CI run **1228**: Python 3.12/3.13 backend tests and Ruff, frontend type-check/unit/build, Playwright/axe E2E, and the targeted release-gate suites all passed.
+These items are **repository-verified** by branch-head CI run **1231**: Python 3.12/3.13 backend tests and Ruff, frontend type-check/unit/build, Playwright/axe E2E, and the targeted release-gate suites all passed.
 
 The remaining open items are external certification gates listed above and are intentionally not represented as complete by repository changes. See `docs/release/EVIDENCE_MATRIX.md` for the evidence register.
