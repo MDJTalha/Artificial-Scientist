@@ -634,9 +634,10 @@ def test_lab_api_requires_constant_time_key_outside_development(monkeypatch, tmp
             "/api/v1/lab/runs",
             headers={"X-Lab-API-Key": "test-secret-value-that-is-at-least-32-chars"},
         )
-        # The legacy shared key authenticates the deployment, but it does not
-        # establish tenant membership. A forbidden response proves the key was
-        # accepted (invalid keys return 401) without weakening tenant isolation.
+        # The legacy shared deployment key authenticates the caller, but production
+        # access still requires explicitly authorized tenant membership. Without
+        # X-Tenant-ID, 403 (rather than 401 for an invalid key) proves authentication
+        # succeeded and tenant isolation remains enforced.
         assert accepted.status_code == 403
         assert accepted.json()["detail"] == "Authenticated tenant membership is required."
     finally:
