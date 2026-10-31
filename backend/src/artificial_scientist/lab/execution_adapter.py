@@ -63,10 +63,21 @@ class DockerSandboxExecutionAdapter:
         *,
         timeout_seconds: float,
     ) -> dict[str, Any]:
-        if target.__name__ != "_execute_step_direct" or target.__module__ != "artificial_scientist.lab.engine":
-            raise ExecutionAdapterUnavailable("Docker adapter accepts only the fixed lab worker.")
-        if len(args) != 2 or not isinstance(args[0], str) or not isinstance(args[1], dict):
-            raise ExecutionAdapterUnavailable("Docker adapter received an invalid operation contract.")
+        if (
+            target.__name__ != "_execute_step_direct"
+            or target.__module__ != "artificial_scientist.lab.engine"
+        ):
+            raise ExecutionAdapterUnavailable(
+                "Docker adapter accepts only the fixed lab worker."
+            )
+        if (
+            len(args) != 2
+            or not isinstance(args[0], str)
+            or not isinstance(args[1], dict)
+        ):
+            raise ExecutionAdapterUnavailable(
+                "Docker adapter received an invalid operation contract."
+            )
         if not shutil.which("docker"):
             raise ExecutionAdapterUnavailable("Docker executable is unavailable.")
         if not self.image.strip():
@@ -74,20 +85,36 @@ class DockerSandboxExecutionAdapter:
 
         container_name = f"asds-lab-{uuid.uuid4().hex}"
         command = [
-            "docker", "run", "--rm", "--name", container_name,
-            "--network", "none",
+            "docker",
+            "run",
+            "--rm",
+            "--name",
+            container_name,
+            "--network",
+            "none",
             "--read-only",
-            "--cap-drop", "ALL",
-            "--security-opt", "no-new-privileges",
-            "--pids-limit", "64",
-            "--memory", "512m",
-            "--cpus", "1.0",
-            "--ulimit", "nofile=64:64",
-            "--ulimit", "nproc=64:64",
-            "--tmpfs", "/tmp:rw,noexec,nosuid,nodev,size=64m",
-            "--user", "65532:65532",
+            "--cap-drop",
+            "ALL",
+            "--security-opt",
+            "no-new-privileges",
+            "--pids-limit",
+            "64",
+            "--memory",
+            "512m",
+            "--cpus",
+            "1.0",
+            "--ulimit",
+            "nofile=64:64",
+            "--ulimit",
+            "nproc=64:64",
+            "--tmpfs",
+            "/tmp:rw,noexec,nosuid,nodev,size=64m",
+            "--user",
+            "65532:65532",
             self.image,
-            "python", "-m", "artificial_scientist.lab.sandbox_worker",
+            "python",
+            "-m",
+            "artificial_scientist.lab.sandbox_worker",
         ]
         payload = json.dumps(
             {"operation": args[0], "inputs": args[1]},
@@ -103,7 +130,10 @@ class DockerSandboxExecutionAdapter:
                 stderr=subprocess.PIPE,
                 env={"PATH": "/usr/local/bin:/usr/bin:/bin", "PYTHONUNBUFFERED": "1"},
             )
-            stdout, stderr = process.communicate(input=payload, timeout=timeout_seconds)
+            stdout, stderr = process.communicate(
+                input=payload,
+                timeout=timeout_seconds,
+            )
         except subprocess.TimeoutExpired as error:
             if process is not None:
                 try:
@@ -121,7 +151,9 @@ class DockerSandboxExecutionAdapter:
                 f"Docker sandbox exceeded its {timeout_seconds:g}-second deadline."
             ) from error
         except OSError as error:
-            raise ExecutionAdapterUnavailable("Could not start the Docker sandbox.") from error
+            raise ExecutionAdapterUnavailable(
+                "Could not start the Docker sandbox."
+            ) from error
         finally:
             if process is not None and process.poll() is None:
                 process.kill()
@@ -134,12 +166,18 @@ class DockerSandboxExecutionAdapter:
         try:
             response = json.loads(stdout.decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError) as error:
-            raise ExecutionAdapterUnavailable("Docker sandbox returned invalid JSON.") from error
+            raise ExecutionAdapterUnavailable(
+                "Docker sandbox returned invalid JSON."
+            ) from error
         if not isinstance(response, dict) or response.get("ok") is not True:
-            raise ExecutionAdapterUnavailable("Docker sandbox returned an invalid result.")
+            raise ExecutionAdapterUnavailable(
+                "Docker sandbox returned an invalid result."
+            )
         result = response.get("result")
         if not isinstance(result, dict):
-            raise ExecutionAdapterUnavailable("Docker sandbox result is not an object.")
+            raise ExecutionAdapterUnavailable(
+                "Docker sandbox result is not an object."
+            )
         return result
 
 
@@ -157,7 +195,8 @@ class ReviewedSandboxExecutionAdapter:
         timeout_seconds: float,
     ) -> dict[str, Any]:
         raise ExecutionAdapterUnavailable(
-            f"Execution adapter {self.name!r} is declared but has no reviewed sandbox implementation.",
+            f"Execution adapter {self.name!r} is declared but has no reviewed "
+            "sandbox implementation.",
         )
 
 
