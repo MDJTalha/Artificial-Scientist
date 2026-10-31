@@ -605,7 +605,7 @@ class RecordStore:
                 )
                 if isinstance(record, SourceRecord):
                     connection.execute(
-                        (\n                            "INSERT INTO source_identity("\n                            "identity_key, tenant_id, record_id) VALUES (?, ?, ?)"\n                        ),
+                        "INSERT INTO source_identity(" \n                        "identity_key, tenant_id, record_id) VALUES (?, ?, ?)",
                         (lookup_key, tenant_id, record_id),
                     )
                 connection.execute(
@@ -665,7 +665,7 @@ class RecordStore:
                     )
                     if isinstance(record, SourceRecord):
                         connection.execute(
-                            (\n                                "INSERT INTO source_identity(" \n                                "identity_key, tenant_id, record_id) VALUES (?, ?, ?)"\n                            ),
+                            "INSERT INTO source_identity(" \n                            "identity_key, tenant_id, record_id) VALUES (?, ?, ?)",
                             (lookup_key, tenant_id, record_id),
                         )
                     connection.execute(
