@@ -4,7 +4,7 @@ This register separates **repository verification evidence** from **external rel
 
 | Gate / work item | Repository evidence | Verification command / protocol | Status |
 |---|---|---|---|
-| Endpoint-by-endpoint authorization matrix | `tests/test_release_authorization_matrix.py`, existing Phase 7 tenant isolation/release-gate suites | `pytest -q tests/test_release_authorization_matrix.py tests/test_phase7_tenant_isolation.py tests/test_phase7_release_gate.py` | Verified — CI run **1231** (workflow run **41224168508**), tested code commit **20681adc2520464a6735628bd0ddf78a3cfa9f61** |
+| Endpoint-by-endpoint authorization matrix | `tests/test_release_authorization_matrix.py`, existing Phase 7 tenant isolation/release-gate suites | `pytest -q tests/test_release_authorization_matrix.py tests/test_phase7_tenant_isolation.py tests/test_phase7_release_gate.py` | Verified — CI run **1242** (workflow run **41225031000**), tested code commit **20681adc2520464a6735628bd0ddf78a3cfa9f61** |
 | Cross-tenant adversarial coverage | Phase 7 isolation tests cover record reads/listing, discovery evidence and concurrent tenant writes; Phase 6 suites cover run/artifact/verification/export/upload negative paths | Full backend suite plus targeted release-gate suite | Repository complete after CI |
 | Quota/ownership race testing | `tests/test_lab_quota_races.py` exercises atomic tenant run reservation and same-run ownership collision | `pytest -q tests/test_lab_quota_races.py` under Python 3.12/3.13 | Repository complete after CI |
 | Migration/recovery fixtures | `tests/test_migration_recovery_assertions.py` verifies source byte identity, reopenability and no partial claim after failed rehearsal; existing rehearsal/migration suites remain required | `pytest -q tests/test_migration_recovery_assertions.py tests/test_phase6_rehearsal.py tests/test_phase7_tenant_migration.py` | Repository complete after CI |
@@ -21,12 +21,13 @@ This register separates **repository verification evidence** from **external rel
 ## Final repository verification record
 
 - Branch: `phase-release-verification-hardening`
-- Tested code commit: `8c4eec72ba0e710c606b50956af0de4288015148`
-- GitHub Actions workflow: **Continuous Integration**, run **1231** / ID **41224168508**
+- Implementation commit: `20681adc2520464a6735628bd0ddf78a3cfa9f61`
+- Verified branch head: `597d3d8c43affb2c4794189c9f60a6400fb034ba`
+- GitHub Actions workflow: **Continuous Integration**, run **1242** / ID **41225031000**
 - Backend: Python 3.12 and 3.13 full test suites + Ruff passed.
 - Frontend: TypeScript type-check, unit tests, production build, Playwright/axe accessibility and conference-workspace E2E passed.
 - Release-gate job: policy validation, Phase 6 hardening regressions, Phase 7 authorization/tenant regressions, and Phases 8–14 regressions passed.
-- This evidence-matrix synchronization is documentation-only and does not alter the tested implementation commit above.
+- The verified CI run exercised the current branch head; the implementation under test remains the repository-side hardening commit above, with later documentation-only synchronization.
 
 ## Evidence rules
 
