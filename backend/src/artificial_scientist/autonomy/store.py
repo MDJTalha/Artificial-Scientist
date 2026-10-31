@@ -107,7 +107,7 @@ class AutonomyStore:
         with closing(self._connect()) as connection:
             connection.execute(
                 "INSERT INTO autonomy_workflows "
-                "(workflow_id,state,consequential,approval_token_hash,tenant_id,created_at,updated_at) "
+                "WHERE workflow_id=? AND tenant_id=? ORDER BY created_at, checkpoint_id",
                 "VALUES(?,?,?,?,?,?,?)",
                 (
                     workflow_id,
