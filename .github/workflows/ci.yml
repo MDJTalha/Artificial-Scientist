@@ -11,7 +11,9 @@ on:
       - phase-5-mathematical-tools
       - phase-7-security-complete
       - phase-6-controlled-lab
+      - phase-8-14-complete
       - phase-6-execution-tenant-tests
+      - phase-8-14-complete
       - phase-7-hypothesis-discovery
       - phase-7-tenant-scoped-record-store
       - phase-8-14-complete
