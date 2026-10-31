@@ -4,7 +4,9 @@
 
 The decomposition endpoint extracts only conservative patterns from the research question, reports unresolved variables/context/controls/time horizon, and returns clarification prompts. It labels its method as a bounded heuristic and leaves unrecognized variables unset rather than inventing them.
 
-The Phase 7 API exposes `POST /api/v1/discovery/decompose`, `POST /api/v1/discovery/assess`, and `POST /api/v1/discovery/prior-work-screen`. Assessment accepts one research question and 2–10 competing, caller-supplied candidates. Prior-work screening queries the existing OpenAlex and Crossref metadata connectors for 2–5 candidates, without persisting search results. Each candidate must include assumptions, alternative explanations, predictions, falsification criteria, and a discriminating test. Source and claim references are validated against stored records before any hypothesis is written.
+The Phase 7 API exposes `POST /api/v1/discovery/decompose`, `POST /api/v1/discovery/generate`, `POST /api/v1/discovery/assess`, and `POST /api/v1/discovery/prior-work-screen`. Assessment accepts one research question and 2–10 competing, caller-supplied candidates. Prior-work screening queries the existing OpenAlex and Crossref metadata connectors for 2–5 candidates, without persisting search results. Each candidate must include assumptions, alternative explanations, predictions, falsification criteria, and a discriminating test. Source and claim references are validated against stored records before any hypothesis is written.
+
+The bounded generation endpoint produces a small positive/inverse/null hypothesis set from explicitly supplied variables. It is deterministic, evidence-free, marked `requires_human_review`, and does not persist records or claim novelty, truth, or causality.
 
 The service:
 - checks required structure and bounded input sizes with Pydantic;
@@ -65,7 +67,7 @@ Six equally weighted checks contribute to completeness: explicit assumptions, al
 
 ## Explicit limitations and remaining acceptance gates
 
-- Candidate hypotheses are supplied by a caller. No model-driven hypothesis generation is claimed.
+- Generated suggestions are deterministic directional/null templates, not model-derived scientific discoveries. They remain review-required and evidence-free.
 - Novelty assessment is provisional. The endpoint does not itself run a literature search or guarantee that a hypothesis is novel.
 - Lexical similarity can miss paraphrases and can flag unrelated wording; a human should review every duplicate warning.
 - Candidate persistence uses one SQLite transaction for the whole batch; a validation or write failure rolls back every candidate and its audit event.
