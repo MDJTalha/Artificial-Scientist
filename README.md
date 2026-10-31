@@ -8,11 +8,15 @@ This is **not a commercial SaaS product**. Its guiding objective is to contribut
 
 ## Current status
 
-**Phases 0–5 have recorded implementation CI evidence on their respective historical commits. Phase 5 is available as [draft Pull Request #5](https://github.com/MDJTalha/Artificial-Scientist/pull/5). Phase 6 — Controlled Computational Laboratory now includes a declarative runner, SQLite-backed run history, canonical full-record integrity checks, and atomic JSON result artifacts with SHA-256 verification and run/plan/step provenance. Artifact APIs are implemented on `phase-6-controlled-lab`; latest-head backend CI is still running and full exit criteria remain pending. All phase pull requests remain unmerged by design.**
+The repository contains integrated implementations across Phases 0–14, with repository-side hardening and regression coverage for provenance, literature metadata, knowledge graphs, bounded mathematics, tenant-scoped records, hypothesis discovery, controlled autonomy, governance, and domain safety boundaries.
 
-The foundation includes a FastAPI backend, health/readiness endpoints, a React + TypeScript overview dashboard that checks the actual local API, typed research records, SQLite provenance storage, and GitHub Actions verification.
+The current release posture is **evidence-gated, not production-certified**. Phase 6 intentionally fails closed for production-like execution until a reviewed OS-level sandbox is deployed and independently assessed. Remaining external gates include real OIDC/JWKS provider validation, sanitized migration/backup/restore/rollback rehearsal, operational deployment validation, independent security review, and scientific/domain-expert replication evidence.
 
-Phase 3 adds OpenAlex and Crossref metadata search adapters, source normalization, DOI-based deduplication, and optional persistent source records. Phase 4 adds typed scientific concepts, a controlled vocabulary, evidence-linked relationship assertions, server-side concept search, and bounded graph-neighborhood traversal. Phase 4 CI passed 46 backend tests on Python 3.12 and 46 on Python 3.13, plus frontend type-checking, 6 frontend tests, and the production build; see the [verified run](https://github.com/MDJTalha/Artificial-Scientist/actions/runs/40265564598). Phase 5 adds bounded symbolic and numerical math, descriptive statistics, allowlisted unit conversion, dimensional checks, and in-memory PNG plotting. Its implementation CI passed 75 backend tests on Python 3.12 and 75 on Python 3.13, plus frontend type-checking, 6 frontend tests, and the production build; see the [verified code run](https://github.com/MDJTalha/Artificial-Scientist/actions/runs/40266731194) and [passing pull-request run](https://github.com/MDJTalha/Artificial-Scientist/actions/runs/40266895491). Full-text ingestion, automated claim verification, autonomous hypothesis generation, durable and OS-isolated experiment execution, and agent orchestration **are not implemented yet**. Phase 7 now provides heuristic research-question decomposition, structured hypothesis assessment, and bounded OpenAlex/Crossref prior-work-screen APIs for caller-supplied competing hypotheses, with traceable record persistence, falsification planning, and heuristic duplicate warnings; it does not autonomously generate hypotheses or guarantee novelty. Phase 6 is an allowlisted declarative runner with persisted run history, not a general-purpose sandbox. Planned capabilities are not presented as active features.
+Phase 7 now includes bounded research-question decomposition, competing-hypothesis assessment, falsification planning, bounded OpenAlex/Crossref prior-work screening, tenant-scoped evidence validation, and deterministic directional/null hypothesis suggestions. Generated suggestions are explicitly marked **requires human review** and make no claims of truth, causality, or novelty.
+
+Phases 8–14 provide protected workflow orchestration, approval tokens, restart-recoverable tenant-scoped memory, independent verification, bounded specialist collaboration, evidence-linked scientific writing, benchmark/governance decisions, and an evidence-gated domain registry with a hard rejection boundary for physical actions. These controls do not certify scientific correctness or production security by themselves.
+
+GitHub Actions remains the authoritative repository verification mechanism: every material branch or release candidate must pass the exact current commit on Python 3.12 and 3.13 plus frontend type-checking, tests, and production build before merge.
 
 ## Scientific principles
 
@@ -58,9 +62,9 @@ See [docs/ROADMAP.md](docs/ROADMAP.md) for phase goals and exit criteria.
 - **Core API:** Python 3.12+, FastAPI, Pydantic through FastAPI request/response validation
 - **Interface:** React, TypeScript, Vite
 - **Mathematical tools implemented in Phase 5:** NumPy, SciPy, SymPy, Pint, and Matplotlib for bounded symbolic/numeric calculations, descriptive statistics, unit checks, and function plots. pandas, machine learning, and broader scientific workflows remain future scope.
-- **Persistence planned:** SQLite initially, behind repository interfaces that allow later migration
+- **Persistence:** SQLite-backed repository stores are implemented for research provenance, lab runs, and governed autonomy; interfaces preserve a path to later migration
 - **Models planned:** provider-independent adapters; optional local inference with Ollama
-- **Workflow orchestration planned:** explicit, testable workflows; evaluate LangGraph when checkpointed orchestration is needed
+- **Workflow orchestration:** explicit, testable, bounded workflow engines with persistence and approval gates; no unrestricted agent execution
 - **Scholarly metadata connectors:** OpenAlex and Crossref are implemented in Phase 3; additional repositories and full-text handling remain future work
 - **Verification:** pytest, Ruff, TypeScript type checking, frontend unit tests, production build, regression tests, and reproducibility checks
 
