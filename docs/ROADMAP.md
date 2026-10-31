@@ -61,36 +61,43 @@ The project is organized into **15 phases, Phase 0 through Phase 14**. These are
 ## Phase 8 — Experimental planning and orchestration
 
 **Build:** explicit stateful workflow, baselines, variables, controls, success/failure criteria, approvals, and stopping conditions.  
+**Implementation:** `autonomy.workflow` provides a finite-state workflow, approval-token gate, checkpoints, pause/recovery, failure and cancellation transitions, with no arbitrary-code execution.  
 **Exit criteria:** workflow transitions are validated; interruptions and failures are recoverable; consequential actions pause for authorization.
 
 ## Phase 9 — Analysis and independent verification
 
 **Build:** validation of data and calculations, uncertainty analysis, statistical checks, baseline comparison, alternative explanations, and replication support.  
+**Implementation:** `autonomy.verification` provides independent finite-vector comparison with absolute/relative tolerances and deterministic bootstrap dispersion checks; invalid/non-finite inputs fail closed.  
 **Exit criteria:** benchmark cases and negative tests pass at agreed thresholds; an experiment is not marked successful solely because an agent says it succeeded.
 
 ## Phase 10 — Scientific memory and controlled learning
 
 **Build:** versioned research memory, contradiction handling, update evaluation, provenance, rollback, and retention policy.  
+**Implementation:** `autonomy.memory` stores immutable versions with evidence, content digests, contradiction records, and rollback-as-new-version semantics; history is never erased.  
 **Exit criteria:** every retained claim has a source/status; updates have validation records; rejected or retracted findings can be corrected without erasing history.
 
 ## Phase 11 — Multi-agent research collaboration
 
 **Build:** bounded specialist roles, delegation, shared structured records, conflict resolution, and resource budgets.  
+**Implementation:** `autonomy.collaboration` enforces named roles, task budgets, per-role limits, independent completed results, and explicit conflict resolution; agreement is not treated as evidence.  
 **Exit criteria:** agents have distinct responsibilities; duplicated work and shared failure modes are measured; consensus is not treated as evidence; single-agent baselines are retained.
 
 ## Phase 12 — Scientific writing
 
 **Build:** evidence-linked reports/manuscripts, verified bibliographies, figures, methods, limitations, data/code statements, and journal-specific templates.  
+**Implementation:** `autonomy.writing` requires verified citations and methods/limitations/data statements, bounds claims, and keeps external submission approval-gated; no submission transport is implemented.  
 **Exit criteria:** citation checks pass; claim-to-evidence traceability is available; fabricated-reference tests fail safely; external submissions remain approval-gated.
 
 ## Phase 13 — Evaluation, adversarial testing, and governance
 
 **Build:** repeatable benchmark suite, security tests, misleading-source tests, prompt-injection resistance, audit review, and release criteria.  
+**Implementation:** `autonomy.governance` supports bounded benchmark cases, adversarial categories, missing-case detection, critical-failure blocking, conditional decisions, and explicit release decisions.  
 **Exit criteria:** documented results and unresolved issues are reviewed; critical risks are addressed; benchmarks are versioned and do not rely solely on self-scoring.
 
 ## Phase 14 — Multidisciplinary expansion and advanced autonomy
 
 **Build:** additional domain agents, specialized datasets/tools, advanced computational discovery, and, only where justified, approved physical research integrations.  
+**Implementation:** `autonomy.domains` provides a domain registry with tool allowlists, validation-case requirements, risk classes, expert-review gates, and an unconditional software boundary against physical actions.  
 **Exit criteria:** each new domain has its own validation cases, tool constraints, risk assessment, and expert review path. Expansion is evidence-gated.
 
 ## Current implementation status
