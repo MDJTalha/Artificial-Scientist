@@ -4,6 +4,8 @@
 **Repository:** `MDJTalha/Artificial-Scientist`  
 **Verified baseline:** `main` commit `b28b6bdaffa4851a2dec390460706e100302d138` is the merged Phase 0/6/7/14 hardening baseline; post-merge CI run 1114 succeeded.
 
+**Release-hardening branch:** `phase-release-verification-hardening` adds the final repository-side authorization matrix, concurrency/race, migration/recovery, frontend accessibility/E2E, release-evidence and documentation controls. Final completion is evidence-gated on the CI run for the branch head.
+
 This document is the current repository evidence snapshot. Older phase documents may contain historical branch names or earlier implementation descriptions; this snapshot takes precedence for the present integration state.
 
 ## Verified integration state
@@ -74,11 +76,17 @@ These cannot honestly be completed by repository edits alone:
 
 No external gate is marked complete merely because a unit test, mock provider, documentation page, or CI run exists. The release package must contain concrete evidence, scope, commit/version, commands, outcomes, limitations, risks and sign-off for every gate.
 
-## Next repository-side priorities
+## Repository-side final verification
 
-While external evidence is being gathered, repository work should continue on:
-- endpoint-by-endpoint authorization and cross-tenant negative-test coverage;
-- concurrency/race regressions for quotas and ownership;
-- migration/rehearsal fixture quality and rollback assertions;
-- frontend accessibility/E2E and conference-grade research-workspace verification;
-- CI/release-gate automation that prevents stale documentation from being interpreted as production certification.
+The previously open repository-side hardening items are implemented on `phase-release-verification-hardening`:
+
+- endpoint-by-endpoint authorization contract and cross-tenant adversarial coverage;
+- atomic quota and ownership race regressions;
+- migration/recovery source-integrity and rollback assertions;
+- conference-grade frontend Playwright keyboard/navigation and automated accessibility checks;
+- machine-readable release policy and populated evidence matrix;
+- synchronized status/evidence documentation.
+
+These items become **repository-verified** only after the branch-head CI run passes Python 3.12/3.13, frontend unit/type/build checks, Playwright/axe E2E, and the targeted release-gate suites.
+
+The remaining open items are external certification gates listed above and are intentionally not represented as complete by repository changes. See `docs/release/EVIDENCE_MATRIX.md` for the evidence register.
