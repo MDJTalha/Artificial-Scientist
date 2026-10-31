@@ -91,3 +91,15 @@ def test_tenant_isolation_for_persistent_autonomy(tmp_path):
         pass
     else:
         raise AssertionError("cross-tenant workflow read")
+
+
+def test_persistent_memory_isolation_allows_same_key_per_tenant(tmp_path):
+    from artificial_scientist.autonomy.memory import ResearchMemory
+
+    database = tmp_path / "memory-tenant-isolation.sqlite3"
+    first = ResearchMemory(AutonomyStore(database), tenant_id="tenant-a")
+    second = ResearchMemory(AutonomyStore(database), tenant_id="tenant-b")
+    first.put("shared-key", {"tenant": "a"}, evidence=("source:a",))
+    second.put("shared-key", {"tenant": "b"}, evidence=("source:b",))
+    assert first.current("shared-key").value == {"tenant": "a"}
+    assert second.current("shared-key").value == {"tenant": "b"}
