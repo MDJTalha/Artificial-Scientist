@@ -21,10 +21,16 @@ from uuid import NAMESPACE_URL, uuid4, uuid5
 _SUBJECT_MAX = 255
 _TENANT_NAME_MAX = 120
 _ALLOWED_ROLES = frozenset({"tenant_admin", "researcher", "viewer", "auditor"})
-_ALLOWED_ACTIONS = frozenset({
+_LAB_ACTIONS = frozenset({
     "run:create", "run:list", "run:read", "run:verify", "run:export",
     "artifact:read", "artifact:upload", "membership:manage", "retention:purge",
 })
+_RECORD_ACTIONS = frozenset({
+    "record:create", "record:read", "record:list", "record:search",
+    "record:audit:read", "discovery:decompose", "discovery:prior-work-screen",
+    "discovery:assess",
+})
+_ALLOWED_ACTIONS = _LAB_ACTIONS | _RECORD_ACTIONS
 
 
 class AuthorizationDenied(PermissionError):
@@ -58,11 +64,25 @@ def stable_tenant_id(external_key: str) -> str:
 
 
 def role_allows(role: str, action: str) -> bool:
-    """Return explicit role permissions; unknown roles and actions deny by default."""
+    """Return explicit least-privilege permissions for lab and research APIs."""
     if role not in _ALLOWED_ROLES or action not in _ALLOWED_ACTIONS:
         return False
     if role == "tenant_admin":
         return action != "retention:purge"
+    if action in _RECORD_ACTIONS:
+        if role == "researcher":
+            return action in {
+                "record:create", "record:read", "record:list", "record:search",
+                "discovery:decompose", "discovery:prior-work-screen", "discovery:assess",
+            }
+        if role == "viewer":
+            return action in {
+                "record:read", "record:list", "record:search",
+                "discovery:decompose", "discovery:prior-work-screen",
+            }
+        if role == "auditor":
+            return action in {"record:read", "record:list", "record:audit:read"}
+        return False
     if role == "researcher":
         return action in {
             "run:create", "run:list", "run:read", "run:verify", "run:export",

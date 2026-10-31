@@ -154,6 +154,9 @@ def test_audit_accepts_bounded_operational_metadata(tmp_path):
             {
                 "run:create", "run:list", "run:read", "run:verify", "run:export",
                 "artifact:read", "artifact:upload", "membership:manage",
+                "record:create", "record:read", "record:list", "record:search",
+                "record:audit:read", "discovery:decompose", "discovery:prior-work-screen",
+                "discovery:assess",
             },
         ),
         (
@@ -161,10 +164,25 @@ def test_audit_accepts_bounded_operational_metadata(tmp_path):
             {
                 "run:create", "run:list", "run:read", "run:verify", "run:export",
                 "artifact:read", "artifact:upload",
+                "record:create", "record:read", "record:list", "record:search",
+                "discovery:decompose", "discovery:prior-work-screen", "discovery:assess",
             },
         ),
-        ("viewer", {"run:list", "run:read", "run:export", "artifact:read"}),
-        ("auditor", {"run:list", "run:read", "run:export", "artifact:read"}),
+        (
+            "viewer",
+            {
+                "run:list", "run:read", "run:export", "artifact:read",
+                "record:read", "record:list", "record:search",
+                "discovery:decompose", "discovery:prior-work-screen",
+            },
+        ),
+        (
+            "auditor",
+            {
+                "run:list", "run:read", "run:export", "artifact:read",
+                "record:read", "record:list", "record:audit:read",
+            },
+        ),
     ],
 )
 def test_role_action_matrix_is_explicit(role, allowed_actions):

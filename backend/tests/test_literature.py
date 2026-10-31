@@ -405,4 +405,4 @@ def test_source_identity_index_migrates_existing_schema_v1_records(
     assert existing.id == source.id
 
     with sqlite3.connect(database_path) as connection:
-        assert connection.execute("PRAGMA user_version").fetchone()[0] == 2
+        assert connection.execute("PRAGMA user_version").fetchone()[0] == 3
