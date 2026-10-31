@@ -276,7 +276,6 @@ app = FastAPI(
         "Automated truth verification and autonomous scientific discovery are not claimed."
     ),
 )
-app.add_middleware(Phase7RecordIsolationGateMiddleware)
 app.add_middleware(LabRequestBodyLimitMiddleware)
 app.add_middleware(LabSecurityAuditMiddleware, database_path=settings.database_path)
 
