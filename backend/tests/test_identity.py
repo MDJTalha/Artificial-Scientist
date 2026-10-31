@@ -91,3 +91,125 @@ def test_oidc_validator_wraps_jwt_validation_errors(monkeypatch):
             audience="scientific-api",
             jwks_url="https://identity.example.test/jwks.json",
         )
+
+
+def test_oidc_validator_fails_closed_when_jwks_key_lookup_fails(monkeypatch):
+    class UnavailableJWKClient:
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+        def get_signing_key_from_jwt(self, _token):
+            raise jwt.PyJWKClientError("upstream JWKS details must not escape")
+
+    monkeypatch.setattr(identity, "PyJWKClient", UnavailableJWKClient)
+
+    with pytest.raises(identity.InvalidIdentityError, match="validation failed") as error:
+        identity.validate_oidc_bearer_token(
+            "signed-token",
+            issuer="https://identity.example.test/",
+            audience="scientific-api",
+            jwks_url="https://identity.example.test/jwks.json",
+        )
+
+    assert "upstream JWKS details" not in str(error.value)
+
+
+@pytest.mark.parametrize(
+    ("claims", "message"),
+    [
+        (
+            {
+                "sub": "   ",
+                "iss": "https://identity.example.test/",
+                "aud": "scientific-api",
+                "exp": 2_000_000_000,
+                "iat": 1_900_000_000,
+            },
+            "subject is missing or invalid",
+        ),
+        (
+            {
+                "sub": "principal-123",
+                "iss": "https://identity.example.test/",
+                "aud": "wrong-api",
+                "exp": 2_000_000_000,
+                "iat": 1_900_000_000,
+            },
+            "audience is invalid",
+        ),
+        (
+            {
+                "sub": "s" * 256,
+                "iss": "https://identity.example.test/",
+                "aud": "scientific-api",
+                "exp": 2_000_000_000,
+                "iat": 1_900_000_000,
+            },
+            "subject is missing or invalid",
+        ),
+        (
+            {
+                "sub": "principal-123",
+                "iss": "i" * 513,
+                "aud": "scientific-api",
+                "exp": 2_000_000_000,
+                "iat": 1_900_000_000,
+            },
+            "issuer is missing or invalid",
+        ),
+    ],
+)
+def test_oidc_validator_rejects_invalid_identity_claim_shapes(monkeypatch, claims, message):
+    class FakeJWKClient:
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+        def get_signing_key_from_jwt(self, _token):
+            return SimpleNamespace(key="trusted-public-key")
+
+    monkeypatch.setattr(identity, "PyJWKClient", FakeJWKClient)
+    monkeypatch.setattr(identity.jwt, "decode", lambda *_args, **_kwargs: claims)
+
+    with pytest.raises(identity.InvalidIdentityError, match=message):
+        identity.validate_oidc_bearer_token(
+            "signed-token",
+            issuer="https://identity.example.test/",
+            audience="scientific-api",
+            jwks_url="https://identity.example.test/jwks.json",
+        )
+
+@pytest.mark.parametrize(
+    "jwks_url",
+    [
+        "https://",
+        "https://user:password@identity.example.test/jwks.json",
+        "https://identity.example.test/jwks.json#fragment",
+        "https://identity.example.test:invalid/jwks.json",
+        "https://identity.example.test:65536/jwks.json",
+        "https://identity.example.test /jwks.json",
+    ],
+)
+def test_oidc_validator_rejects_malformed_or_unsafe_jwks_urls(jwks_url):
+    with pytest.raises(identity.IdentityConfigurationError, match="JWKS URL"):
+        identity.validate_oidc_bearer_token(
+            "token",
+            issuer="https://identity.example.test/",
+            audience="scientific-api",
+            jwks_url=jwks_url,
+        )
+
+
+@pytest.mark.parametrize(
+    ("issuer", "audience"),
+    [("   ", "scientific-api"), ("https://identity.example.test/", "  ")],
+)
+def test_oidc_validator_rejects_blank_trust_values(issuer, audience):
+    with pytest.raises(
+        identity.IdentityConfigurationError, match="must all be configured"
+    ):
+        identity.validate_oidc_bearer_token(
+            "token",
+            issuer=issuer,
+            audience=audience,
+            jwks_url="https://identity.example.test/jwks.json",
+        )

@@ -146,6 +146,56 @@ def test_audit_accepts_bounded_operational_metadata(tmp_path):
     }
 
 
+@pytest.mark.parametrize(
+    ("role", "allowed_actions"),
+    [
+        (
+            "tenant_admin",
+            {
+                "run:create", "run:list", "run:read", "run:verify", "run:export",
+                "artifact:read", "artifact:upload", "membership:manage",
+                "record:create", "record:read", "record:list", "record:search",
+                "record:audit:read", "discovery:decompose", "discovery:prior-work-screen",
+                "discovery:assess", "autonomy:workflow:create",
+                "autonomy:workflow:read", "autonomy:workflow:write", "autonomy:workflow:approve",
+            },
+        ),
+        (
+            "researcher",
+            {
+                "run:create", "run:list", "run:read", "run:verify", "run:export",
+                "artifact:read", "artifact:upload",
+                "record:create", "record:read", "record:list", "record:search",
+                "discovery:decompose", "discovery:prior-work-screen", "discovery:assess",
+                "autonomy:workflow:create", "autonomy:workflow:read",
+                "autonomy:workflow:write", "autonomy:workflow:approve",
+            },
+        ),
+        (
+            "viewer",
+            {
+                "run:list", "run:read", "run:export", "artifact:read",
+                "record:read", "record:list", "record:search",
+                "discovery:decompose", "discovery:prior-work-screen", "autonomy:workflow:read",
+            },
+        ),
+        (
+            "auditor",
+            {
+                "run:list", "run:read", "run:export", "artifact:read",
+                "record:read", "record:list", "record:audit:read",
+            },
+        ),
+    ],
+)
+def test_role_action_matrix_is_explicit(role, allowed_actions):
+    from artificial_scientist.authorization import _ALLOWED_ACTIONS
+
+    assert all(
+        role_allows(role, action) == (action in allowed_actions)
+        for action in _ALLOWED_ACTIONS
+    )
+    assert not role_allows(role, "unknown:action")
 
 def test_tenant_scoped_run_store_hides_foreign_and_legacy_records(tmp_path):
     store = LabRunStore(str(tmp_path / "tenant-scoped-runs.sqlite3"))
@@ -194,3 +244,13 @@ def test_tenant_scoped_execution_status_hides_foreign_attempts(tmp_path):
     assert store.get_execution_status(run_id, tenant_id="tenant-a")["run_id"] == str(run_id)
     with pytest.raises(LabExecutionNotFound):
         store.get_execution_status(run_id, tenant_id="tenant-b")
+
+
+def test_autonomy_workflow_actions_follow_least_privilege():
+    from artificial_scientist.authorization import role_allows
+
+    assert role_allows("tenant_admin", "autonomy:workflow:approve")
+    assert role_allows("researcher", "autonomy:workflow:approve")
+    assert role_allows("viewer", "autonomy:workflow:read")
+    assert not role_allows("viewer", "autonomy:workflow:approve")
+    assert not role_allows("auditor", "autonomy:workflow:write")

@@ -5,6 +5,7 @@ import hashlib
 import hmac
 import io
 import json
+import re
 import zipfile
 from functools import lru_cache
 from typing import Annotated
@@ -41,6 +42,7 @@ from artificial_scientist.lab.scanning import (
 from artificial_scientist.lab.store import (
     LabArtifactNotFound,
     LabExecutionNotFound,
+    LabQuotaExceeded,
     LabRunNotFound,
     LabRunStore,
 )
@@ -53,6 +55,9 @@ def require_lab_access(
 ) -> None:
     """Require configured OIDC identity or the legacy deployment-level API key."""
     settings = get_settings()
+    database_path = getattr(settings, "database_path", None)
+    if database_path:
+        request.state.security_audit_database_path = database_path
     if settings.environment.lower() == "development":
         request.state.authenticated_principal = AuthenticatedPrincipal(
             subject="local-development-principal",
@@ -160,7 +165,68 @@ def require_tenant_access(request: Request, action: str) -> str | None:
             detail="Authenticated tenant membership is required.",
         )
     principal_id = stable_principal_id(principal.issuer, principal.subject)
+    correlation_id = request.headers.get("x-correlation-id", "").strip()
+    # Correlation IDs are untrusted metadata. Keep a conservative printable
+    # alphabet so control characters and whitespace cannot pollute audit records.
+    if not re.fullmatch(r"[A-Za-z0-9._:-]{1,128}", correlation_id):
+        correlation_id = str(uuid4())
+
+    # Tenant IDs are generated UUIDs. Reject malformed or unbounded selectors before
+    # opening the directory or writing an audit row containing attacker-controlled data.
+    # The rejection itself is still audited, but as an unscoped request with no tenant ID.
+    try:
+        parsed_tenant_id = UUID(tenant_id)
+        valid_tenant_id = str(parsed_tenant_id) == tenant_id.lower()
+    except (ValueError, AttributeError):
+        valid_tenant_id = False
+    if not valid_tenant_id:
+        request.state.authorization_audit = {
+            "principal_id": principal_id,
+            "tenant_id": None,
+            "database_path": settings.database_path,
+            "action": action,
+            "target_type": "request",
+            "target_id": None,
+            "correlation_id": correlation_id,
+            "method": request.method,
+            "route": request.url.path,
+        }
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Requested tenant resource is not available.",
+        )
+
+    tenant_id = str(parsed_tenant_id)
     directory = TenantDirectory(settings.database_path)
+    path_params = request.path_params
+    target_id = next(
+        (
+            str(path_params[key])
+            for key in ("run_id", "artifact_id")
+            if path_params.get(key) is not None
+        ),
+        tenant_id,
+    )
+    target_type = (
+        "binary_artifact"
+        if "binary-artifacts" in request.url.path
+        else "artifact"
+        if path_params.get("artifact_id") is not None
+        else "run"
+        if path_params.get("run_id") is not None
+        else "tenant"
+    )
+    request.state.authorization_audit = {
+        "principal_id": principal_id,
+        "tenant_id": tenant_id,
+        "database_path": settings.database_path,
+        "action": action,
+        "target_type": target_type,
+        "target_id": target_id,
+        "correlation_id": correlation_id,
+        "method": request.method,
+        "route": request.url.path,
+    }
     try:
         directory.authorize(principal_id, tenant_id, action)
     except (AuthorizationDenied, ValueError) as error:
@@ -180,13 +246,21 @@ def create_lab_run(
     """Execute a bounded declarative run and persist its traceable response."""
     tenant_id = require_tenant_access(http_request, "run:create")
     run_id = uuid4()
-    store.begin_execution(run_id, lab_request, tenant_id=tenant_id)
+    try:
+        store.begin_execution(run_id, lab_request, tenant_id=tenant_id)
+    except LabQuotaExceeded as error:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Tenant has reached its lab run quota.",
+        ) from error
     try:
         run = run_lab(lab_request, run_id=run_id)
+        # Persistence can fail independently (for example, a tenant storage quota).
+        # Mark the reservation failed rather than leaving a false "running" status.
+        return store.save(run, tenant_id=tenant_id)
     except Exception:
-        store.fail_execution(run_id)
+        store.fail_execution(run_id, tenant_id=tenant_id)
         raise
-    return store.save(run, tenant_id=tenant_id)
 
 
 @router.get("/runs/{run_id}/execution-status", response_model=dict[str, object])
@@ -451,15 +525,43 @@ async def upload_lab_binary_artifact(
 ) -> dict[str, object]:
     """Upload a bounded binary attachment using the request body as its bytes."""
     tenant_id = require_tenant_access(request, "artifact:upload")
+    # Check run ownership before consuming or scanning an attacker-controlled body.
+    # Otherwise a tenant could make the service spend upload/scanner resources against
+    # another tenant's run even though persistence eventually rejects the attachment.
+    try:
+        store.get(run_id, tenant_id=tenant_id)
+    except LabRunNotFound as error:
+        raise HTTPException(status_code=404, detail="Lab run not found.") from error
+    except RuntimeError as error:
+        raise HTTPException(
+            status_code=500, detail="Stored lab data failed integrity validation."
+        ) from error
+
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,179}", filename):
+        raise HTTPException(status_code=422, detail="Invalid binary artifact filename.")
+
+    raw_content_type = request.headers.get("content-type", "application/octet-stream")
+    media_type = raw_content_type.split(";", 1)[0].strip()
+    media_type_pattern = r"[A-Za-z0-9!#$&^_.+-]+/[A-Za-z0-9!#$&^_.+-]+"
+    if not re.fullmatch(media_type_pattern, media_type):
+        raise HTTPException(status_code=422, detail="Invalid binary artifact content type.")
+
     content_length = request.headers.get("content-length")
     if content_length is not None:
-        try:
-            if int(content_length) > _MAX_BINARY_ARTIFACT_BYTES:
-                raise HTTPException(
-                    status_code=413, detail="Binary artifact exceeds the 10 MiB limit."
-                )
-        except ValueError as error:
-            raise HTTPException(status_code=400, detail="Invalid Content-Length header.") from error
+        # HTTP Content-Length is a non-negative ASCII decimal byte count. Reject
+        # signs, whitespace, and Unicode digits; compare normalized decimal strings
+        # before int conversion so an attacker cannot trigger Python's huge-int limit.
+        if not content_length.isascii() or not content_length.isdecimal():
+            raise HTTPException(status_code=400, detail="Invalid Content-Length header.")
+        normalized_length = content_length.lstrip("0") or "0"
+        maximum_length = str(_MAX_BINARY_ARTIFACT_BYTES)
+        if len(normalized_length) > len(maximum_length) or (
+            len(normalized_length) == len(maximum_length)
+            and normalized_length > maximum_length
+        ):
+            raise HTTPException(
+                status_code=413, detail="Binary artifact exceeds the 10 MiB limit."
+            )
     chunks: list[bytes] = []
     total = 0
     async for chunk in request.stream():
@@ -468,6 +570,11 @@ async def upload_lab_binary_artifact(
             raise HTTPException(status_code=413, detail="Binary artifact exceeds the 10 MiB limit.")
         chunks.append(chunk)
     content = b"".join(chunks)
+    if not content:
+        raise HTTPException(
+            status_code=422,
+            detail="Binary artifacts must be between 1 byte and 10 MiB.",
+        )
     try:
         scan_status = await asyncio.to_thread(
             scan_binary_content,
@@ -485,9 +592,7 @@ async def upload_lab_binary_artifact(
         artifact = store.save_binary_artifact(
             run_id,
             filename,
-            request.headers.get("content-type", "application/octet-stream")
-            .split(";", 1)[0]
-            .strip(),
+            media_type,
             content,
             scan_status=scan_status,
             tenant_id=tenant_id,

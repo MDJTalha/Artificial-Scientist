@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import multiprocessing
 import os
 from collections.abc import Callable
@@ -78,7 +79,7 @@ def _worker_entry(
                 {
                     "ok": False,
                     "error_type": type(error).__name__,
-                    "error": str(error).replace("\\n", " ")[:500],
+                    "error": " ".join(str(error).split())[:500],
                 }
             )
         except (BrokenPipeError, EOFError, OSError):
@@ -98,6 +99,9 @@ def run_isolated(
     limits. These controls are not a complete OS security sandbox: they do not
     isolate filesystems, network access, syscalls, or kernel attack surface.
     """
+    if not math.isfinite(timeout_seconds) or timeout_seconds <= 0:
+        raise LabExecutionError("Lab step timeout must be a finite positive number.")
+
     context = multiprocessing.get_context("spawn")
     receive_connection, send_connection = context.Pipe(duplex=False)
     process = context.Process(
