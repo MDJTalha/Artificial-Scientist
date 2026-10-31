@@ -156,7 +156,8 @@ def test_audit_accepts_bounded_operational_metadata(tmp_path):
                 "artifact:read", "artifact:upload", "membership:manage",
                 "record:create", "record:read", "record:list", "record:search",
                 "record:audit:read", "discovery:decompose", "discovery:prior-work-screen",
-                "discovery:assess",
+                "discovery:assess", "autonomy:workflow:create",
+                "autonomy:workflow:read", "autonomy:workflow:write", "autonomy:workflow:approve",
             },
         ),
         (
@@ -166,6 +167,8 @@ def test_audit_accepts_bounded_operational_metadata(tmp_path):
                 "artifact:read", "artifact:upload",
                 "record:create", "record:read", "record:list", "record:search",
                 "discovery:decompose", "discovery:prior-work-screen", "discovery:assess",
+                "autonomy:workflow:create", "autonomy:workflow:read",
+                "autonomy:workflow:write", "autonomy:workflow:approve",
             },
         ),
         (
@@ -173,7 +176,7 @@ def test_audit_accepts_bounded_operational_metadata(tmp_path):
             {
                 "run:list", "run:read", "run:export", "artifact:read",
                 "record:read", "record:list", "record:search",
-                "discovery:decompose", "discovery:prior-work-screen",
+                "discovery:decompose", "discovery:prior-work-screen", "autonomy:workflow:read",
             },
         ),
         (
