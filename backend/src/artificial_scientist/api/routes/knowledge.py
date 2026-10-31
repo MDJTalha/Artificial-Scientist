@@ -146,6 +146,7 @@ def get_concept(
 def create_relationship(
     record: KnowledgeRelationshipRecord,
     store: Annotated[RecordStore, Depends(get_record_store)],
+    tenant_id: Annotated[str | None, Depends(record_access("record:create"))],
 ) -> RecordEnvelope:
     """Create a typed, evidence-linkable relationship between two existing concepts."""
     try:
@@ -165,6 +166,7 @@ def list_concept_relationships(
     predicate: KnowledgePredicate | None = Query(default=None),
     limit: int = Query(default=100, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
+    tenant_id: Annotated[str | None, Depends(record_access("record:search"))] = None,
 ) -> KnowledgeRelationshipListResponse:
     """Read a concept's incoming/outgoing assertions without inferring inverse edges."""
     _get_concept(store, concept_id, tenant_id)
