@@ -108,6 +108,13 @@ class AutonomyStore:
             )
             connection.commit()
         return version
+    def memory_keys(self) -> list[str]:
+        with closing(self._connect()) as connection:
+            rows = connection.execute(
+                "SELECT DISTINCT key_name FROM autonomy_memory ORDER BY key_name"
+            ).fetchall()
+        return [str(row[0]) for row in rows]
+
     def memory_history(self, key: str) -> list[dict]:
         with closing(self._connect()) as connection:
             rows = connection.execute(
