@@ -13,6 +13,7 @@ RECORD_ACTIONS = frozenset({
     "record:search",
     "record:audit:read",
     "discovery:decompose",
+    "discovery:generate",
     "discovery:prior-work-screen",
     "discovery:assess",
 })
@@ -21,12 +22,12 @@ RECORD_ACTIONS = frozenset({
 _ROLE_ACTIONS = {
     "tenant_admin": frozenset({
         "record:create", "record:read", "record:list", "record:search",
-        "record:audit:read", "discovery:decompose", "discovery:prior-work-screen",
+        "record:audit:read", "discovery:decompose", "discovery:generate", "discovery:prior-work-screen",
         "discovery:assess",
     }),
     "researcher": frozenset({
         "record:create", "record:read", "record:list", "record:search",
-        "discovery:decompose", "discovery:prior-work-screen", "discovery:assess",
+        "discovery:decompose", "discovery:generate", "discovery:prior-work-screen", "discovery:assess",
     }),
     "viewer": frozenset({
         "record:read", "record:list", "record:search",
