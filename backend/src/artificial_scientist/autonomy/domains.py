@@ -23,30 +23,39 @@ class DomainRegistry:
         self._domains: dict[str, DomainSpec] = {}
 
     @staticmethod
-    def _validate_items(items: tuple[str, ...], *, label: str, maximum: int) -> None:
+    def _validate_items(
+        items: tuple[str, ...], *, label: str, maximum: int
+    ) -> tuple[str, ...]:
         if not items or any(not isinstance(item, str) or not item.strip() for item in items):
             raise ValueError(f"{label} must contain non-empty strings")
-        if len(set(items)) != len(items):
+        normalized = tuple(item.strip() for item in items)
+        if len(set(normalized)) != len(normalized):
             raise ValueError(f"{label} must not contain duplicates")
-        if any(len(item.strip()) > maximum for item in items):
+        if any(len(item) > maximum for item in normalized):
             raise ValueError(f"{label} entries are too long")
+        return normalized
 
     def register(self, spec: DomainSpec) -> None:
         name = spec.name.strip()
         if not name or len(name) > _MAX_NAME:
             raise ValueError("domain name must be bounded and non-empty")
-        if spec.risk_class not in _ALLOWED_RISK_CLASSES:
+        risk_class = spec.risk_class.strip() if isinstance(spec.risk_class, str) else ""
+        if risk_class not in _ALLOWED_RISK_CLASSES:
             raise ValueError("unknown domain risk class")
-        self._validate_items(spec.tools, label="tools", maximum=_MAX_TOOL)
-        self._validate_items(spec.validation_cases, label="validation_cases", maximum=_MAX_CASE)
+        tools = self._validate_items(spec.tools, label="tools", maximum=_MAX_TOOL)
+        validation_cases = self._validate_items(
+            spec.validation_cases, label="validation_cases", maximum=_MAX_CASE
+        )
+        if not isinstance(spec.expert_required, bool):
+            raise ValueError("expert_required must be a boolean")
         if name in self._domains:
             raise ValueError("domain already registered")
         normalized = DomainSpec(
             name=name,
-            risk_class=spec.risk_class,
-            tools=tuple(tool.strip() for tool in spec.tools),
-            validation_cases=tuple(case.strip() for case in spec.validation_cases),
-            expert_required=bool(spec.expert_required),
+            risk_class=risk_class,
+            tools=tools,
+            validation_cases=validation_cases,
+            expert_required=spec.expert_required,
         )
         self._domains[name] = normalized
 
