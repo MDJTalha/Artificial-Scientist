@@ -1,11 +1,13 @@
 """Container entrypoint for the fixed allowlisted laboratory operations."""
 from __future__ import annotations
+
 import json
 import sys
 
 from artificial_scientist.lab.engine import _execute_step_direct
 
 ALLOWED = {"symbolic", "integrate", "root", "statistics", "unit_convert"}
+
 
 def main() -> int:
     request = json.load(sys.stdin)
@@ -19,6 +21,7 @@ def main() -> int:
     json.dump({"ok": True, "result": result}, sys.stdout, separators=(",", ":"))
     sys.stdout.write("\n")
     return 0
+
 
 if __name__ == "__main__":
     raise SystemExit(main())
