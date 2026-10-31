@@ -410,11 +410,14 @@ class RecordStore:
                 "part_of",
                 "prerequisite_of",
             }:
-                self._validate_acyclic_relationship(connection, record)
+                self._validate_acyclic_relationship(connection, record, tenant_id=tenant_id)
 
     @staticmethod
     def _validate_acyclic_relationship(
-        connection: sqlite3.Connection, record: KnowledgeRelationshipRecord
+        connection: sqlite3.Connection,
+        record: KnowledgeRelationshipRecord,
+        *,
+        tenant_id: str | None = None,
     ) -> None:
         """Reject cycles within one of the controlled transitive predicates."""
         rows = connection.execute(
