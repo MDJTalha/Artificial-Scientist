@@ -1,41 +1,44 @@
-# Phase 7 — Hypothesis Discovery and Isolation Gate
+# Phase 7 — Hypothesis Discovery, Falsification, and Tenant Isolation
 
 ## Scope
 
-Phase 7 provides bounded research-question decomposition, structured comparison of competing hypotheses, prior-work metadata screening, and auditable hypothesis-record persistence. It is a research-support workflow, not an autonomous scientific-discovery guarantee.
+Phase 7 provides bounded research-question decomposition, deterministic hypothesis suggestions, structured comparison of competing hypotheses, prior-work metadata screening, and auditable hypothesis-record persistence. It is a research-support workflow, not an autonomous scientific-discovery guarantee.
 
 ## Implemented capability
 
 - `POST /api/v1/discovery/decompose` extracts conservative variable/context hints and identifies unresolved details.
-- `POST /api/v1/discovery/assess` compares 2–10 candidates, checks required structure, records assumptions, alternatives, predictions, falsification criteria, and a discriminating test, and persists hypothesis records atomically with audit events.
+- `POST /api/v1/discovery/generate` produces a small positive/inverse/null candidate set from explicitly supplied variables. Suggestions are deterministic, evidence-free, and marked `requires_human_review`.
+- `POST /api/v1/discovery/assess` compares competing candidates, checks required structure, records assumptions, alternatives, predictions, falsification criteria, and a discriminating test, and persists hypothesis records atomically with audit events.
 - `POST /api/v1/discovery/prior-work-screen` searches bounded OpenAlex/Crossref bibliographic metadata without persisting provider results.
-- Source and claim references are validated before hypothesis persistence.
+- Source and claim references are validated within the caller's tenant before hypothesis persistence.
 - Completeness scoring is a transparent rubric, not a scientific truth or confidence estimate.
 - Duplicate detection is a deterministic warning heuristic, not proof of equivalence.
-- Request bodies and candidate text are bounded; regression tests cover oversize requests and legacy payload checksums.
+- Request bodies and candidate text are bounded; regression tests cover oversized requests, tenant isolation, and bounded generation.
 
-## Release isolation gate
+## Tenant isolation
 
-The general research-record store is append-only but is not yet tenant-scoped. Phase 6 tenant authorization currently protects lab runs and artifacts; it does not isolate general research records. A caller could otherwise read or reference shared research records across tenant boundaries.
+Research-record, discovery, and knowledge-graph access is tenant-scoped in the integrated main branch. Protected routes require authenticated tenant membership outside development, and caller-supplied evidence references are resolved within the caller's tenant. Legacy ownership migration is explicit and dry-run-first; unknown historical ownership is not guessed.
 
-To fail safely, `Phase7RecordIsolationGateMiddleware` returns HTTP 503 with `Cache-Control: no-store` for `/api/v1/records` and `/api/v1/discovery/*` whenever `ARTIFICIAL_SCIENTIST_ENV` is not `development`. This is a release gate, not a substitute for tenant-scoped authorization. Local development and tests remain available.
-
-**Do not mark Phase 7 production-ready until all of the following are completed and independently reviewed:**
-
-1. Complete an explicit migration/assignment procedure for legacy NULL-tenant records without guessing ownership.
-2. Complete cross-tenant adversarial API tests for every record/discovery/knowledge endpoint and relationship type, including concurrency.
-3. Complete production OIDC/JWKS provider and key-rotation evidence.
-4. Complete backup/restore and migration rehearsal, sandbox review, and operational controls.
-5. Obtain independent security review and release sign-off.
+The repository contains adversarial cross-tenant and concurrency regression coverage. This is repository evidence, not proof of live production identity-provider or deployment behavior.
 
 ## Scientific-integrity boundaries
 
-- Metadata search is a lead-generation step, not exhaustive systematic review.
+- Metadata search is a lead-generation step, not an exhaustive systematic review.
 - A missing search result does not establish novelty.
 - A completeness rubric is not evidence that a hypothesis is true.
-- Hypotheses are user-provided structured candidates; the system does not claim autonomous hypothesis generation.
+- Generated candidates are deterministic templates, not model-derived scientific discoveries; they do not claim truth, causality, probability, or novelty.
+- Every generated candidate remains subject to prior-work screening, domain constraints, falsification planning, and human review.
 - Experimental outcomes must be independently validated and reproducible.
 
-## Validation
+## Release gates
 
-The Phase 7 implementation CI run at commit `ae00a62267451dabf34687c57f8290a690c7bfdc` passed. The isolation-gate changes require their own pull-request CI run before merge.
+Phase 7 repository acceptance requires the exact current branch SHA to pass frontend type-check/tests/build, Ruff, and the complete backend test suite on Python 3.12 and 3.13.
+
+Production release additionally requires:
+1. Real OIDC/JWKS provider and key-rotation evidence.
+2. Reviewed migration/backup/restore/recovery rehearsal.
+3. Independent security and operational review.
+4. Scientific replication, benchmark, and domain-expert evidence.
+5. The separate Phase 6 reviewed OS sandbox gate.
+
+No mock test or documentation statement substitutes for those external gates.
