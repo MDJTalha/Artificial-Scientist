@@ -10,7 +10,10 @@ from uuid import UUID, uuid4
 
 from pydantic import ValidationError
 
-from artificial_scientist.lab.execution_adapter import LabExecutionAdapter, get_execution_adapter
+from artificial_scientist.lab.execution_adapter import (
+    LabExecutionAdapter,
+    get_execution_adapter,
+)
 from artificial_scientist.lab.integrity import result_digest
 from artificial_scientist.lab.manifest import capture_environment_manifest
 from artificial_scientist.lab.models import LabRunRequest, LabRunResponse, LabStepResult
