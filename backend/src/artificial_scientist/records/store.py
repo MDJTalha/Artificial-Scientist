@@ -414,12 +414,13 @@ class RecordStore:
 
     @staticmethod
     def _validate_acyclic_relationship(
+        self,
         connection: sqlite3.Connection,
         record: KnowledgeRelationshipRecord,
         *,
         tenant_id: str | None = None,
     ) -> None:
-        """Reject cycles within one of the controlled transitive predicates."""
+        """Reject cycles using only relationship assertions in the same tenant."""
         rows = connection.execute(
             """
             SELECT * FROM research_records
@@ -429,17 +430,13 @@ class RecordStore:
         ).fetchall()
         adjacency: dict[UUID, list[UUID]] = {}
         for row in rows:
-            envelope = RecordStore._row_to_envelope(row)
+            envelope = self._row_to_envelope(row)
             payload = envelope.payload
-            if (
-                payload.get("predicate") != record.predicate
-                or payload.get("assertion_status") == "rejected"
-            ):
+            if payload.get("predicate") != record.predicate or payload.get("assertion_status") == "rejected":
                 continue
             source = UUID(str(payload["source_concept_id"]))
             target = UUID(str(payload["target_concept_id"]))
             adjacency.setdefault(source, []).append(target)
-
         pending = [record.target_concept_id]
         visited: set[UUID] = set()
         while pending:
