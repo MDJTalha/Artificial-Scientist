@@ -1278,5 +1278,3 @@ def test_production_lab_execution_fails_closed_without_reviewed_sandbox(
 
     with pytest.raises(ExecutionAdapterUnavailable, match="No reviewed"):
         run_lab(request)
-
-        get_lab_store.cache_clear()
