@@ -96,6 +96,11 @@ def _sha256_text(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
+def _source_identity_lookup_key(record: SourceRecord, tenant_id: str | None) -> str:
+    identity = source_identity_key(record)
+    return identity if tenant_id is None else f"tenant:{tenant_id}:{identity}"
+
+
 class RecordStore:
     """Append-only SQLite store. Record and audit-event writes are transactional."""
 
@@ -368,16 +373,24 @@ class RecordStore:
         return references
 
     def _validate_relationships(
-        self, connection: sqlite3.Connection, record: RecordBase
+        self,
+        connection: sqlite3.Connection,
+        record: RecordBase,
+        *,
+        tenant_id: str | None = None,
     ) -> None:
         for reference_id, allowed_types, field_name in self._references(record):
             row = connection.execute(
-                "SELECT record_type FROM research_records WHERE id = ?",
+                "SELECT record_type, tenant_id FROM research_records WHERE id = ?",
                 (str(reference_id),),
             ).fetchone()
             if row is None:
                 raise InvalidRelationship(
                     f"{field_name} references record {reference_id}, which does not exist."
+                )
+            if tenant_id is not None and row["tenant_id"] != tenant_id:
+                raise InvalidRelationship(
+                    f"{field_name} references a record that is not available in this tenant."
                 )
             actual_type = str(row["record_type"])
             if actual_type not in allowed_types:
