@@ -247,8 +247,8 @@ class RecordStore:
                         "during migration."
                     ) from exc
                 connection.execute(
-                    "INSERT OR IGNORE INTO source_identity(identity_key, record_id) VALUES (?, ?)",
-                    (source_identity_key(source_record), str(source_record.id)),
+                    "INSERT OR IGNORE INTO source_identity(identity_key, tenant_id, record_id) VALUES (?, ?, ?)",
+                    (source_identity_key(source_record), source_row["tenant_id"], str(source_record.id)),
                 )
             connection.execute(
                 """
