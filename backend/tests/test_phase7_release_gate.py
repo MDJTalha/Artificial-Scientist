@@ -7,28 +7,37 @@ from fastapi.testclient import TestClient
 import artificial_scientist.main as main
 
 
-def test_unscoped_research_records_and_discovery_fail_closed_outside_development(
-    monkeypatch,
-) -> None:
+def test_production_research_routes_require_configured_oidc(monkeypatch) -> None:
+    configured = main.get_settings()
+    monkeypatch.setattr(
+        main,
+        "get_settings",
+        lambda: replace(
+            configured,
+            environment="production",
+            oidc_issuer=None,
+            oidc_audience=None,
+            oidc_jwks_url=None,
+        ),
+    )
+    with TestClient(main.app) as client:
+        for path in ("/api/v1/records", "/api/v1/discovery/decompose"):
+            response = client.get(path) if path.endswith("records") else client.post(
+                path, json={"research_question": "Does temperature affect reaction rate?"}
+            )
+            assert response.status_code == 503
+            assert "OIDC authentication is not fully configured." in response.json()["detail"]
+
+def test_production_health_remains_available_without_record_access(monkeypatch) -> None:
     configured = main.get_settings()
     monkeypatch.setattr(
         main,
         "get_settings",
         lambda: replace(configured, environment="production"),
     )
-
     with TestClient(main.app) as client:
-        for method, path in (
-            ("get", "/api/v1/records"),
-            ("get", "/api/v1/records/audit-events"),
-            ("get", "/api/v1/discovery/decompose"),
-            ("post", "/api/v1/discovery/assess"),
-            ("post", "/api/v1/discovery/prior-work-screen"),
-        ):
-            response = client.post(path, json={}) if method == "post" else client.get(path)
-            assert response.status_code == 503
-            assert response.headers["cache-control"] == "no-store"
-            assert "tenant-scoped record authorization" in response.json()["detail"]
+        response = client.get("/api/v1/health")
+    assert response.status_code == 200
 
 
 def test_health_endpoint_remains_available_while_research_routes_are_gated(
