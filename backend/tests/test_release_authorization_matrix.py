@@ -9,7 +9,6 @@ from __future__ import annotations
 from dataclasses import replace
 
 import pytest
-from fastapi import Depends
 from fastapi.testclient import TestClient
 
 import artificial_scientist.api.routes.autonomy as autonomy_routes
@@ -68,14 +67,14 @@ def test_record_authorization_denies_cross_tenant_selector_before_handler(
     )
     monkeypatch.setattr(records_routes, "get_settings", lambda: production)
 
-    def deny(*args, **kwargs):
+    def deny(*_args, **_kwargs):
         raise AuthorizationDenied("denied")
 
     monkeypatch.setattr(records_routes.TenantDirectory, "authorize", deny)
     monkeypatch.setattr(
         records_routes,
         "validate_oidc_bearer_token",
-        lambda *args, **kwargs: type(
+        lambda *_args, **_kwargs: type(
             "Principal", (), {"issuer": "https://issuer.example/", "subject": "user-a"}
         )(),
     )
