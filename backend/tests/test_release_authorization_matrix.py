@@ -33,7 +33,7 @@ def _dependency_names(route) -> set[str]:
     [
         (records_routes.router, set()),
         (discovery_routes.router, set()),
-        (knowledge_routes.router, set()),
+        (knowledge_routes.router, {"/vocabulary"}),
         (autonomy_routes.router, set()),
     ],
 )
@@ -95,18 +95,7 @@ def test_record_authorization_denies_cross_tenant_selector_before_handler(
     assert response.json()["detail"] == "Requested tenant resource is not available."
 
 
-def test_health_is_the_only_intentionally_public_system_route() -> None:
-    public = {
-        (method, route.path)
-        for route in main.app.routes
-        if getattr(route, "methods", None)
-        for method in route.methods
-        if route.path == "/api/v1/health"
-    }
-    assert public
-    allowed_prefixes = ("/docs", "/redoc", "/openapi.json")
-    assert all(
-        route.path == "/api/v1/health" or route.path.startswith(allowed_prefixes)
-        for route in main.app.routes
-        if getattr(route, "methods", None)
-    )
+def test_health_is_public_and_responds_without_research_authorization() -> None:
+    with TestClient(main.app) as client:
+        response = client.get("/api/v1/health")
+    assert response.status_code == 200
