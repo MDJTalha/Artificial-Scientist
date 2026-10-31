@@ -1,5 +1,6 @@
 """Phase 7 tenant-isolation regression tests."""
 
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from uuid import uuid4
 
@@ -171,3 +172,35 @@ def test_api_record_reads_and_discovery_evidence_cannot_cross_tenants(
             assert "does not exist" in discovery.json()["detail"]
     finally:
         app.dependency_overrides.pop(get_record_store, None)
+
+
+def test_concurrent_tenant_writes_remain_isolated(tmp_path: Path) -> None:
+    store = RecordStore(tmp_path / "concurrent-records.sqlite3")
+
+    def write(tenant_id: str, index: int) -> None:
+        store.create(
+            ResearchTaskRecord(
+                title=f"{tenant_id}-{index}",
+                research_question=f"Question {tenant_id}-{index}",
+                objective="Concurrent isolation regression.",
+            ),
+            tenant_id=tenant_id,
+        )
+
+    work = [
+        (tenant, index)
+        for tenant in ("tenant-a", "tenant-b")
+        for index in range(8)
+    ]
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        list(executor.map(lambda item: write(*item), work))
+
+    items_a, total_a = store.list_records(tenant_id="tenant-a")
+    items_b, total_b = store.list_records(tenant_id="tenant-b")
+    assert total_a == total_b == 8
+    assert {item.payload["title"] for item in items_a} == {
+        f"tenant-a-{index}" for index in range(8)
+    }
+    assert {item.payload["title"] for item in items_b} == {
+        f"tenant-b-{index}" for index in range(8)
+    }
