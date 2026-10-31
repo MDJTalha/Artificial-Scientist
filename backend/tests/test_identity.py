@@ -45,6 +45,8 @@ def test_oidc_validator_checks_signature_issuer_audience_and_required_claims(mon
     assert principal.audience == "scientific-api"
     assert captured["url"] == "https://identity.example.test/.well-known/jwks.json"
     assert captured["client_kwargs"]["timeout"] == 5
+    assert captured["client_kwargs"]["cache_jwk_set"] is True
+    assert captured["client_kwargs"]["lifespan"] == 300
     assert captured["decode"]["algorithms"] == ["RS256"]
     assert captured["decode"]["issuer"] == "https://identity.example.test/"
     assert captured["decode"]["audience"] == "scientific-api"
@@ -211,5 +213,25 @@ def test_oidc_validator_rejects_blank_trust_values(issuer, audience):
             "token",
             issuer=issuer,
             audience=audience,
+            jwks_url="https://identity.example.test/jwks.json",
+        )
+
+
+@pytest.mark.parametrize(
+    "issuer",
+    [
+        "http://identity.example.test/",
+        "https://",
+        "https://user:password@identity.example.test/",
+        "https://identity.example.test/#fragment",
+        "https://identity.example.test /",
+    ],
+)
+def test_oidc_validator_rejects_unsafe_issuer(issuer):
+    with pytest.raises(identity.IdentityConfigurationError, match="OIDC"):
+        identity.validate_oidc_bearer_token(
+            "token",
+            issuer=issuer,
+            audience="scientific-api",
             jwks_url="https://identity.example.test/jwks.json",
         )
