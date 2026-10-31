@@ -8,9 +8,9 @@ This register separates repository-verifiable implementation evidence from deplo
 |---|---|---|
 | Phase 6 implementation | Implemented | Completion matrix and regression suite |
 | Production execution fallback | Blocked | `execution_adapter.py` fails closed unless development local-process mode is explicitly selected |
-| Frontend CI | Passing on latest tested Phase 6 PR commit before this document update | GitHub Actions exact-SHA check |
-| Python 3.12 CI | Running on the current documentation commit | GitHub Actions exact-SHA check |
-| Python 3.13 CI | Running on the current documentation commit | GitHub Actions exact-SHA check |
+| Frontend CI | Must pass on the exact release candidate SHA | GitHub Actions exact-SHA check |
+| Python 3.12 CI | Must pass on the exact release candidate SHA | GitHub Actions exact-SHA check |
+| Python 3.13 CI | Must pass on the exact release candidate SHA | GitHub Actions exact-SHA check |
 
 ## Deployment evidence required before production release
 
