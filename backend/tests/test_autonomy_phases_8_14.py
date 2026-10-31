@@ -144,3 +144,34 @@ def test_domain_registry_rejects_normalized_duplicates_and_unbounded_values():
         domains.register(
             DomainSpec("x", "low", ("solver",), ("case",), expert_required="yes")
         )
+
+
+def test_critical_domain_always_requires_expert_approval():
+    domains = DomainRegistry()
+    domains.register(
+        DomainSpec(
+            "Critical Research",
+            "CRITICAL",
+            ("solver",),
+            ("independent replication",),
+            expert_required=False,
+        )
+    )
+    assert not domains.authorize(
+        "Critical Research",
+        validation_passed=True,
+        expert_approved=False,
+    )
+    assert domains.authorize(
+        "Critical Research",
+        validation_passed=True,
+        expert_approved=True,
+    )
+
+
+def test_domain_registration_is_case_insensitive_for_names():
+    domains = DomainRegistry()
+    domains.register(DomainSpec("Astrophysics", "low", ("solver",), ("case",)))
+    assert domains.get(" astrophysics ").name == "Astrophysics"
+    with pytest.raises(ValueError, match="already registered"):
+        domains.register(DomainSpec(" astrophysics ", "low", ("solver",), ("case-2",)))

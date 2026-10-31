@@ -39,7 +39,7 @@ class DomainRegistry:
         name = spec.name.strip()
         if not name or len(name) > _MAX_NAME:
             raise ValueError("domain name must be bounded and non-empty")
-        risk_class = spec.risk_class.strip() if isinstance(spec.risk_class, str) else ""
+        risk_class = spec.risk_class.strip().casefold() if isinstance(spec.risk_class, str) else ""
         if risk_class not in _ALLOWED_RISK_CLASSES:
             raise ValueError("unknown domain risk class")
         tools = self._validate_items(spec.tools, label="tools", maximum=_MAX_TOOL)
@@ -48,7 +48,7 @@ class DomainRegistry:
         )
         if not isinstance(spec.expert_required, bool):
             raise ValueError("expert_required must be a boolean")
-        if name in self._domains:
+        if any(existing.casefold() == name.casefold() for existing in self._domains):
             raise ValueError("domain already registered")
         normalized = DomainSpec(
             name=name,
@@ -57,10 +57,10 @@ class DomainRegistry:
             validation_cases=validation_cases,
             expert_required=spec.expert_required,
         )
-        self._domains[name] = normalized
+        self._domains[name.casefold()] = normalized
 
     def get(self, name: str) -> DomainSpec:
-        return self._domains[name]
+        return self._domains[name.strip().casefold()]
 
     def authorize(
         self,
@@ -75,7 +75,7 @@ class DomainRegistry:
             return False
         if not validation_passed:
             return False
-        if spec.expert_required and not expert_approved:
+        if (spec.expert_required or spec.risk_class == "critical") and not expert_approved:
             return False
         return True
 

@@ -43,3 +43,8 @@ The repository tests cover missing validation, missing expert approval, physical
 ## Integration boundary
 
 Phases 8-14 now have bounded backend primitives, persistent workflow/memory state, a protected workflow API, and regression coverage. They do not independently replace the Phase 6 OS-level sandbox, real OIDC/JWKS verification, production migration/backup rehearsal, or independent security/scientific review. Those are release gates, not claims that can be satisfied by code alone.
+
+
+## Phase 14 final authorization hardening
+
+Critical-risk domains now require qualified expert approval regardless of the registration flag. Domain names are compared case-insensitively to prevent duplicate governance entries, risk classes are normalized, and malformed/duplicated tool and validation definitions remain rejected before registration. Physical actions remain unconditionally denied by this software boundary.

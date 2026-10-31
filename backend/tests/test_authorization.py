@@ -155,7 +155,8 @@ def test_audit_accepts_bounded_operational_metadata(tmp_path):
                 "run:create", "run:list", "run:read", "run:verify", "run:export",
                 "artifact:read", "artifact:upload", "membership:manage",
                 "record:create", "record:read", "record:list", "record:search",
-                "record:audit:read", "discovery:decompose", "discovery:prior-work-screen",
+                "record:audit:read", "discovery:decompose", "discovery:generate",
+                "discovery:prior-work-screen",
                 "discovery:assess", "autonomy:workflow:create",
                 "autonomy:workflow:read", "autonomy:workflow:write", "autonomy:workflow:approve",
             },
@@ -166,7 +167,8 @@ def test_audit_accepts_bounded_operational_metadata(tmp_path):
                 "run:create", "run:list", "run:read", "run:verify", "run:export",
                 "artifact:read", "artifact:upload",
                 "record:create", "record:read", "record:list", "record:search",
-                "discovery:decompose", "discovery:prior-work-screen", "discovery:assess",
+                "discovery:decompose", "discovery:generate", "discovery:prior-work-screen",
+                "discovery:assess",
                 "autonomy:workflow:create", "autonomy:workflow:read",
                 "autonomy:workflow:write", "autonomy:workflow:approve",
             },
@@ -196,6 +198,13 @@ def test_role_action_matrix_is_explicit(role, allowed_actions):
         for action in _ALLOWED_ACTIONS
     )
     assert not role_allows(role, "unknown:action")
+
+
+def test_hypothesis_generation_is_not_granted_to_viewers_or_auditors():
+    assert role_allows("tenant_admin", "discovery:generate")
+    assert role_allows("researcher", "discovery:generate")
+    assert not role_allows("viewer", "discovery:generate")
+    assert not role_allows("auditor", "discovery:generate")
 
 def test_tenant_scoped_run_store_hides_foreign_and_legacy_records(tmp_path):
     store = LabRunStore(str(tmp_path / "tenant-scoped-runs.sqlite3"))

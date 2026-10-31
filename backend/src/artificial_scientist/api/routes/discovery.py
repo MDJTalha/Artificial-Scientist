@@ -10,6 +10,8 @@ from artificial_scientist.discovery import (
     DiscoveryAssessmentRequest,
     DiscoveryAssessmentResponse,
     HypothesisCandidate,
+    HypothesisGenerationRequest,
+    HypothesisGenerationResponse,
     PriorWorkCandidateResult,
     PriorWorkMatch,
     PriorWorkScreenRequest,
@@ -18,6 +20,7 @@ from artificial_scientist.discovery import (
     ResearchQuestionDecompositionResponse,
     assess_candidates,
     decompose_research_question,
+    generate_hypotheses,
 )
 from artificial_scientist.literature.models import LiteratureSearchRequest
 from artificial_scientist.literature.service import LiteratureService
@@ -162,6 +165,19 @@ def screen_prior_work(
             "strategy remain required.",
         ],
     )
+
+
+@router.post(
+    "/generate",
+    response_model=HypothesisGenerationResponse,
+    summary="Generate bounded competing hypothesis suggestions",
+)
+def generate_hypothesis_candidates(
+    request: HypothesisGenerationRequest,
+    tenant_id: Annotated[str | None, Depends(record_access("discovery:generate"))],
+) -> HypothesisGenerationResponse:
+    """Generate deterministic suggestions that always require human review."""
+    return generate_hypotheses(request)
 
 
 @router.post(
