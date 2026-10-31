@@ -79,11 +79,19 @@ def test_same_source_identity_is_allowed_across_tenants(tmp_path: Path) -> None:
 def test_audit_events_are_tenant_scoped(tmp_path: Path) -> None:
     store = RecordStore(tmp_path / "records.sqlite3")
     store.create(
-        ResearchTaskRecord(title="Tenant A audit", research_question="Question A for audit", objective="Audit objective A"),
+        ResearchTaskRecord(
+            title="Tenant A audit",
+            research_question="Question A for audit",
+            objective="Audit objective A",
+        ),
         tenant_id="tenant-a",
     )
     store.create(
-        ResearchTaskRecord(title="Tenant B audit", research_question="Question B for audit", objective="Audit objective B"),
+        ResearchTaskRecord(
+            title="Tenant B audit",
+            research_question="Question B for audit",
+            objective="Audit objective B",
+        ),
         tenant_id="tenant-b",
     )
     events_a, total_a = store.list_audit_events(tenant_id="tenant-a")
