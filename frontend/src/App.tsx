@@ -175,7 +175,14 @@ export default function App() {
             <p className="metric-value">{integratedCount}<span> / {phases.length}</span></p>
             <h2>Capability layers integrated</h2>
             <p className="card-description">{gatedCount} phases remain explicitly gated by acceptance evidence rather than being represented as production-complete.</p>
-            <div className="milestone-track" aria-label={integratedCount + ' of ' + phases.length + ' phases integrated'}>
+            <div
+              className="milestone-track"
+              role="progressbar"
+              aria-label="Integrated capability phases"
+              aria-valuemin={0}
+              aria-valuemax={phases.length}
+              aria-valuenow={integratedCount}
+            >
               <span style={{ width: ((integratedCount / phases.length) * 100).toFixed(1) + '%' }} />
             </div>
             <p className="metric-footnote">Capability-led roadmap · no fixed delivery dates</p>
