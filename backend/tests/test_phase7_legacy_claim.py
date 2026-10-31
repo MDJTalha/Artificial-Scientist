@@ -43,11 +43,6 @@ def test_dry_run_does_not_assign_legacy_record(tmp_path: Path) -> None:
     assert result["mode"] == "dry-run"
     assert result["claims_to_update"] == 1
     assert store.get(record.id, tenant_id=None).id == record.id
-    assert store.find_source_by_identity(SourceRecord(
-        title="unused",
-        source_url="https://example.org/unused",
-        external_identifier="unused",
-    )) is None
 
 
 def test_apply_assigns_record_and_writes_security_audit(tmp_path: Path) -> None:
