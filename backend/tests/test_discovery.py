@@ -11,7 +11,6 @@ from artificial_scientist.api.routes.literature import get_literature_service
 from artificial_scientist.api.routes.records import get_record_store
 from artificial_scientist.discovery import (
     DiscoveryAssessmentRequest,
-    HypothesisGenerationRequest,
     ResearchQuestionDecompositionRequest,
     assess_candidates,
     decompose_research_question,
