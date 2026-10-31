@@ -458,15 +458,17 @@ class RecordStore:
         concept_status: str | None = None,
         limit: int = 20,
         offset: int = 0,
+        tenant_id: str | None = None,
     ) -> tuple[list[RecordEnvelope], int]:
         """Search concept labels, definitions, and aliases with server-side pagination."""
+
         if not 1 <= limit <= 100:
             raise ValueError("limit must be between 1 and 100")
         if offset < 0:
             raise ValueError("offset must be non-negative")
 
-        conditions = ["record_type = 'knowledge_concept'"]
-        parameters: list[object] = []
+        conditions = ["record_type = 'knowledge_concept'", "tenant_id IS ?"]
+        parameters: list[object] = [tenant_id]
         if query and query.strip():
             pattern = f"%{' '.join(query.split()).casefold()}%"
             conditions.append(
@@ -518,8 +520,10 @@ class RecordStore:
         predicate: str | None = None,
         limit: int = 100,
         offset: int = 0,
+        tenant_id: str | None = None,
     ) -> tuple[list[RecordEnvelope], int]:
         """List graph assertions incident to a concept, with direction preserved."""
+
         if direction not in {"incoming", "outgoing", "both"}:
             raise ValueError("direction must be incoming, outgoing, or both")
         if not 1 <= limit <= 100:
@@ -535,8 +539,8 @@ class RecordStore:
             incident_clause = target_clause
         else:
             incident_clause = f"({source_clause} OR {target_clause})"
-        conditions = ["record_type = 'knowledge_relationship'", incident_clause]
-        parameters: list[object] = [str(concept_id)]
+        conditions = ["record_type = 'knowledge_relationship'", incident_clause, "tenant_id IS ?"]
+        parameters: list[object] = [str(concept_id), tenant_id]
         if direction == "both":
             parameters.append(str(concept_id))
         if predicate:
