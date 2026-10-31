@@ -172,5 +172,6 @@ def test_critical_domain_always_requires_expert_approval():
 def test_domain_registration_is_case_insensitive_for_names():
     domains = DomainRegistry()
     domains.register(DomainSpec("Astrophysics", "low", ("solver",), ("case",)))
+    assert domains.get(" astrophysics ").name == "Astrophysics"
     with pytest.raises(ValueError, match="already registered"):
         domains.register(DomainSpec(" astrophysics ", "low", ("solver",), ("case-2",)))
