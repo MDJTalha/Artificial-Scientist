@@ -10,7 +10,10 @@ from uuid import UUID, uuid4
 
 from pydantic import ValidationError
 
-from artificial_scientist.lab.execution import run_isolated
+from artificial_scientist.lab.execution_adapter import (
+    LabExecutionAdapter,
+    get_execution_adapter,
+)
 from artificial_scientist.lab.integrity import result_digest
 from artificial_scientist.lab.manifest import capture_environment_manifest
 from artificial_scientist.lab.models import LabRunRequest, LabRunResponse, LabStepResult
@@ -57,13 +60,25 @@ def _execute_step_direct(operation: str, inputs: dict[str, object]) -> dict[str,
 
 
 def _execute_step(
-    operation: str, inputs: dict[str, object], timeout_seconds: float
+    operation: str,
+    inputs: dict[str, object],
+    timeout_seconds: float,
+    adapter: LabExecutionAdapter,
 ) -> dict[str, object]:
-    """Run one allowlisted math operation in a killable child process."""
-    return run_isolated(_execute_step_direct, (operation, inputs), timeout_seconds)
+    """Run one allowlisted operation through the selected execution boundary."""
+    return adapter.execute(
+        _execute_step_direct,
+        (operation, inputs),
+        timeout_seconds=timeout_seconds,
+    )
 
 
-def run_lab(request: LabRunRequest, *, run_id: UUID | None = None) -> LabRunResponse:
+def run_lab(
+    request: LabRunRequest,
+    *,
+    run_id: UUID | None = None,
+    execution_adapter: LabExecutionAdapter | None = None,
+) -> LabRunResponse:
     """Run a bounded sequence; a failed step stops all later steps."""
     started = datetime.now(UTC)
     start_clock = time.perf_counter()
@@ -72,7 +87,10 @@ def run_lab(request: LabRunRequest, *, run_id: UUID | None = None) -> LabRunResp
         _canonical_json(configuration).encode("utf-8")
     ).hexdigest()
     run_id = run_id or uuid4()
-    logs = [f"run={run_id} accepted_steps={len(request.steps)}"]
+    adapter = execution_adapter or get_execution_adapter()
+    logs = [
+        f"run={run_id} accepted_steps={len(request.steps)} execution_adapter={adapter.name}"
+    ]
     results: list[LabStepResult] = []
     failed = False
 
@@ -90,7 +108,9 @@ def run_lab(request: LabRunRequest, *, run_id: UUID | None = None) -> LabRunResp
             )
             continue
         try:
-            output = _execute_step(step.operation, step.inputs, request.step_timeout_seconds)
+            output = _execute_step(
+                step.operation, step.inputs, request.step_timeout_seconds, adapter
+            )
             results.append(
                 LabStepResult(
                     step_id=step.step_id,
