@@ -250,7 +250,9 @@ class RecordStore:
                     "INSERT OR IGNORE INTO source_identity("
                     "identity_key, tenant_id, record_id) VALUES (?, ?, ?)",
                     (
-                        source_identity_key(source_record),
+                        _source_identity_lookup_key(
+                            source_record, source_row["tenant_id"]
+                        ),
                         source_row["tenant_id"],
                         str(source_record.id),
                     ),
