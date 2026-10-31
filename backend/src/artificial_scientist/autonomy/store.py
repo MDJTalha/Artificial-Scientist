@@ -266,13 +266,14 @@ class AutonomyStore:
         tenant_id: str,
     ) -> int:
         tenant = self._require_tenant(tenant_id)
+        storage_key = f"{tenant}:{key}"
         now = datetime.now(UTC).isoformat()
         with closing(self._connect()) as connection:
             connection.execute("BEGIN IMMEDIATE")
             row = connection.execute(
                 "SELECT COALESCE(MAX(version), 0) FROM autonomy_memory "
                 "WHERE key_name=? AND tenant_id=?",
-                (key, tenant),
+                (storage_key, tenant),
             ).fetchone()
             version = int(row[0]) + 1
             connection.execute(
@@ -281,7 +282,7 @@ class AutonomyStore:
                 "supersedes_version,tenant_id,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)",
                 (
                     str(uuid4()),
-                    key,
+                    storage_key,
                     version,
                     status,
                     json.dumps(value, sort_keys=True),
@@ -303,14 +304,16 @@ class AutonomyStore:
                 "WHERE tenant_id=? ORDER BY key_name",
                 (tenant,),
             ).fetchall()
-        return [str(row[0]) for row in rows]
+        prefix = f"{tenant}:"
+        return [str(row[0])[len(prefix):] for row in rows if str(row[0]).startswith(prefix)]
 
     def memory_history(self, key: str, *, tenant_id: str) -> list[dict]:
         tenant = self._require_tenant(tenant_id)
+        storage_key = f"{tenant}:{key}"
         with closing(self._connect()) as connection:
             rows = connection.execute(
                 "SELECT * FROM autonomy_memory "
                 "WHERE key_name=? AND tenant_id=? ORDER BY version",
-                (key, tenant),
+                (storage_key, tenant),
             ).fetchall()
         return [dict(row) for row in rows]
