@@ -9,9 +9,9 @@ from artificial_scientist.api.routes.records import get_record_store, record_acc
 from artificial_scientist.discovery import (
     DiscoveryAssessmentRequest,
     DiscoveryAssessmentResponse,
+    HypothesisCandidate,
     HypothesisGenerationRequest,
     HypothesisGenerationResponse,
-    HypothesisCandidate,
     PriorWorkCandidateResult,
     PriorWorkMatch,
     PriorWorkScreenRequest,
