@@ -22,12 +22,11 @@ To fail safely, `Phase7RecordIsolationGateMiddleware` returns HTTP 503 with `Cac
 
 **Do not mark Phase 7 production-ready until all of the following are completed and independently reviewed:**
 
-1. Add immutable tenant ownership to research records and audit events with a migration plan for existing records.
-2. Scope create, get, list, search, graph traversal, evidence-reference validation, duplicate checks, and audit queries by the authorized tenant.
-3. Verify that cross-tenant record IDs and relationship references cannot disclose record existence or content.
-4. Authenticate discovery and record endpoints using the configured OIDC trust, require active membership, and apply a least-privilege action matrix.
-5. Add adversarial cross-tenant tests for every endpoint and every relationship type, including concurrent requests and migration/backfill behavior.
-6. Complete production OIDC/JWKS verification, backup/restore rehearsal, sandbox review, and operational controls.
+1. Complete an explicit migration/assignment procedure for legacy NULL-tenant records without guessing ownership.
+2. Complete cross-tenant adversarial API tests for every record/discovery/knowledge endpoint and relationship type, including concurrency.
+3. Complete production OIDC/JWKS provider and key-rotation evidence.
+4. Complete backup/restore and migration rehearsal, sandbox review, and operational controls.
+5. Obtain independent security review and release sign-off.
 
 ## Scientific-integrity boundaries
 
