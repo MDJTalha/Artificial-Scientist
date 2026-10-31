@@ -8,6 +8,8 @@ from artificial_scientist.api.routes.literature import get_literature_service
 from artificial_scientist.api.routes.records import get_record_store, record_access
 from artificial_scientist.discovery import (
     DiscoveryAssessmentRequest,
+    HypothesisGenerationRequest,
+    HypothesisGenerationResponse,
     DiscoveryAssessmentResponse,
     HypothesisCandidate,
     PriorWorkCandidateResult,
@@ -18,6 +20,7 @@ from artificial_scientist.discovery import (
     ResearchQuestionDecompositionResponse,
     assess_candidates,
     decompose_research_question,
+    generate_hypotheses,
 )
 from artificial_scientist.literature.models import LiteratureSearchRequest
 from artificial_scientist.literature.service import LiteratureService
