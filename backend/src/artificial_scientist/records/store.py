@@ -227,7 +227,7 @@ class RecordStore:
             # record history and map duplicate identities to the first record.
             source_rows = connection.execute(
                 """
-                SELECT id, content_sha256, payload_json
+                SELECT id, tenant_id, content_sha256, payload_json
                 FROM research_records
                 WHERE record_type = 'source'
                 ORDER BY created_at ASC, id ASC
@@ -247,8 +247,8 @@ class RecordStore:
                         "during migration."
                     ) from exc
                 connection.execute(
-                    "INSERT OR IGNORE INTO source_identity(identity_key, record_id) VALUES (?, ?)",
-                    (source_identity_key(source_record), str(source_record.id)),
+                    "INSERT OR IGNORE INTO source_identity(identity_key, tenant_id, record_id) VALUES (?, ?, ?)",
+                    (source_identity_key(source_record), source_row["tenant_id"], str(source_record.id)),
                 )
             connection.execute(
                 """
