@@ -2,7 +2,7 @@
 
 **Snapshot:** 2026-10-31  
 **Repository:** `MDJTalha/Artificial-Scientist`  
-**Verified baseline:** `main` CI run 1080 succeeded at `0a3a0f056614f75f345cba8e4569b7dbc1231dba`; the current head should be read from Git rather than hard-coded here.
+**Verified baseline:** `main` commit `b28b6bdaffa4851a2dec390460706e100302d138` is the merged Phase 0/6/7/14 hardening baseline; post-merge CI run 1114 succeeded.
 
 This document is the current repository evidence snapshot. Older phase documents may contain historical branch names or earlier implementation descriptions; this snapshot takes precedence for the present integration state.
 
@@ -18,7 +18,7 @@ The current `main` head contains:
 
 ### Latest main CI
 
-GitHub Actions run **41210545687** (run number **1080**) for commit `0a3a0f056614f75f345cba8e4569b7dbc1231dba` completed with **success**. The subsequent conference-grade frontend integration was merged as `ee9077dfb0d0001ad814ff4fe7e8c6b83bccdaa0`; its post-merge CI is tracked by GitHub Actions rather than copied into this static snapshot.
+GitHub Actions run **41212896349** (run number **1114**) for commit `b28b6bdaffa4851a2dec390460706e100302d138` completed with **success**. It verifies Python 3.12, Python 3.13, frontend type-check/tests/build on the merged Phase 0/6/7/14 hardening baseline.
 
 The repository CI workflow covers:
 - Python 3.12 backend checks/tests;
@@ -31,21 +31,21 @@ A successful CI result is repository evidence only. It is not evidence of produc
 
 | Phase | Repository status | Release interpretation |
 |---|---|---|
-| 0 | Foundation substantially documented | Risk/evaluation baseline still requires formal completion |
+| 0 | Repository baseline complete | External review/evaluation evidence remains environment-dependent |
 | 1 | Integrated | Repository implementation complete; operational setup remains environment-dependent |
 | 2 | Integrated | Provenance implementation exists; long-term backup/data-governance evidence remains operational |
 | 3 | Integrated | Retrieval implementation exists; provider availability/licensing remain deployment concerns |
 | 4 | Integrated | Knowledge graph implementation exists; scientific-definition conflicts require evidence review |
 | 5 | Integrated | Bounded scientific tools are implemented; tool correctness remains benchmark/evaluation dependent |
-| 6 | Advanced, **not release-complete** | Real OS-level sandbox, live IdP verification, migration rehearsal, operations validation and independent review remain open |
-| 7 | Implemented, **acceptance-gated** | Tenant isolation and discovery structure exist; novelty/truth/expert validation are not claimed |
+| 6 | Hardened, **not release-complete** | Real OS-level sandbox, live IdP verification, migration rehearsal, operations validation and independent review remain open |
+| 7 | Implemented, **acceptance-gated** | Tenant isolation, legacy ownership migration and discovery structure are integrated; scientific novelty/truth/expert validation remain evidence-gated |
 | 8 | Implemented | Bounded workflow, approval, persistence and recovery are integrated |
 | 9 | Implemented | Independent verification primitives are integrated; broader benchmark evidence remains required |
 | 10 | Implemented | Versioned tenant-scoped memory and contradiction/rollback semantics are integrated |
 | 11 | Implemented | Bounded roles, budgets and conflict resolution are integrated |
 | 12 | Implemented | Evidence-linked writing and explicit submission authorization are integrated |
 | 13 | Implemented | Governance and benchmark decision primitives are integrated; external review remains required |
-| 14 | Implemented with hard physical-action boundary | Domain expansion remains evidence- and expert-gated |
+| 14 | Hardened implementation with hard physical-action boundary | Domain expansion remains evidence- and expert-gated; registry controls and adversarial definition tests are integrated |
 
 ## Phase 6 security boundary
 
