@@ -48,7 +48,7 @@ class DomainRegistry:
         )
         if not isinstance(spec.expert_required, bool):
             raise ValueError("expert_required must be a boolean")
-        if name in self._domains:
+        if any(existing.casefold() == name.casefold() for existing in self._domains):
             raise ValueError("domain already registered")
         normalized = DomainSpec(
             name=name,
@@ -75,7 +75,7 @@ class DomainRegistry:
             return False
         if not validation_passed:
             return False
-        if spec.expert_required and not expert_approved:
+        if (spec.expert_required or spec.risk_class == "critical") and not expert_approved:
             return False
         return True
 
