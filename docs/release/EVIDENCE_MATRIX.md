@@ -21,7 +21,7 @@ This register separates **repository verification evidence** from **external rel
 ## Final repository verification record
 
 - Branch: `phase-release-verification-hardening`
-- Tested code commit: `20681adc2520464a6735628bd0ddf78a3cfa9f61`
+- Tested code commit: `8c4eec72ba0e710c606b50956af0de4288015148`
 - GitHub Actions workflow: **Continuous Integration**, run **1231** / ID **41224168508**
 - Backend: Python 3.12 and 3.13 full test suites + Ruff passed.
 - Frontend: TypeScript type-check, unit tests, production build, Playwright/axe accessibility and conference-workspace E2E passed.
