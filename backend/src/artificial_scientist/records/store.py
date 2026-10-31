@@ -605,7 +605,7 @@ class RecordStore:
                 )
                 if isinstance(record, SourceRecord):
                     connection.execute(
-                        """\n                        INSERT INTO source_identity(identity_key, tenant_id, record_id)\n                        VALUES (?, ?, ?)\n                        """,
+                        "INSERT INTO source_identity(" +\n                        "identity_key, tenant_id, record_id) VALUES (?, ?, ?)",
                         (lookup_key, tenant_id, record_id),
                     )
                 connection.execute(
@@ -615,7 +615,7 @@ class RecordStore:
                          record_type, content_sha256)
                     VALUES (?, ?, ?, 'record.created', 'local-api-client', ?, ?, ?)
                     """,
-                    (\n                        str(uuid4()),\n                        tenant_id,\n                        created_at,\n                        record_id,\n                        record.record_type,\n                        content_sha256,\n                    ),
+                    (\n                        str(uuid4()), tenant_id, created_at, record_id,\n                        record.record_type, content_sha256,\n                    ),
                 )
                 connection.commit()
         except sqlite3.IntegrityError as exc:
@@ -665,7 +665,7 @@ class RecordStore:
                     )
                     if isinstance(record, SourceRecord):
                         connection.execute(
-                            """\n                            INSERT INTO source_identity(identity_key, tenant_id, record_id)\n                            VALUES (?, ?, ?)\n                            """,
+                            "INSERT INTO source_identity(" +\n                            "identity_key, tenant_id, record_id) VALUES (?, ?, ?)",
                             (lookup_key, tenant_id, record_id),
                         )
                     connection.execute(
@@ -675,7 +675,7 @@ class RecordStore:
                              record_type, content_sha256)
                         VALUES (?, ?, ?, 'record.created', 'local-api-client', ?, ?, ?)
                         """,
-                        (\n                            str(uuid4()),\n                            tenant_id,\n                            created_at,\n                            record_id,\n                            record.record_type,\n                            digest,\n                        ),
+                        (\n                            str(uuid4()), tenant_id, created_at, record_id,\n                            record.record_type, digest,\n                        ),
                     )
                     envelopes.append(
                         RecordEnvelope(
