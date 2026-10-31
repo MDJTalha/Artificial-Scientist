@@ -1,10 +1,14 @@
 """Phase 10: versioned scientific memory with contradictions and rollback."""
 from __future__ import annotations
 
-from dataclasses import dataclass
 import json
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from hashlib import sha256
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from artificial_scientist.autonomy.store import AutonomyStore
 
 
 @dataclass(frozen=True)
@@ -24,11 +28,35 @@ class MemoryError(ValueError):
 
 
 class ResearchMemory:
-    def __init__(self):
+    def __init__(self, store: AutonomyStore | None = None):
+        self.store = store
         self._items: dict[str, list[MemoryVersion]] = {}
+        if store:
+            self._load_persisted()
+
+    def _load_persisted(self) -> None:
+        for key in self.store.memory_keys():
+            for row in self.store.memory_history(key):
+                self._items.setdefault(key, []).append(
+                    MemoryVersion(
+                        key=row["key_name"],
+                        version=int(row["version"]),
+                        value=json.loads(row["value_json"]),
+                        status=row["status"],
+                        evidence=tuple(json.loads(row["evidence_json"])),
+                        created_at=datetime.fromisoformat(row["created_at"]),
+                        digest=row["digest"],
+                        supersedes=row["supersedes_version"],
+                    )
+                )
 
     def put(
-        self, key: str, value: dict, *, evidence: tuple[str, ...], status: str = "active"
+        self,
+        key: str,
+        value: dict,
+        *,
+        evidence: tuple[str, ...],
+        status: str = "active",
     ) -> MemoryVersion:
         if not key or len(key) > 200 or not evidence:
             raise MemoryError("key and evidence are required")
@@ -46,6 +74,12 @@ class ResearchMemory:
             digest=digest,
             supersedes=previous.version if previous else None,
         )
+        if self.store:
+            persisted_version = self.store.memory_put(
+                key, value, status, tuple(evidence), digest, item.supersedes
+            )
+            if persisted_version != item.version:
+                raise MemoryError("persistent memory version diverged")
         versions.append(item)
         return item
 
