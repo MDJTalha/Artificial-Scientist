@@ -4,9 +4,9 @@ from collections import deque
 from typing import Annotated, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 
-from artificial_scientist.api.routes.records import get_record_store
+from artificial_scientist.api.routes.records import get_record_store, record_access
 from artificial_scientist.knowledge.schemas import (
     KnowledgeConceptSearchResponse,
     KnowledgeGraphNeighborhoodResponse,
@@ -58,9 +58,9 @@ def _translate_error(error: RecordStoreError) -> HTTPException:
     )
 
 
-def _get_concept(store: RecordStore, concept_id: UUID) -> RecordEnvelope:
+def _get_concept(store: RecordStore, concept_id: UUID, tenant_id: str | None) -> RecordEnvelope:
     try:
-        envelope = store.get(concept_id)
+        envelope = store.get(concept_id, tenant_id=tenant_id)
     except RecordStoreError as error:
         raise _translate_error(error) from error
     if envelope.record_type != "knowledge_concept":
@@ -88,10 +88,11 @@ def get_vocabulary() -> KnowledgeVocabularyResponse:
 def create_concept(
     record: KnowledgeConceptRecord,
     store: Annotated[RecordStore, Depends(get_record_store)],
+    tenant_id: Annotated[str | None, Depends(record_access("record:create"))],
 ) -> RecordEnvelope:
     """Add an immutable concept without merging it into similarly named concepts."""
     try:
-        return store.create(record)
+        return store.create(record, tenant_id=tenant_id)
     except RecordStoreError as error:
         raise _translate_error(error) from error
 
@@ -105,6 +106,7 @@ def search_concepts(
     concept_status: ConceptStatus | None = Query(default=None),
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
+    tenant_id: Annotated[str | None, Depends(record_access("record:search"))] = None,
 ) -> KnowledgeConceptSearchResponse:
     """Search labels, aliases and definitions with server-side pagination."""
     try:
@@ -114,7 +116,7 @@ def search_concepts(
             concept_type=concept_type,
             concept_status=concept_status,
             limit=limit,
-            offset=offset,
+            offset=offset, tenant_id=tenant_id,
         )
     except RecordStoreError as error:
         raise _translate_error(error) from error
@@ -130,9 +132,10 @@ def search_concepts(
 def get_concept(
     concept_id: UUID,
     store: Annotated[RecordStore, Depends(get_record_store)],
+    tenant_id: Annotated[str | None, Depends(record_access("record:read"))],
 ) -> RecordEnvelope:
     """Fetch a concept and verify its content checksum and schema."""
-    return _get_concept(store, concept_id)
+    return _get_concept(store, concept_id, tenant_id)
 
 
 @router.post(
@@ -146,7 +149,7 @@ def create_relationship(
 ) -> RecordEnvelope:
     """Create a typed, evidence-linkable relationship between two existing concepts."""
     try:
-        return store.create(record)
+        return store.create(record, tenant_id=tenant_id)
     except RecordStoreError as error:
         raise _translate_error(error) from error
 
@@ -164,14 +167,14 @@ def list_concept_relationships(
     offset: int = Query(default=0, ge=0),
 ) -> KnowledgeRelationshipListResponse:
     """Read a concept's incoming/outgoing assertions without inferring inverse edges."""
-    _get_concept(store, concept_id)
+    _get_concept(store, concept_id, tenant_id)
     try:
         items, total = store.list_knowledge_relationships(
             concept_id=concept_id,
             direction=direction,
             predicate=predicate,
             limit=limit,
-            offset=offset,
+            offset=offset, tenant_id=tenant_id,
         )
     except RecordStoreError as error:
         raise _translate_error(error) from error
@@ -189,9 +192,10 @@ def get_graph_neighborhood(
     concept_id: UUID,
     depth: int = Query(default=1, ge=1, le=3),
     limit: int = Query(default=50, ge=1, le=100),
+    tenant_id: Annotated[str | None, Depends(record_access("record:search"))] = None,
 ) -> KnowledgeGraphNeighborhoodResponse:
     """Traverse a bounded neighborhood without executing or interpreting source content."""
-    root = _get_concept(store, concept_id)
+    root = _get_concept(store, concept_id, tenant_id)
     nodes: dict[UUID, RecordEnvelope] = {concept_id: root}
     relationships: dict[UUID, RecordEnvelope] = {}
     frontier: deque[UUID] = deque([concept_id])
@@ -207,7 +211,7 @@ def get_graph_neighborhood(
                 edges, total = store.list_knowledge_relationships(
                     concept_id=current_id,
                     direction="both",
-                    limit=100,
+                    limit=100, tenant_id=tenant_id,
                 )
             except RecordStoreError as error:
                 raise _translate_error(error) from error
@@ -231,7 +235,7 @@ def get_graph_neighborhood(
                     truncated = True
                     continue
                 try:
-                    neighbor = store.get(neighbor_id)
+                    neighbor = store.get(neighbor_id, tenant_id=tenant_id)
                 except RecordNotFound:
                     continue
                 except RecordStoreError as error:
