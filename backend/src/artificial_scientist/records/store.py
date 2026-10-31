@@ -631,75 +631,62 @@ class RecordStore:
             payload=record.model_dump(mode="json"),
         )
 
-    def create_many(self, records: list[RecordBase]) -> list[RecordEnvelope]:
-        """Atomically persist a bounded batch and its audit events in one transaction."""
+    def create_many(
+        self, records: list[RecordBase], *, tenant_id: str | None = None
+    ) -> list[RecordEnvelope]:
+        """Atomically persist a bounded batch and its audit events."""
         if not records:
             raise ValueError("records must not be empty")
         if len(records) > 10:
             raise ValueError("a record batch may contain at most 10 items")
-
-        prepared = [
-            (record, _canonical_payload(record), _utc_iso())
-            for record in records
-        ]
+        prepared = [(record, _canonical_payload(record), _utc_iso()) for record in records]
         envelopes: list[RecordEnvelope] = []
         try:
             with closing(self._connect()) as connection:
                 connection.execute("BEGIN IMMEDIATE")
                 for record, payload_json, created_at in prepared:
                     record_id = str(record.id)
+                    identity_key = None
                     if isinstance(record, SourceRecord):
-                        identity_key = source_identity_key(record)
+                        identity_key = _tenant_identity_key(record, tenant_id)
                         duplicate = connection.execute(
                             "SELECT record_id FROM source_identity WHERE identity_key = ?",
                             (identity_key,),
                         ).fetchone()
                         if duplicate is not None:
                             raise DuplicateSource(UUID(str(duplicate["record_id"])))
-                    self._validate_relationships(connection, record)
+                    self._validate_relationships(connection, record, tenant_id=tenant_id)
+                    digest = _sha256_text(payload_json)
                     connection.execute(
                         """
                         INSERT INTO research_records
-                            (id, record_type, schema_version, created_at, content_sha256,
-                             payload_json)
-                        VALUES (?, ?, ?, ?, ?, ?)
+                            (id, tenant_id, record_type, schema_version, created_at,
+                             content_sha256, payload_json)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
                         """,
-                        (
-                            record_id,
-                            record.record_type,
-                            record.schema_version,
-                            created_at,
-                            _sha256_text(payload_json),
-                            payload_json,
-                        ),
+                        (record_id, tenant_id, record.record_type, record.schema_version,
+                         created_at, digest, payload_json),
                     )
                     if isinstance(record, SourceRecord):
                         connection.execute(
-                            "INSERT INTO source_identity(identity_key, record_id) VALUES (?, ?)",
-                            (source_identity_key(record), record_id),
+                            "INSERT INTO source_identity(identity_key, tenant_id, record_id) VALUES (?, ?, ?)",
+                            (identity_key, tenant_id, record_id),
                         )
                     connection.execute(
                         """
                         INSERT INTO audit_events
-                            (event_id, occurred_at, action, actor, record_id, record_type,
-                             content_sha256)
-                        VALUES (?, ?, 'record.created', 'local-api-client', ?, ?, ?)
+                            (event_id, tenant_id, occurred_at, action, actor, record_id,
+                             record_type, content_sha256)
+                        VALUES (?, ?, ?, 'record.created', 'local-api-client', ?, ?, ?)
                         """,
-                        (
-                            str(uuid4()),
-                            created_at,
-                            record_id,
-                            record.record_type,
-                            _sha256_text(payload_json),
-                        ),
+                        (str(uuid4()), tenant_id, created_at, record_id, record.record_type, digest),
                     )
                     envelopes.append(
                         RecordEnvelope(
-                            id=record.id,
-                            record_type=record.record_type,
+                            id=record.id, record_type=record.record_type,
                             schema_version=record.schema_version,
                             created_at=datetime.fromisoformat(created_at),
-                            content_sha256=_sha256_text(payload_json),
+                            content_sha256=digest,
                             payload=record.model_dump(mode="json"),
                         )
                     )
