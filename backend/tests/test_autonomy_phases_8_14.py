@@ -9,8 +9,8 @@ from artificial_scientist.autonomy.governance import (
 )
 from artificial_scientist.autonomy.memory import ResearchMemory
 from artificial_scientist.autonomy.verification import IndependentVerifier
-from artificial_scientist.autonomy.writing import Citation, ScientificWriter, WritingError
 from artificial_scientist.autonomy.workflow import WorkflowEngine, WorkflowError, WorkflowState
+from artificial_scientist.autonomy.writing import Citation, ScientificWriter, WritingError
 
 
 def test_workflow_requires_approval():
