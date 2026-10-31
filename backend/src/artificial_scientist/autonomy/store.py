@@ -266,7 +266,7 @@ class AutonomyStore:
         tenant_id: str,
     ) -> int:
         tenant = self._require_tenant(tenant_id)
-        storage_key = f"{tenant}:{key}"
+        storage_key = key
         now = datetime.now(UTC).isoformat()
         with closing(self._connect()) as connection:
             connection.execute("BEGIN IMMEDIATE")
@@ -304,12 +304,11 @@ class AutonomyStore:
                 "WHERE tenant_id=? ORDER BY key_name",
                 (tenant,),
             ).fetchall()
-        prefix = f"{tenant}:"
-        return [str(row[0])[len(prefix):] for row in rows if str(row[0]).startswith(prefix)]
+        return [str(row[0]) for row in rows]
 
     def memory_history(self, key: str, *, tenant_id: str) -> list[dict]:
         tenant = self._require_tenant(tenant_id)
-        storage_key = f"{tenant}:{key}"
+        storage_key = key
         with closing(self._connect()) as connection:
             rows = connection.execute(
                 "SELECT * FROM autonomy_memory "
