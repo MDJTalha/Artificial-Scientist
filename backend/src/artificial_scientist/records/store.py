@@ -258,14 +258,6 @@ class RecordStore:
                     ),
                 )
             connection.execute(
-                    "INSERT OR IGNORE INTO source_identity("
-                        identity_key, tenant_id, record_id
-                    ) VALUES (?, ?, ?)",
-                    (
-                        source_identity_key(source_record),
-                        source_row["tenant_id"],
-                        str(source_record.id),
-                    ),
                 """
                 CREATE TRIGGER IF NOT EXISTS research_records_no_update
                 BEFORE UPDATE ON research_records
