@@ -423,8 +423,9 @@ class RecordStore:
         rows = connection.execute(
             """
             SELECT * FROM research_records
-            WHERE record_type = 'knowledge_relationship'
-            """
+            WHERE record_type = 'knowledge_relationship' AND tenant_id IS ?
+            """,
+            (tenant_id,),
         ).fetchall()
         adjacency: dict[UUID, list[UUID]] = {}
         for row in rows:
