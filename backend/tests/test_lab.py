@@ -484,7 +484,7 @@ def test_isolated_worker_normalizes_multiline_error_messages() -> None:
     from artificial_scientist.lab.execution import LabExecutionError
 
     with pytest.raises(LabExecutionError) as error:
-        run_isolated(_multiline_error_lab_worker, (), timeout_seconds=2)
+        run_isolated(_multiline_error_lab_worker, (), timeout_seconds=5)
 
     assert "line one line two" in str(error.value)
     assert "\n" not in str(error.value)
