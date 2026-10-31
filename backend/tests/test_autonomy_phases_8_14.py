@@ -124,3 +124,23 @@ def test_domain_registry_normalizes_bounded_definitions():
     assert domains.get("physics").validation_cases == ("case-1",)
     with pytest.raises(ValueError, match="already registered"):
         domains.register(DomainSpec("physics", "high", ("other",), ("case-2",)))
+
+
+def test_domain_registry_rejects_normalized_duplicates_and_unbounded_values():
+    domains = DomainRegistry()
+    with pytest.raises(ValueError, match="duplicates"):
+        domains.register(
+            DomainSpec("dup", "low", ("solver", " solver "), ("case",))
+        )
+    with pytest.raises(ValueError, match="too long"):
+        domains.register(
+            DomainSpec("x", "low", ("s" * 81,), ("case",))
+        )
+    with pytest.raises(ValueError, match="too long"):
+        domains.register(
+            DomainSpec("x", "low", ("solver",), ("c" * 161,))
+        )
+    with pytest.raises(ValueError, match="boolean"):
+        domains.register(
+            DomainSpec("x", "low", ("solver",), ("case",), expert_required="yes")
+        )
