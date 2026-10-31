@@ -89,9 +89,10 @@ class LabRunResponse(BaseModel):
     )
     limitations: list[str] = [
         "Canonical JSON result artifacts and bounded binary attachments are supported, with "
-        "per-run limits of 100 attachments and 50 MiB total binary content. Complete cross-system "
-        "provenance and per-user or tenant quotas are not implemented. An opt-in retention job "
-        "entry point is available, but must be invoked by an external operator-managed scheduler.",
+        "per-run limits of 100 attachments and 50 MiB total binary content. Tenant-wide run and "
+        "artifact count/byte quotas are enforced, but per-user quotas and complete cross-system "
+        "provenance are not implemented. An opt-in retention job entry point is available, but "
+        "must be invoked by an external operator-managed scheduler.",
         "POSIX workers receive CPU, address-space, file-size, descriptor, and core-dump limits. "
         "These limits do not isolate filesystem, network, syscalls, or kernel attack surface.",
         "Environment manifests and replay comparison are available, but identical outputs do not "

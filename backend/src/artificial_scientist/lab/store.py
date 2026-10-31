@@ -22,6 +22,12 @@ from artificial_scientist.lab.models import (
 _MAX_ARTIFACT_BYTES = 1_048_576
 _MAX_BINARY_ARTIFACTS_PER_RUN = 100
 _MAX_BINARY_BYTES_PER_RUN = 50 * 1024 * 1024
+# Conservative initial tenant-wide caps; make these configurable after workload baselining.
+_MAX_BINARY_ARTIFACTS_PER_TENANT = 500
+_MAX_BINARY_BYTES_PER_TENANT = 250 * 1024 * 1024
+_MAX_RUNS_PER_TENANT = 1_000
+_MAX_JSON_ARTIFACTS_PER_TENANT = 5_000
+_MAX_JSON_BYTES_PER_TENANT = 250 * 1024 * 1024
 _EXECUTION_STALE_AFTER_SECONDS = 15 * 60
 
 
@@ -35,6 +41,10 @@ class LabArtifactNotFound(LookupError):
 
 class LabExecutionNotFound(LookupError):
     """Raised when a requested execution-attempt ID is not present in the lab store."""
+
+
+class LabQuotaExceeded(ValueError):
+    """Raised when a tenant has exhausted a configured lab resource quota."""
 
 
 class LabRunStore:
@@ -208,6 +218,29 @@ class LabRunStore:
         now = datetime.now(UTC).isoformat()
         with closing(self._connect()) as connection:
             with connection:
+                # Atomically reserve a tenant run slot before recording execution.
+                connection.execute("BEGIN IMMEDIATE")
+                if tenant_id is not None:
+                    usage = connection.execute(
+                        """
+                        SELECT COUNT(*) AS run_count
+                        FROM (
+                            SELECT run_id FROM lab_runs WHERE tenant_id = ?
+                            UNION
+                            SELECT attempts.run_id
+                            FROM lab_execution_attempts AS attempts
+                            WHERE attempts.tenant_id = ?
+                              AND attempts.status = 'running'
+                              AND NOT EXISTS (
+                                  SELECT 1 FROM lab_run_retention_events AS retention
+                                  WHERE retention.run_id = attempts.run_id
+                              )
+                        )
+                        """,
+                        (tenant_id, tenant_id),
+                    ).fetchone()
+                    if int(usage["run_count"]) >= _MAX_RUNS_PER_TENANT:
+                        raise LabQuotaExceeded("Tenant has reached its lab run quota.")
                 connection.execute(
                     """
                     INSERT INTO lab_execution_attempts (
@@ -219,8 +252,10 @@ class LabRunStore:
                 )
         return self.get_execution_status(run_id, tenant_id=tenant_id)
 
-    def fail_execution(self, run_id: UUID) -> None:
-        """Mark an execution failed without storing sensitive exception details."""
+    def fail_execution(
+        self, run_id: UUID, tenant_id: str | None = None
+    ) -> None:
+        """Mark only the specified tenant's execution failed without storing exception details."""
         now = datetime.now(UTC).isoformat()
         with closing(self._connect()) as connection:
             with connection:
@@ -229,13 +264,14 @@ class LabRunStore:
                     UPDATE lab_execution_attempts
                     SET status = 'failed', updated_at = ?, finished_at = ?,
                         failure_reason = ?
-                    WHERE run_id = ? AND status = 'running'
+                    WHERE run_id = ? AND tenant_id IS ? AND status = 'running'
                     """,
                     (
                         now,
                         now,
                         "Execution failed before a terminal result was persisted.",
                         str(run_id),
+                        tenant_id,
                     ),
                 )
 
@@ -270,15 +306,18 @@ class LabRunStore:
             with connection:
                 rows = connection.execute(
                     """
-                    SELECT run_id FROM lab_execution_attempts
+                    SELECT run_id, tenant_id FROM lab_execution_attempts
                     WHERE status = 'running' AND updated_at < ?
                     """,
                     (stale_before,),
                 ).fetchall()
                 for row in rows:
                     run = connection.execute(
-                        "SELECT status, result_sha256 FROM lab_runs WHERE run_id = ?",
-                        (row["run_id"],),
+                        """
+                        SELECT status, result_sha256 FROM lab_runs
+                        WHERE run_id = ? AND tenant_id IS ?
+                        """,
+                        (row["run_id"], row["tenant_id"]),
                     ).fetchone()
                     if run is not None:
                         connection.execute(
@@ -286,7 +325,7 @@ class LabRunStore:
                             UPDATE lab_execution_attempts
                             SET status = ?, updated_at = ?, finished_at = ?,
                                 result_sha256 = ?, failure_reason = NULL
-                            WHERE run_id = ? AND status = 'running'
+                            WHERE run_id = ? AND tenant_id IS ? AND status = 'running'
                             """,
                             (
                                 run["status"],
@@ -294,6 +333,7 @@ class LabRunStore:
                                 now,
                                 run["result_sha256"],
                                 row["run_id"],
+                                row["tenant_id"],
                             ),
                         )
                     else:
@@ -302,13 +342,14 @@ class LabRunStore:
                             UPDATE lab_execution_attempts
                             SET status = 'interrupted', updated_at = ?, finished_at = ?,
                                 failure_reason = ?
-                            WHERE run_id = ? AND status = 'running'
+                            WHERE run_id = ? AND tenant_id IS ? AND status = 'running'
                             """,
                             (
                                 now,
                                 now,
                                 "Process stopped before a terminal run record was persisted.",
                                 row["run_id"],
+                                row["tenant_id"],
                             ),
                         )
                     recovered += 1
@@ -336,6 +377,33 @@ class LabRunStore:
         }
         with closing(self._connect()) as connection:
             with connection:
+                # Serialize tenant budget check + run/artifact writes.
+                connection.execute("BEGIN IMMEDIATE")
+                if tenant_id is not None:
+                    tenant_usage = connection.execute(
+                        """
+                        SELECT COUNT(*) AS artifact_count,
+                               COALESCE(SUM(artifacts.size_bytes), 0) AS total_bytes
+                        FROM lab_artifacts AS artifacts
+                        JOIN lab_runs AS runs ON runs.run_id = artifacts.run_id
+                        WHERE runs.tenant_id = ?
+                        """,
+                        (tenant_id,),
+                    ).fetchone()
+                    if (
+                        int(tenant_usage["artifact_count"])
+                        >= _MAX_JSON_ARTIFACTS_PER_TENANT
+                    ):
+                        raise ValueError(
+                            "Tenant has reached its JSON artifact count quota."
+                        )
+                    if (
+                        int(tenant_usage["total_bytes"]) + len(artifact_bytes)
+                        > _MAX_JSON_BYTES_PER_TENANT
+                    ):
+                        raise ValueError(
+                            "Tenant has reached its JSON artifact storage quota."
+                        )
                 connection.execute(
                     """
                     INSERT INTO lab_runs (
@@ -648,11 +716,36 @@ class LabRunStore:
         }
         with closing(self._connect()) as connection:
             with connection:
+                # Serialize quota check + insert so concurrent uploads cannot both
+                # observe the same remaining tenant capacity.
+                connection.execute("BEGIN IMMEDIATE")
                 existing = connection.execute(
                     "SELECT * FROM lab_binary_artifacts WHERE artifact_id = ?",
                     (str(artifact_id),),
                 ).fetchone()
                 if existing is None:
+                    if tenant_id is not None:
+                        tenant_usage = connection.execute(
+                            """
+                            SELECT COUNT(*) AS artifact_count,
+                                   COALESCE(SUM(binary.size_bytes), 0) AS total_bytes
+                            FROM lab_binary_artifacts AS binary
+                            JOIN lab_runs AS runs ON runs.run_id = binary.run_id
+                            WHERE runs.tenant_id = ?
+                            """,
+                            (tenant_id,),
+                        ).fetchone()
+                        if int(tenant_usage["artifact_count"]) >= _MAX_BINARY_ARTIFACTS_PER_TENANT:
+                            raise ValueError(
+                                "Tenant has reached its binary artifact count quota."
+                            )
+                        if (
+                            int(tenant_usage["total_bytes"]) + len(content)
+                            > _MAX_BINARY_BYTES_PER_TENANT
+                        ):
+                            raise ValueError(
+                                "Tenant has reached its binary artifact storage quota."
+                            )
                     usage = connection.execute(
                         """
                         SELECT COUNT(*) AS artifact_count,

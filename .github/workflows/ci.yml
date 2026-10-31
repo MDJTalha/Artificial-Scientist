@@ -9,7 +9,11 @@ on:
       - phase-3-literature-retrieval
       - phase-4-knowledge-graph
       - phase-5-mathematical-tools
+      - phase-7-security-complete
       - phase-6-controlled-lab
+      - phase-6-execution-tenant-tests
+      - phase-7-hypothesis-discovery
+      - phase-7-tenant-scoped-record-store
   pull_request:
     branches:
       - main
@@ -19,6 +23,8 @@ on:
       - phase-4-knowledge-graph
       - phase-5-mathematical-tools
       - phase-6-controlled-lab
+      - phase-6-execution-tenant-tests
+      - phase-7-hypothesis-discovery
   workflow_dispatch:
 
 permissions:
