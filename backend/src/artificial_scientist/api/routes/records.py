@@ -4,11 +4,19 @@ from functools import lru_cache
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 
-from artificial_scientist.authorization import AuthorizationDenied, TenantDirectory, stable_principal_id
+from artificial_scientist.authorization import (
+    AuthorizationDenied,
+    TenantDirectory,
+    stable_principal_id,
+)
 from artificial_scientist.config import get_settings
-from artificial_scientist.identity import IdentityConfigurationError, InvalidIdentityError, validate_oidc_bearer_token
+from artificial_scientist.identity import (
+    IdentityConfigurationError,
+    InvalidIdentityError,
+    validate_oidc_bearer_token,
+)
 from artificial_scientist.records.models import (
     AuditEventListResponse,
     RecordEnvelope,
@@ -42,7 +50,11 @@ def require_record_access(
     if not (issuer and audience and jwks_url):
         raise HTTPException(status_code=503, detail="OIDC authentication is not fully configured.")
     if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Valid bearer token required.", headers={"WWW-Authenticate":"Bearer"})
+        raise HTTPException(
+            status_code=401,
+            detail="Valid bearer token required.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     if not x_tenant_id:
         raise HTTPException(status_code=403, detail="Tenant membership is required.")
     try:
@@ -53,11 +65,15 @@ def require_record_access(
         principal_id = stable_principal_id(principal.issuer, principal.subject)
         TenantDirectory(settings.database_path).authorize(principal_id, x_tenant_id, action)
     except IdentityConfigurationError as error:
-        raise HTTPException(status_code=503, detail="OIDC authentication configuration is invalid.") from error
+        raise HTTPException(
+            status_code=503, detail="OIDC authentication configuration is invalid."
+        ) from error
     except InvalidIdentityError as error:
         raise HTTPException(status_code=401, detail="Bearer token validation failed.", headers={"WWW-Authenticate":"Bearer"}) from error
     except (AuthorizationDenied, ValueError) as error:
-        raise HTTPException(status_code=404, detail="Requested tenant resource is not available.") from error
+        raise HTTPException(
+            status_code=404, detail="Requested tenant resource is not available."
+        ) from error
     request.state.authenticated_principal = principal
     return x_tenant_id
 
