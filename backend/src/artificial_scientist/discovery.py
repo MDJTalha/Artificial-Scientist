@@ -345,3 +345,119 @@ def assess_candidates(request: DiscoveryAssessmentRequest) -> DiscoveryAssessmen
             "generate hypotheses or verify evidence.",
         ],
     )
+
+
+class HypothesisGenerationRequest(BaseModel):
+    """Bounded, deterministic hypothesis suggestions from a structured question."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    research_question: str = Field(min_length=10, max_length=5000)
+    independent_variable: str = Field(min_length=2, max_length=300)
+    dependent_variable: str = Field(min_length=2, max_length=300)
+    system_or_population: str = Field(min_length=2, max_length=500)
+    context: str | None = Field(default=None, max_length=1000)
+    include_null: bool = True
+    include_inverse: bool = True
+
+    @model_validator(mode="after")
+    def reject_same_variables(self) -> HypothesisGenerationRequest:
+        if self.independent_variable.casefold() == self.dependent_variable.casefold():
+            raise ValueError("independent_variable and dependent_variable must differ")
+        return self
+
+
+class GeneratedHypothesis(BaseModel):
+    """A review-ready suggestion; never a claim of truth or novelty."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    candidate: HypothesisCandidate
+    generation_method: Literal["bounded_directional_templates"]
+    review_status: Literal["requires_human_review"] = "requires_human_review"
+
+
+class HypothesisGenerationResponse(BaseModel):
+    research_question: str
+    candidates: list[GeneratedHypothesis]
+    limitations: list[str]
+
+
+def generate_hypotheses(request: HypothesisGenerationRequest) -> HypothesisGenerationResponse:
+    """Generate a small, explicit hypothesis set without inventing evidence."""
+    iv = request.independent_variable.strip()
+    dv = request.dependent_variable.strip()
+    system = request.system_or_population.strip()
+    context = request.context.strip() if request.context else "the stated study conditions"
+
+    templates: list[tuple[str, str]] = [
+        (
+            "Positive directional hypothesis",
+            f"In {system}, increasing {iv} increases {dv} under {context}.",
+        ),
+    ]
+    if request.include_inverse:
+        templates.append(
+            (
+                "Inverse directional hypothesis",
+                f"In {system}, increasing {iv} decreases {dv} under {context}.",
+            )
+        )
+    if request.include_null:
+        templates.append(
+            (
+                "Null-effect hypothesis",
+                f"In {system}, changing {iv} does not materially change {dv} under {context}.",
+            )
+        )
+
+    candidates: list[GeneratedHypothesis] = []
+    for title, statement in templates:
+        direction = "increases" if " increases " in statement else "decreases" if " decreases " in statement else "does not materially change"
+        predictions = [
+            f"Measured {dv} follows the stated direction across a predefined {iv} range."
+            if direction != "does not materially change"
+            else f"Measured {dv} remains within a predefined equivalence or uncertainty bound across the {iv} range."
+        ]
+        falsification = [
+            f"The observed {dv} change is opposite to the stated direction beyond the predefined uncertainty bound."
+            if direction != "does not materially change"
+            else f"The observed {dv} change exceeds the predefined equivalence or uncertainty bound."
+        ]
+        alternatives = [
+            f"A confounder correlated with {iv} explains the observed change in {dv}.",
+            f"Measurement or selection effects account for the apparent relationship.",
+        ]
+        assumptions = [
+            f"{system} is defined consistently across observations.",
+            f"Relevant confounders and measurement procedures are controlled or recorded.",
+        ]
+        test = (
+            f"Randomize or stratify {iv} where appropriate, measure {dv} with blinded analysis, "
+            "predefine the uncertainty/equivalence threshold, and compare the result against "
+            "the competing directional candidates."
+        )
+        candidates.append(
+            GeneratedHypothesis(
+                candidate=HypothesisCandidate(
+                    title=title,
+                    statement=statement,
+                    assumptions=assumptions,
+                    alternative_explanations=alternatives,
+                    predictions=predictions,
+                    falsification_criteria=falsification,
+                    discriminating_test=test,
+                ),
+                generation_method="bounded_directional_templates",
+            )
+        )
+    return HypothesisGenerationResponse(
+        research_question=" ".join(request.research_question.split()),
+        candidates=candidates,
+        limitations=[
+            "Candidates are deterministic templates, not model-derived scientific discoveries.",
+            "No evidence, literature result, causal claim, novelty claim, or truth probability is inferred.",
+            "Generated candidates must be assessed against prior work, domain constraints, and expert review.",
+            "The default set is intentionally small; complex mechanisms and interactions require explicit human specification.",
+        ],
+    )
