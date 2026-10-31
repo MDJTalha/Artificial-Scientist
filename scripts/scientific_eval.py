@@ -19,12 +19,12 @@ def main() -> int:
         StatisticsRequest(values=[1, 2, 3, 4], variance_mode="population")
     )
     conversion = convert_unit(
-        UnitConversionRequest(value=1, from_unit="meter", to_unit="centimeter")
+        UnitConversionRequest(value=1, source_unit="meter", target_unit="centimeter")
     )
     result = {
         "statistics_mean": statistics.mean,
         "statistics_variance": statistics.variance,
-        "meter_to_centimeter": conversion.value,
+        "meter_to_centimeter": conversion.converted_value,
     }
     expected = {
         "statistics_mean": 2.5,
