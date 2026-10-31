@@ -67,5 +67,52 @@ jobs:
         run: npm run typecheck
       - name: Run unit tests
         run: npm test
+      - name: Install isolated E2E tooling
+        run: npm install --no-save --no-audit --no-fund @playwright/test@1.56.1 @axe-core/playwright@4.11.0
       - name: Build production assets
         run: npm run build
+      - name: Run accessibility and conference workspace E2E
+        run: npx playwright test
+
+  release-gates:
+    name: Release-gate policy and hardened regression checks
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Validate release-gate policy
+        run: python scripts/validate_release_evidence.py
+      - name: Install scientific evaluation dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .
+      - name: Run deterministic scientific reproducibility smoke benchmark
+        run: python scripts/scientific_eval.py
+      - name: Compile production validation helpers
+        run: python -m py_compile scripts/validate_production_config.py scripts/sqlite_backup_restore.py scripts/oidc_probe.py scripts/scientific_eval.py
+      - name: Build fixed laboratory sandbox image
+        run: docker build --file deploy/sandbox/Dockerfile --tag asds-lab-sandbox:ci .
+      - name: Smoke-test fixed laboratory sandbox
+        run: |
+          printf '%s\n' '{"operation":"statistics","inputs":{"values":[1,2,3],"variance_mode":"population"}}' |
+            docker run --rm -i --network none --read-only --cap-drop ALL --security-opt no-new-privileges               --pids-limit 64 --memory 512m --cpus 1.0 --tmpfs /tmp:rw,noexec,nosuid,nodev,size=64m               --user 65532:65532 asds-lab-sandbox:ci
+      - name: Install backend test tools
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+      - name: Exercise Phase 6 rehearsal, recovery and concurrency hardening
+        working-directory: backend
+        run: pytest -q tests/test_phase6_rehearsal.py tests/test_lab.py tests/test_lab_store.py tests/test_lab_quota_races.py tests/test_migration_recovery_assertions.py tests/test_execution_adapter.py
+      - name: Exercise Phase 7 authorization matrix and tenant isolation
+        working-directory: backend
+        run: pytest -q tests/test_phase7_tenant_isolation.py tests/test_phase7_tenant_migration.py tests/test_phase7_tenant_policy.py tests/test_phase7_release_gate.py tests/test_release_authorization_matrix.py
+      - name: Exercise Phases 8-14 bounded autonomy
+        working-directory: backend
+        run: pytest -q tests/test_autonomy_api.py tests/test_autonomy_persistence.py tests/test_autonomy_phases_8_14.py

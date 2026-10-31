@@ -4,6 +4,8 @@
 **Repository:** `MDJTalha/Artificial-Scientist`  
 **Verified baseline:** `main` commit `b28b6bdaffa4851a2dec390460706e100302d138` is the merged Phase 0/6/7/14 hardening baseline; post-merge CI run 1114 succeeded.
 
+**Release-hardening branch:** `phase-release-verification-hardening` adds the final repository-side authorization matrix, concurrency/race, migration/recovery, frontend accessibility/E2E, release-evidence and documentation controls. The implementation was verified at commit `20681adc2520464a6735628bd0ddf78a3cfa9f61`; GitHub Actions run **1242** (workflow run **41225031000**) passed all backend, frontend and release-gate jobs. Subsequent branch commits are documentation-only evidence synchronization.
+
 This document is the current repository evidence snapshot. Older phase documents may contain historical branch names or earlier implementation descriptions; this snapshot takes precedence for the present integration state.
 
 ## Verified integration state
@@ -23,7 +25,7 @@ GitHub Actions run **41212896349** (run number **1114**) for commit `b28b6bdaffa
 The repository CI workflow covers:
 - Python 3.12 backend checks/tests;
 - Python 3.13 backend checks/tests;
-- frontend type-check, unit tests and production build.
+- frontend type-check, unit tests, production build and release E2E/accessibility on the release-hardening branch.
 
 A successful CI result is repository evidence only. It is not evidence of production deployment, live identity-provider validation, OS sandbox certification, scientific validity, or independent security review.
 
@@ -74,11 +76,17 @@ These cannot honestly be completed by repository edits alone:
 
 No external gate is marked complete merely because a unit test, mock provider, documentation page, or CI run exists. The release package must contain concrete evidence, scope, commit/version, commands, outcomes, limitations, risks and sign-off for every gate.
 
-## Next repository-side priorities
+## Repository-side final verification
 
-While external evidence is being gathered, repository work should continue on:
-- endpoint-by-endpoint authorization and cross-tenant negative-test coverage;
-- concurrency/race regressions for quotas and ownership;
-- migration/rehearsal fixture quality and rollback assertions;
-- frontend accessibility/E2E and conference-grade research-workspace verification;
-- CI/release-gate automation that prevents stale documentation from being interpreted as production certification.
+The previously open repository-side hardening items are implemented on `phase-release-verification-hardening`:
+
+- endpoint-by-endpoint authorization contract and cross-tenant adversarial coverage;
+- atomic quota and ownership race regressions;
+- migration/recovery source-integrity and rollback assertions;
+- conference-grade frontend Playwright keyboard/navigation and automated accessibility checks;
+- machine-readable release policy and populated evidence matrix;
+- synchronized status/evidence documentation.
+
+These items are **repository-verified** by CI run **1242** against implementation commit `20681adc2520464a6735628bd0ddf78a3cfa9f61`: Python 3.12/3.13 backend tests and Ruff, frontend type-check/unit/build, Playwright/axe E2E, and the targeted release-gate suites all passed.
+
+The repository now also contains the production-validation execution package: production configuration preflight, SQLite backup/restore rehearsal helper, sanitized OIDC/JWKS probe, deterministic scientific reproducibility smoke benchmark, reviewed sandbox deployment contract, independent security-review scope, scientific-validation protocol, and production operations acceptance checklist. These are engineering aids and remain subject to CI verification and real-environment execution. The six external certification gates above remain open until their evidence exists. See `docs/release/EVIDENCE_MATRIX.md` for the evidence register.

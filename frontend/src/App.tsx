@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-import { getStatusPresentation, isHealthyResponse, type ServiceStatus } from './lib/status'
+import { getStatusPresentation, isHealthyResponse, resolveApiBaseUrl, type ServiceStatus } from './lib/status'
 
 interface HealthResponse {
   status: string
@@ -17,8 +17,7 @@ interface Phase {
   detail: string
 }
 
-const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8000')
-  .replace(/\/+$/, '')
+const apiConfiguration = resolveApiBaseUrl(import.meta.env.VITE_API_BASE_URL, import.meta.env.PROD)
 
 const phases: Phase[] = [
   { id: 0, title: 'Charter', state: 'ADVANCED', detail: 'Mission, boundaries, risk and evaluation baseline.' },
@@ -66,8 +65,15 @@ export default function App() {
       setStatus('checking')
       setErrorMessage(null)
 
+      if (!apiConfiguration.baseUrl) {
+        setHealth(null)
+        setStatus('unavailable')
+        setErrorMessage(apiConfiguration.error)
+        return
+      }
+
       try {
-        const response = await fetch(apiBaseUrl + '/api/v1/health', {
+        const response = await fetch(apiConfiguration.baseUrl + '/api/v1/health', {
           method: 'GET',
           headers: { Accept: 'application/json' },
           signal: controller.signal,
@@ -134,7 +140,7 @@ export default function App() {
           </div>
           <div className="topbar-status">
             <span className={status === 'connected' ? 'status-dot status-dot-ok' : 'status-dot'} />
-            <span>{status === 'connected' ? 'API CONNECTED' : 'DEVELOPMENT / GATED'}</span>
+            <span>{status === 'connected' ? 'API CONNECTED' : status === 'unavailable' ? 'API UNAVAILABLE' : 'CHECKING API'}</span>
           </div>
         </header>
 
@@ -162,7 +168,7 @@ export default function App() {
             </div>
             <p className="card-description">{presentation.detail}</p>
             <p className="connection-detail">
-              {health ? health.service + ' · v' + health.version : 'Expected API: ' + apiBaseUrl}
+              {health ? health.service + ' · v' + health.version : 'Expected API: ' + (apiConfiguration.baseUrl ?? 'not configured')}
             </p>
             {errorMessage && <p className="error-message" role="status">{errorMessage}</p>}
             <button className="secondary-button" type="button" onClick={() => setRetryKey((key) => key + 1)}>
@@ -175,7 +181,14 @@ export default function App() {
             <p className="metric-value">{integratedCount}<span> / {phases.length}</span></p>
             <h2>Capability layers integrated</h2>
             <p className="card-description">{gatedCount} phases remain explicitly gated by acceptance evidence rather than being represented as production-complete.</p>
-            <div className="milestone-track" aria-label={integratedCount + ' of ' + phases.length + ' phases integrated'}>
+            <div
+              className="milestone-track"
+              role="progressbar"
+              aria-label="Integrated capability phases"
+              aria-valuemin={0}
+              aria-valuemax={phases.length}
+              aria-valuenow={integratedCount}
+            >
               <span style={{ width: ((integratedCount / phases.length) * 100).toFixed(1) + '%' }} />
             </div>
             <p className="metric-footnote">Capability-led roadmap · no fixed delivery dates</p>

@@ -1,14 +1,16 @@
 """Deployment-neutral execution boundary for the controlled laboratory.
 
-The production service deliberately fails closed until a reviewed OS-level
-sandbox adapter is configured. The existing local subprocess runner is kept
-only for development and trusted allowlisted operations; it is not advertised
-or usable as a hostile-code sandbox.
+Production deployments fail closed unless a reviewed sandbox adapter is
+configured. The Docker adapter below is deliberately restricted to the fixed
+allowlisted math worker; it does not execute arbitrary user shell commands.
 """
-
 from __future__ import annotations
 
+import json
 import os
+import shutil
+import subprocess
+import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, Protocol
@@ -21,8 +23,6 @@ class ExecutionAdapterUnavailable(RuntimeError):
 
 
 class LabExecutionAdapter(Protocol):
-    """Interface implemented by a deployment-specific execution boundary."""
-
     name: str
 
     def execute(
@@ -37,8 +37,6 @@ class LabExecutionAdapter(Protocol):
 
 @dataclass(frozen=True, slots=True)
 class LocalDevelopmentExecutionAdapter:
-    """Development-only adapter for the existing trusted allowlist."""
-
     name: str = "local-process-development"
 
     def execute(
@@ -52,15 +50,140 @@ class LocalDevelopmentExecutionAdapter:
 
 
 @dataclass(frozen=True, slots=True)
-class ReviewedSandboxExecutionAdapter:
-    """Contract for a separately deployed reviewed sandbox.
+class DockerSandboxExecutionAdapter:
+    """Execute only the repository's fixed math worker inside Docker isolation."""
 
-    A production adapter must be implemented by the deployment layer. It must
-    enforce OS/orchestrator isolation for filesystem, network, identity,
-    syscalls/capabilities and resources before this adapter is considered
-    available. Keeping this explicit prevents accidental fallback to the local
-    process runner.
-    """
+    image: str
+    name: str = "sandbox:docker"
+
+    def execute(
+        self,
+        target: Callable[..., dict[str, Any]],
+        args: tuple[Any, ...],
+        *,
+        timeout_seconds: float,
+    ) -> dict[str, Any]:
+        if (
+            target.__name__ != "_execute_step_direct"
+            or target.__module__ != "artificial_scientist.lab.engine"
+        ):
+            raise ExecutionAdapterUnavailable(
+                "Docker adapter accepts only the fixed lab worker."
+            )
+        if (
+            len(args) != 2
+            or not isinstance(args[0], str)
+            or not isinstance(args[1], dict)
+        ):
+            raise ExecutionAdapterUnavailable(
+                "Docker adapter received an invalid operation contract."
+            )
+        if not shutil.which("docker"):
+            raise ExecutionAdapterUnavailable("Docker executable is unavailable.")
+        if not self.image.strip():
+            raise ExecutionAdapterUnavailable("Sandbox image is not configured.")
+
+        container_name = f"asds-lab-{uuid.uuid4().hex}"
+        command = [
+            "docker",
+            "run",
+            "--rm",
+            "--name",
+            container_name,
+            "--network",
+            "none",
+            "--read-only",
+            "--cap-drop",
+            "ALL",
+            "--security-opt",
+            "no-new-privileges",
+            "--pids-limit",
+            "64",
+            "--memory",
+            "512m",
+            "--cpus",
+            "1.0",
+            "--ulimit",
+            "nofile=64:64",
+            "--ulimit",
+            "nproc=64:64",
+            "--tmpfs",
+            "/tmp:rw,noexec,nosuid,nodev,size=64m",
+            "--user",
+            "65532:65532",
+            self.image,
+            "python",
+            "-m",
+            "artificial_scientist.lab.sandbox_worker",
+        ]
+        payload = json.dumps(
+            {"operation": args[0], "inputs": args[1]},
+            separators=(",", ":"),
+            ensure_ascii=False,
+        ).encode("utf-8")
+        process: subprocess.Popen[bytes] | None = None
+        try:
+            process = subprocess.Popen(
+                command,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env={"PATH": "/usr/local/bin:/usr/bin:/bin", "PYTHONUNBUFFERED": "1"},
+            )
+            stdout, stderr = process.communicate(
+                input=payload,
+                timeout=timeout_seconds,
+            )
+        except subprocess.TimeoutExpired as error:
+            if process is not None:
+                try:
+                    subprocess.run(
+                        ["docker", "rm", "-f", container_name],
+                        check=False,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                        timeout=5,
+                    )
+                finally:
+                    process.kill()
+                    process.communicate()
+            raise ExecutionAdapterUnavailable(
+                f"Docker sandbox exceeded its {timeout_seconds:g}-second deadline."
+            ) from error
+        except OSError as error:
+            raise ExecutionAdapterUnavailable(
+                "Could not start the Docker sandbox."
+            ) from error
+        finally:
+            if process is not None and process.poll() is None:
+                process.kill()
+
+        if process.returncode != 0:
+            detail = stderr.decode("utf-8", errors="replace").strip()[:500]
+            raise ExecutionAdapterUnavailable(
+                f"Docker sandbox failed with exit code {process.returncode}: {detail}"
+            )
+        try:
+            response = json.loads(stdout.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as error:
+            raise ExecutionAdapterUnavailable(
+                "Docker sandbox returned invalid JSON."
+            ) from error
+        if not isinstance(response, dict) or response.get("ok") is not True:
+            raise ExecutionAdapterUnavailable(
+                "Docker sandbox returned an invalid result."
+            )
+        result = response.get("result")
+        if not isinstance(result, dict):
+            raise ExecutionAdapterUnavailable(
+                "Docker sandbox result is not an object."
+            )
+        return result
+
+
+@dataclass(frozen=True, slots=True)
+class ReviewedSandboxExecutionAdapter:
+    """Compatibility contract for non-Docker reviewed deployment adapters."""
 
     name: str
 
@@ -78,20 +201,20 @@ class ReviewedSandboxExecutionAdapter:
 
 
 def get_execution_adapter() -> LabExecutionAdapter:
-    """Resolve the execution boundary and fail closed outside development.
-
-    Local-process execution is intentionally accepted only when the application
-    environment is explicitly development. Production-like environments must
-    select a reviewed external sandbox adapter; until one is registered, lab
-    execution is unavailable rather than silently falling back to a child
-    process with inherited host access.
-    """
-
+    """Resolve the execution boundary and fail closed outside development."""
     environment = os.getenv("ARTIFICIAL_SCIENTIST_ENV", "production").strip().lower()
     mode = os.getenv("ARTIFICIAL_SCIENTIST_LAB_EXECUTION_MODE", "").strip().lower()
 
     if environment == "development" and mode in {"", "local-process"}:
         return LocalDevelopmentExecutionAdapter()
+
+    if mode == "sandbox:docker":
+        image = os.getenv("ARTIFICIAL_SCIENTIST_LAB_SANDBOX_IMAGE", "").strip()
+        if not image:
+            raise ExecutionAdapterUnavailable(
+                "ARTIFICIAL_SCIENTIST_LAB_SANDBOX_IMAGE is required for sandbox:docker."
+            )
+        return DockerSandboxExecutionAdapter(image=image)
 
     if mode.startswith("sandbox:") and len(mode) > len("sandbox:"):
         return ReviewedSandboxExecutionAdapter(name=mode)

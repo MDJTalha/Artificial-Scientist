@@ -51,13 +51,21 @@ def validate_oidc_bearer_token(
         )
 
     try:
+        parsed_issuer = urlsplit(issuer)
+        _ = parsed_issuer.port
         parsed_jwks_url = urlsplit(jwks_url)
         # Accessing .port also validates that any explicit port is numeric and in range.
         _ = parsed_jwks_url.port
     except ValueError as error:
         raise IdentityConfigurationError("OIDC JWKS URL is invalid.") from error
     if (
-        parsed_jwks_url.scheme.lower() != "https"
+        parsed_issuer.scheme.lower() != "https"
+        or not parsed_issuer.hostname
+        or parsed_issuer.username is not None
+        or parsed_issuer.password is not None
+        or parsed_issuer.fragment
+        or any(character.isspace() for character in issuer)
+        or parsed_jwks_url.scheme.lower() != "https"
         or not parsed_jwks_url.hostname
         or parsed_jwks_url.username is not None
         or parsed_jwks_url.password is not None
@@ -69,7 +77,12 @@ def validate_oidc_bearer_token(
         )
 
     try:
-        key_client = PyJWKClient(jwks_url, timeout=5, cache_jwk_set=True)
+        key_client = PyJWKClient(
+            jwks_url,
+            timeout=5,
+            cache_jwk_set=True,
+            lifespan=300,
+        )
         signing_key = key_client.get_signing_key_from_jwt(token)
         claims = jwt.decode(
             token,
