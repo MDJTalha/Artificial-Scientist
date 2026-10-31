@@ -5,6 +5,9 @@ from uuid import uuid4
 
 import pytest
 
+from artificial_scientist.api.routes import records as records_routes
+from artificial_scientist.api.routes.records import get_record_store
+from artificial_scientist.main import app
 from artificial_scientist.records.models import ResearchTaskRecord, SourceRecord
 from artificial_scientist.records.store import InvalidRelationship, RecordNotFound, RecordStore
 
@@ -85,3 +88,86 @@ def test_audit_events_are_tenant_scoped(tmp_path: Path) -> None:
     events_b, total_b = store.list_audit_events(tenant_id="tenant-b")
     assert total_a == total_b == 1
     assert events_a[0].record_id != events_b[0].record_id
+
+
+def test_api_record_reads_and_discovery_evidence_cannot_cross_tenants(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store = RecordStore(tmp_path / "api-records.sqlite3")
+    tenant_a = "tenant-a"
+    tenant_b = "tenant-b"
+    record_a = store.create(
+        ResearchTaskRecord(
+            title="Private A",
+            research_question="Question A",
+            objective="Objective A",
+        ),
+        tenant_id=tenant_a,
+    )
+    source_a = store.create(
+        SourceRecord(
+            title="Private source A",
+            source_url="https://example.org/private-a",
+            external_identifier=f"a:{uuid4()}",
+        ),
+        tenant_id=tenant_a,
+    )
+    store.create(
+        ResearchTaskRecord(
+            title="Private B",
+            research_question="Question B",
+            objective="Objective B",
+        ),
+        tenant_id=tenant_b,
+    )
+
+    monkeypatch.setattr(
+        records_routes,
+        "require_record_access",
+        lambda request, action, authorization, x_tenant_id: tenant_b,
+    )
+    app.dependency_overrides[get_record_store] = lambda: store
+    try:
+        with TestClient(app) as client:
+            response = client.get(f"/api/v1/records/{record_a.id}")
+            assert response.status_code == 404
+
+            listed = client.get("/api/v1/records")
+            assert listed.status_code == 200
+            assert listed.json()["total"] == 1
+            assert listed.json()["items"][0]["payload"]["title"] == "Private B"
+
+            discovery = client.post(
+                "/api/v1/discovery/assess",
+                json={
+                    "research_question": "Does temperature affect reaction rate?",
+                    "candidates": [
+                        {
+                            "title": "Cross-tenant hypothesis",
+                            "statement": "Temperature changes reaction rate.",
+                            "assumptions": ["Pressure remains fixed."],
+                            "alternative_explanations": ["Catalyst concentration changed."],
+                            "predictions": ["Rate changes in the measured range."],
+                            "falsification_criteria": ["Rate does not change."],
+                            "discriminating_test": "Randomize temperature levels.",
+                            "source_record_ids": [str(source_a.id)],
+                            "claim_record_ids": [],
+                        },
+                        {
+                            "title": "Independent hypothesis",
+                            "statement": "Catalyst concentration changes reaction rate.",
+                            "assumptions": ["Temperature remains fixed."],
+                            "alternative_explanations": ["Pressure changes."],
+                            "predictions": ["Rate tracks catalyst concentration."],
+                            "falsification_criteria": ["Rate does not track concentration."],
+                            "discriminating_test": "Randomize catalyst concentration.",
+                            "source_record_ids": [],
+                            "claim_record_ids": [],
+                        },
+                    ],
+                },
+            )
+            assert discovery.status_code == 422
+            assert "does not exist" in discovery.json()["detail"]
+    finally:
+        app.dependency_overrides.pop(get_record_store, None)
