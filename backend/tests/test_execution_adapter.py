@@ -5,14 +5,12 @@ import subprocess
 
 import pytest
 
+from artificial_scientist.lab.engine import _execute_step_direct
 from artificial_scientist.lab.execution_adapter import (
     DockerSandboxExecutionAdapter,
     ExecutionAdapterUnavailable,
 )
 
-
-def _execute_step_direct(operation: str, inputs: dict[str, object]) -> dict[str, object]:
-    return {"operation": operation, "inputs": inputs}
 
 
 def test_docker_adapter_rejects_non_allowlisted_callable(monkeypatch):
