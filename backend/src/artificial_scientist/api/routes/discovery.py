@@ -3,8 +3,6 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from artificial_scientist.api.routes.records import record_access
-
 from artificial_scientist.api.routes.literature import get_literature_service
 from artificial_scientist.api.routes.records import get_record_store, record_access
 from artificial_scientist.discovery import (
@@ -56,7 +54,7 @@ def _validate_evidence_references(
             )
     for record_id in candidate.claim_record_ids:
         try:
-            record = store.get(record_id)
+            record = store.get(record_id, tenant_id=tenant_id)
         except RecordNotFound as error:
             raise HTTPException(
                 status_code=422, detail=f"Claim record {record_id} does not exist."
