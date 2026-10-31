@@ -50,7 +50,10 @@ def test_every_research_router_endpoint_declares_record_access(
         assert "dependency" in names or any(
             "record_access" in repr(dependency.call)
             for dependency in route.dependant.dependencies
-        ), f"missing tenant authorization dependency: {route.methods} {route.path}"
+        ), (
+            f"missing tenant authorization dependency: "
+            f"{route.methods} {route.path}"
+        )
 
 
 def test_record_authorization_denies_cross_tenant_selector_before_handler(
