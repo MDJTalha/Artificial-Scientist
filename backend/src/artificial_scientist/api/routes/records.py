@@ -35,6 +35,8 @@ from artificial_scientist.records.store import (
 )
 
 router = APIRouter(prefix="/api/v1/records", tags=["research records"])
+
+
 def require_record_access(
     request: Request,
     action: str,
