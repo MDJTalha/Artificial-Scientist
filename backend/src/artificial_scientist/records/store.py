@@ -227,7 +227,7 @@ class RecordStore:
             # record history and map duplicate identities to the first record.
             source_rows = connection.execute(
                 """
-                SELECT id, content_sha256, payload_json
+                SELECT id, tenant_id, content_sha256, payload_json
                 FROM research_records
                 WHERE record_type = 'source'
                 ORDER BY created_at ASC, id ASC
