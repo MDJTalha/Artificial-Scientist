@@ -410,19 +410,23 @@ class RecordStore:
                 "part_of",
                 "prerequisite_of",
             }:
-                self._validate_acyclic_relationship(connection, record)
+                self._validate_acyclic_relationship(connection, record, tenant_id=tenant_id)
 
     @staticmethod
     def _validate_acyclic_relationship(
-        connection: sqlite3.Connection, record: KnowledgeRelationshipRecord
+        connection: sqlite3.Connection,
+        record: KnowledgeRelationshipRecord,
+        *,
+        tenant_id: str | None = None,
     ) -> None:
         """Reject cycles within one of the controlled transitive predicates."""
         rows = connection.execute(
             """
             SELECT * FROM research_records
             WHERE record_type = 'knowledge_relationship'
+              AND (tenant_id IS ? OR tenant_id = ?)
             """
-        ).fetchall()
+        , (tenant_id, tenant_id)).fetchall()
         adjacency: dict[UUID, list[UUID]] = {}
         for row in rows:
             envelope = RecordStore._row_to_envelope(row)
