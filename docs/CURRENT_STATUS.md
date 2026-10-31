@@ -2,7 +2,7 @@
 
 **Snapshot:** 2026-10-31  
 **Repository:** `MDJTalha/Artificial-Scientist`  
-**Current `main` commit:** `5c645834ef2895ab90404099073d312faee2a0e7`
+**Verified baseline:** `main` CI run 1080 succeeded at `0a3a0f056614f75f345cba8e4569b7dbc1231dba`; the current head should be read from Git rather than hard-coded here.
 
 This document is the current repository evidence snapshot. Older phase documents may contain historical branch names or earlier implementation descriptions; this snapshot takes precedence for the present integration state.
 
@@ -18,7 +18,7 @@ The current `main` head contains:
 
 ### Latest main CI
 
-GitHub Actions run **41209898005** (run number **1077**) for commit `5c645834ef2895ab90404099073d312faee2a0e7` completed with **success**.
+GitHub Actions run **41210545687** (run number **1080**) for commit `0a3a0f056614f75f345cba8e4569b7dbc1231dba` completed with **success**. The subsequent conference-grade frontend integration was merged as `ee9077dfb0d0001ad814ff4fe7e8c6b83bccdaa0`; its post-merge CI is tracked by GitHub Actions rather than copied into this static snapshot.
 
 The repository CI workflow covers:
 - Python 3.12 backend checks/tests;
