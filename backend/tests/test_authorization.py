@@ -241,3 +241,13 @@ def test_tenant_scoped_execution_status_hides_foreign_attempts(tmp_path):
     assert store.get_execution_status(run_id, tenant_id="tenant-a")["run_id"] == str(run_id)
     with pytest.raises(LabExecutionNotFound):
         store.get_execution_status(run_id, tenant_id="tenant-b")
+
+
+def test_autonomy_workflow_actions_follow_least_privilege():
+    from artificial_scientist.authorization import role_allows
+
+    assert role_allows("tenant_admin", "autonomy:workflow:approve")
+    assert role_allows("researcher", "autonomy:workflow:approve")
+    assert role_allows("viewer", "autonomy:workflow:read")
+    assert not role_allows("viewer", "autonomy:workflow:approve")
+    assert not role_allows("auditor", "autonomy:workflow:write")
