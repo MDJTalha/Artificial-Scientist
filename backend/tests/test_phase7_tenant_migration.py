@@ -111,7 +111,10 @@ def test_existing_tenant_owned_source_identity_keeps_tenant_scoped_key(tmp_path)
             );
             PRAGMA user_version = 2;
             INSERT INTO research_records
-                (id, tenant_id, record_type, schema_version, created_at, content_sha256, payload_json)
+                (
+                    id, tenant_id, record_type, schema_version, created_at,
+                    content_sha256, payload_json
+                )
             VALUES (?, ?, 'source', 1, '2026-01-01T00:00:00+00:00', ?, ?);
             """,
             (str(source.id), "tenant-a", digest, payload_json),
