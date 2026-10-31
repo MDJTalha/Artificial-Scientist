@@ -2,6 +2,8 @@
 
 **Status: threat model and deployment requirements; a complete OS sandbox is not yet implemented.**
 
+**Fail-closed implementation update:** lab execution now resolves through an explicit deployment adapter. The existing subprocess runner is available only in an explicitly selected development environment. Production-like environments have no fallback to the subprocess runner; without a reviewed sandbox adapter, execution returns an unavailable/503 condition. `ARTIFICIAL_SCIENTIST_LAB_EXECUTION_MODE=local-process` is development-only. A `sandbox:<deployment-name>` mode currently identifies a future deployment adapter but intentionally remains unavailable until its reviewed implementation exists.
+
 ## Protected assets
 
 - The API process, its credentials, source tree, environment variables, database, and host filesystem.
@@ -35,7 +37,7 @@ The repository must not silently assume that Docker, a particular container runt
 ## Exit checklist
 
 - [ ] Select and document a supported deployment target and sandbox runtime.
-- [ ] Implement a separate execution adapter with immutable job envelopes and bounded artifact exchange.
+- [x] Implement a deployment-neutral execution-adapter interface and fail-closed selection; the reviewed OS sandbox implementation and immutable external job transport remain open.
 - [ ] Enforce filesystem, network, identity, syscall/capability, and resource policies at the OS/orchestrator boundary.
 - [ ] Prove the controls with adversarial integration tests in a disposable environment.
 - [ ] Verify runtime/image provenance, patching, logging, cleanup, and incident response.
