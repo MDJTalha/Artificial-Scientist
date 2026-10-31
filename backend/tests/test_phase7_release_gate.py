@@ -5,21 +5,20 @@ from dataclasses import replace
 from fastapi.testclient import TestClient
 
 import artificial_scientist.main as main
+import artificial_scientist.api.routes.records as records_routes
 
 
 def test_production_research_routes_require_configured_oidc(monkeypatch) -> None:
     configured = main.get_settings()
-    monkeypatch.setattr(
-        main,
-        "get_settings",
-        lambda: replace(
-            configured,
-            environment="production",
-            oidc_issuer=None,
-            oidc_audience=None,
-            oidc_jwks_url=None,
-        ),
+    production = replace(
+        configured,
+        environment="production",
+        oidc_issuer=None,
+        oidc_audience=None,
+        oidc_jwks_url=None,
     )
+    monkeypatch.setattr(main, "get_settings", lambda: production)
+    monkeypatch.setattr(records_routes, "get_settings", lambda: production)
     with TestClient(main.app) as client:
         for path in ("/api/v1/records", "/api/v1/discovery/decompose"):
             response = client.get(path) if path.endswith("records") else client.post(
