@@ -8,9 +8,9 @@ from artificial_scientist.api.routes.literature import get_literature_service
 from artificial_scientist.api.routes.records import get_record_store, record_access
 from artificial_scientist.discovery import (
     DiscoveryAssessmentRequest,
+    DiscoveryAssessmentResponse,
     HypothesisGenerationRequest,
     HypothesisGenerationResponse,
-    DiscoveryAssessmentResponse,
     HypothesisCandidate,
     PriorWorkCandidateResult,
     PriorWorkMatch,
@@ -165,6 +165,19 @@ def screen_prior_work(
             "strategy remain required.",
         ],
     )
+
+
+@router.post(
+    "/generate",
+    response_model=HypothesisGenerationResponse,
+    summary="Generate bounded competing hypothesis suggestions",
+)
+def generate_hypothesis_candidates(
+    request: HypothesisGenerationRequest,
+    tenant_id: Annotated[str | None, Depends(record_access("discovery:decompose"))],
+) -> HypothesisGenerationResponse:
+    """Generate deterministic suggestions that always require human review."""
+    return generate_hypotheses(request)
 
 
 @router.post(
