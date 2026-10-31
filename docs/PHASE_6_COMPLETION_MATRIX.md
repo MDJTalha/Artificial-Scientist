@@ -1,6 +1,6 @@
 # Phase 6 — Completion and Release-Gate Matrix
 
-**Working branch:** phase-6-execution-tenant-tests  
+**Working branch:** phase-6-execution-adapter-fail-closed  
 **Scope:** tenant-aware controlled computational lab, identity, authorization, quotas, audit, migration safety, and process-execution controls.
 
 This matrix is the authoritative checklist for Phase 6. “Implemented” means code and regression coverage exist on this branch; it does not mean production deployment, independent security assurance, or a full operating-system sandbox has been certified.
