@@ -1,10 +1,7 @@
 """Concurrency regressions for tenant quota and execution ownership."""
 
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import replace
 from uuid import uuid4
-
-import pytest
 
 import artificial_scientist.lab.store as store_module
 from artificial_scientist.lab.models import LabRunRequest
@@ -62,8 +59,7 @@ def test_same_run_id_cannot_be_reassigned_across_tenants(tmp_path):
         outcomes = list(pool.map(reserve, ("tenant-a", "tenant-b")))
 
     assert outcomes.count("accepted") == 1
-    winner = store.get_execution_status(run_id)
-    assert winner["tenant_id"] if "tenant_id" in winner else True
+    store.get_execution_status(run_id)
     tenant_rows = []
     with store._connect() as connection:
         tenant_rows = [
