@@ -16,3 +16,52 @@
 
 /* Keep live announcements available to assistive technology without visual layout impact. */
 .sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
+
+/* Conference-grade research workspace refinement: legibility, hierarchy and resilient controls. */
+:root{
+  color-scheme:dark;
+  --bg:#07131d;
+  --panel:#0c1d29;
+  --panel2:#102532;
+  --line:#2a414d;
+  --muted:#a5b7bf;
+  --muted2:#78929f;
+  --text:#edf4f6;
+  --mint:#7be3c3;
+  --cyan:#8bd6e8;
+}
+body{background:radial-gradient(ellipse at 78% -10%,rgba(47,132,137,.2),transparent 46rem),var(--bg)}
+button,input,select,textarea{line-height:1.5}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid var(--cyan);outline-offset:3px}
+button{transition:background-color .16s ease,border-color .16s ease,transform .16s ease}
+button:disabled{cursor:not-allowed}
+.main-content{width:calc(100% - 254px);min-width:0}
+.page-heading{gap:20px}
+.page-subtitle{font-size:13px;line-height:1.85;color:#a4b7bf}
+.heading-badge{line-height:1.6}
+.hero-panel,.metric-card,.instrument-card,.workspace-panel{box-shadow:0 12px 35px rgba(0,0,0,.10)}
+.metric-card{display:flex;flex-direction:column;align-items:flex-start}
+.metric-card p{font-size:10px;line-height:1.75;color:#91a8b2}
+.metric-card .text-action{margin-top:auto;padding-top:4px}
+.section-title h2,.panel-title h2{line-height:1.35}
+.workspace-panel{scroll-margin-top:24px}
+.workspace-panel label{line-height:1.6}
+.workspace-panel input:not([type=checkbox]),.workspace-panel select,.workspace-panel textarea,.toolbar input{min-height:42px;border-color:#36525f;background:#081923}
+.workspace-panel input:not([type=checkbox]):hover,.workspace-panel select:hover,.workspace-panel textarea:hover,.toolbar input:hover{border-color:#527985}
+.workspace-panel input:not([type=checkbox]):focus-visible,.workspace-panel select:focus-visible,.workspace-panel textarea:focus-visible,.toolbar input:focus-visible{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(139,214,232,.12)}
+.primary-button,.secondary-button{min-height:42px;font-size:11px}
+.primary-button{background:linear-gradient(110deg,rgba(57,143,119,.30),rgba(45,110,115,.22))}
+.primary-button:disabled,.secondary-button:disabled{opacity:.58}
+.record-table th{position:sticky;top:0;z-index:1}
+.record-table tbody tr:hover{background:rgba(122,190,183,.045)}
+.record-table td{line-height:1.65}
+.json-view{font-size:11px!important;line-height:1.8!important;tab-size:2}
+.notice{line-height:1.8}
+.notice p,.muted{line-height:1.85}
+.empty-state{min-height:160px}
+.nav-item:focus-visible,.instrument-card:focus-visible,.tool-option:focus-visible{outline:3px solid var(--cyan);outline-offset:2px}
+.page-footer{line-height:1.8}
+@media(max-width:1200px){.main-content{width:calc(100% - 225px)}}
+@media(max-width:800px){.main-content{width:100%}.page-subtitle{font-size:12px}.sidebar{position:sticky;top:0;z-index:20;background:rgba(7,19,29,.97)}.nav-list{scrollbar-width:thin}.nav-item{min-height:42px}.workspace-panel{margin-top:12px}}
+@media(max-width:480px){.page-subtitle{font-size:11px}.metric-card p{font-size:9px}.primary-button,.secondary-button{min-height:44px}.workspace-panel input:not([type=checkbox]),.workspace-panel select,.workspace-panel textarea,.toolbar input{font-size:16px}}
+@media(forced-colors:active){.nav-item.active,.tool-option.selected{outline:2px solid Highlight}.live-dot,.nav-active-mark{forced-color-adjust:none}}
