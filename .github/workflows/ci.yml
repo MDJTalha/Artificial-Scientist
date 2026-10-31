@@ -14,6 +14,7 @@ on:
       - phase-6-execution-tenant-tests
       - phase-7-hypothesis-discovery
       - phase-7-tenant-scoped-record-store
+      - phase-8-14-complete
   pull_request:
     branches:
       - main
