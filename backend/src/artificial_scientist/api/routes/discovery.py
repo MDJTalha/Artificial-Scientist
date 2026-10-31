@@ -3,9 +3,10 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from artificial_scientist.api.routes.records import record_access
 
 from artificial_scientist.api.routes.literature import get_literature_service
-from artificial_scientist.api.routes.records import get_record_store
+from artificial_scientist.api.routes.records import get_record_store, record_access
 from artificial_scientist.discovery import (
     DiscoveryAssessmentRequest,
     DiscoveryAssessmentResponse,
@@ -35,12 +36,12 @@ router = APIRouter(prefix="/api/v1/discovery", tags=["hypothesis discovery"])
 
 
 def _validate_evidence_references(
-    store: RecordStore, candidate: HypothesisCandidate
+    store: RecordStore, candidate: HypothesisCandidate, tenant_id: str | None = None
 ) -> None:
     """Fail before writes if a referenced source or claim is missing or has wrong type."""
     for record_id in candidate.source_record_ids:
         try:
-            record = store.get(record_id)
+            record = store.get(record_id, tenant_id=tenant_id)
         except RecordNotFound as error:
             raise HTTPException(
                 status_code=422, detail=f"Source record {record_id} does not exist."
@@ -77,6 +78,7 @@ def _validate_evidence_references(
 )
 def decompose_question(
     request: ResearchQuestionDecompositionRequest,
+    tenant_id: Annotated[str | None, Depends(record_access("discovery:decompose"))],
 ) -> ResearchQuestionDecompositionResponse:
     """Extract conservative variable/context hints and expose unresolved details."""
     return decompose_research_question(request)
@@ -90,6 +92,7 @@ def decompose_question(
 def screen_prior_work(
     request: PriorWorkScreenRequest,
     service: Annotated[LiteratureService, Depends(get_literature_service)],
+    tenant_id: Annotated[str | None, Depends(record_access("discovery:prior-work-screen"))],
 ) -> PriorWorkScreenResponse:
     """Search bounded OpenAlex/Crossref metadata; results are not proof of novelty."""
     results: list[PriorWorkCandidateResult] = []
@@ -171,11 +174,12 @@ def screen_prior_work(
 def assess_hypotheses(
     request: DiscoveryAssessmentRequest,
     store: Annotated[RecordStore, Depends(get_record_store)],
+    tenant_id: Annotated[str | None, Depends(record_access("discovery:assess"))],
 ) -> DiscoveryAssessmentResponse:
     """Assess structure, detect likely duplicates, and persist auditable hypothesis records."""
     result = assess_candidates(request)
     for candidate in request.candidates:
-        _validate_evidence_references(store, candidate)
+        _validate_evidence_references(store, candidate, tenant_id=tenant_id)
 
     records: list[HypothesisRecord] = []
     for candidate in request.candidates:
@@ -212,7 +216,7 @@ def assess_hypotheses(
             )
         )
     try:
-        saved = store.create_many(records)
+        saved = store.create_many(records, tenant_id=tenant_id)
     except (InvalidRelationship, RecordConflict) as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
     except RecordIntegrityError as error:
