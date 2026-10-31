@@ -190,7 +190,6 @@ def test_api_generates_bounded_hypotheses_without_persisting_records() -> None:
     assert body["candidates"][0]["candidate"]["source_record_ids"] == []
 
 
-
 def test_api_persists_hypotheses_with_predictions_and_test(store: RecordStore) -> None:
     source = store.create(
         SourceRecord(
