@@ -101,7 +101,7 @@ jobs:
       - name: Build production assets
         run: npm run build
       - name: Install Chromium for E2E
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install chromium
       - name: Run accessibility and conference workspace E2E
         run: npx playwright test
 
