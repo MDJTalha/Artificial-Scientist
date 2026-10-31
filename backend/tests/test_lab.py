@@ -1209,7 +1209,9 @@ def test_clamav_scanner_rejects_invalid_utf8_response(monkeypatch) -> None:
 
 
 
-def test_execution_adapter_fails_closed_outside_development(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_execution_adapter_fails_closed_outside_development(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     from artificial_scientist.lab.execution_adapter import (
         ExecutionAdapterUnavailable,
         get_execution_adapter,
@@ -1246,7 +1248,9 @@ def test_execution_adapter_never_falls_back_for_production_sandbox_mode(
     )
 
     monkeypatch.setenv("ARTIFICIAL_SCIENTIST_ENV", "production")
-    monkeypatch.setenv("ARTIFICIAL_SCIENTIST_LAB_EXECUTION_MODE", "sandbox:unreviewed-placeholder")
+    monkeypatch.setenv(
+        "ARTIFICIAL_SCIENTIST_LAB_EXECUTION_MODE", "sandbox:unreviewed-placeholder"
+    )
     adapter = get_execution_adapter()
     assert isinstance(adapter, ReviewedSandboxExecutionAdapter)
     with pytest.raises(Exception, match="no reviewed sandbox implementation"):
@@ -1263,7 +1267,9 @@ def test_production_lab_api_fails_closed_without_reviewed_sandbox(
     monkeypatch.delenv("ARTIFICIAL_SCIENTIST_OIDC_ISSUER", raising=False)
     monkeypatch.delenv("ARTIFICIAL_SCIENTIST_OIDC_AUDIENCE", raising=False)
     monkeypatch.delenv("ARTIFICIAL_SCIENTIST_OIDC_JWKS_URL", raising=False)
-    monkeypatch.setenv("ARTIFICIAL_SCIENTIST_DB_PATH", str(tmp_path / "fail-closed.sqlite3"))
+    monkeypatch.setenv(
+        "ARTIFICIAL_SCIENTIST_DB_PATH", str(tmp_path / "fail-closed.sqlite3")
+    )
     get_lab_store.cache_clear()
     try:
         client = TestClient(app)
@@ -1282,6 +1288,8 @@ def test_production_lab_api_fails_closed_without_reviewed_sandbox(
             },
         )
         assert response.status_code == 503
-        assert response.json()["detail"] == "No reviewed lab execution sandbox is configured."
+        assert response.json()["detail"] == (
+            "No reviewed lab execution sandbox is configured."
+        )
     finally:
         get_lab_store.cache_clear()
