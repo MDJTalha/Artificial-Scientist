@@ -39,7 +39,7 @@ class DomainRegistry:
         name = spec.name.strip()
         if not name or len(name) > _MAX_NAME:
             raise ValueError("domain name must be bounded and non-empty")
-        risk_class = spec.risk_class.strip() if isinstance(spec.risk_class, str) else ""
+        risk_class = spec.risk_class.strip().casefold() if isinstance(spec.risk_class, str) else ""
         if risk_class not in _ALLOWED_RISK_CLASSES:
             raise ValueError("unknown domain risk class")
         tools = self._validate_items(spec.tools, label="tools", maximum=_MAX_TOOL)
