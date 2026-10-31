@@ -729,91 +729,76 @@ class RecordStore:
             payload=json.loads(payload_json),
         )
 
-    def get(self, record_id: UUID) -> RecordEnvelope:
-        """Fetch one record and verify both stored bytes and schema."""
+    def get(self, record_id: UUID, *, tenant_id: str | None = None) -> RecordEnvelope:
+        """Fetch a record only from the selected tenant namespace."""
         with self._connect() as connection:
             row = connection.execute(
-                "SELECT * FROM research_records WHERE id = ?",
-                (str(record_id),),
+                "SELECT * FROM research_records WHERE id = ? AND tenant_id IS ?",
+                (str(record_id), tenant_id),
             ).fetchone()
         if row is None:
             raise RecordNotFound(f"Record {record_id} was not found.")
         return self._row_to_envelope(row)
 
-    def find_source_by_identity(self, record: SourceRecord) -> RecordEnvelope | None:
-        """Find an existing source with the same DOI, identifier, or landing URL."""
-        identity_key = source_identity_key(record)
+    def find_source_by_identity(
+        self, record: SourceRecord, *, tenant_id: str | None = None
+    ) -> RecordEnvelope | None:
+        identity_key = _tenant_identity_key(record, tenant_id)
         with closing(self._connect()) as connection:
             row = connection.execute(
-                "SELECT record_id FROM source_identity WHERE identity_key = ?",
-                (identity_key,),
+                "SELECT record_id FROM source_identity WHERE identity_key = ? AND tenant_id IS ?",
+                (identity_key, tenant_id),
             ).fetchone()
         if row is None:
             return None
-        return self.get(UUID(str(row["record_id"])))
+        return self.get(UUID(str(row["record_id"])), tenant_id=tenant_id)
 
     def list_records(
-        self,
-        *,
-        record_type: RecordType | None = None,
-        limit: int = 20,
-        offset: int = 0,
+        self, *, record_type: RecordType | None = None, limit: int = 20, offset: int = 0,
+        tenant_id: str | None = None,
     ) -> tuple[list[RecordEnvelope], int]:
-        """List records newest-first, optionally filtered by their validated type."""
         if not 1 <= limit <= 100:
             raise ValueError("limit must be between 1 and 100")
         if offset < 0:
             raise ValueError("offset must be non-negative")
-
-        where_clause = " WHERE record_type = ?" if record_type else ""
-        params: tuple[object, ...] = (record_type,) if record_type else ()
+        conditions = ["tenant_id IS ?" ,]
+        parameters: list[object] = [tenant_id]
+        if record_type:
+            conditions.append("record_type = ?")
+            parameters.append(record_type)
+        where = " WHERE " + " AND ".join(conditions)
         with self._connect() as connection:
-            total = int(
-                connection.execute(
-                    "SELECT COUNT(*) FROM research_records" + where_clause,
-                    params,
-                ).fetchone()[0]
-            )
+            total = int(connection.execute("SELECT COUNT(*) FROM research_records" + where, tuple(parameters)).fetchone()[0])
             rows = connection.execute(
-                "SELECT * FROM research_records"
-                + where_clause
-                + " ORDER BY created_at DESC, id ASC LIMIT ? OFFSET ?",
-                (*params, limit, offset),
+                "SELECT * FROM research_records" + where +
+                " ORDER BY created_at DESC, id ASC LIMIT ? OFFSET ?",
+                (*parameters, limit, offset),
             ).fetchall()
-
         return [self._row_to_envelope(row) for row in rows], total
 
     def list_audit_events(
-        self, *, limit: int = 20, offset: int = 0
+        self, *, limit: int = 20, offset: int = 0, tenant_id: str | None = None
     ) -> tuple[list[AuditEventEnvelope], int]:
-        """Return server-generated record-creation audit events."""
         if not 1 <= limit <= 100:
             raise ValueError("limit must be between 1 and 100")
         if offset < 0:
             raise ValueError("offset must be non-negative")
-
         with self._connect() as connection:
-            total = int(connection.execute("SELECT COUNT(*) FROM audit_events").fetchone()[0])
+            total = int(connection.execute(
+                "SELECT COUNT(*) FROM audit_events WHERE tenant_id IS ?", (tenant_id,)
+            ).fetchone()[0])
             rows = connection.execute(
-                """
-                SELECT event_id, occurred_at, action, actor, record_id, record_type, content_sha256
-                FROM audit_events
-                ORDER BY occurred_at DESC, event_id ASC
-                LIMIT ? OFFSET ?
-                """,
-                (limit, offset),
+                """SELECT event_id, occurred_at, action, actor, record_id, record_type, content_sha256
+                   FROM audit_events WHERE tenant_id IS ?
+                   ORDER BY occurred_at DESC, event_id ASC LIMIT ? OFFSET ?""",
+                (tenant_id, limit, offset),
             ).fetchall()
-
-        events = [
+        return [
             AuditEventEnvelope(
                 event_id=UUID(str(row["event_id"])),
                 occurred_at=datetime.fromisoformat(str(row["occurred_at"])),
-                action="record.created",
-                actor="local-api-client",
-                record_id=UUID(str(row["record_id"])),
-                record_type=row["record_type"],
+                action="record.created", actor="local-api-client",
+                record_id=UUID(str(row["record_id"])), record_type=row["record_type"],
                 content_sha256=str(row["content_sha256"]),
-            )
-            for row in rows
-        ]
-        return events, total
+            ) for row in rows
+        ], total
