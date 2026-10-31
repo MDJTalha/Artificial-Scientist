@@ -101,3 +101,26 @@ def test_end_to_end_autonomy_is_governed():
     assert result.workflow_state == "completed"
     assert result.verification_passed
     assert result.governance_decision == "release"
+
+
+def test_domain_registry_rejects_invalid_definitions():
+    import pytest
+
+    domains = DomainRegistry()
+    with pytest.raises(ValueError, match="risk class"):
+        domains.register(DomainSpec("x", "unknown", ("solver",), ("case",)))
+
+    with pytest.raises(ValueError, match="duplicates"):
+        domains.register(DomainSpec("x", "low", ("solver", "solver"), ("case",)))
+
+    with pytest.raises(ValueError, match="non-empty"):
+        domains.register(DomainSpec("x", "low", ("",), ("case",)))
+
+
+def test_domain_registry_normalizes_bounded_definitions():
+    domains = DomainRegistry()
+    domains.register(DomainSpec(" physics ", "high", (" solver ",), (" case-1 ",)))
+    assert domains.get("physics").tools == ("solver",)
+    assert domains.get("physics").validation_cases == ("case-1",)
+    with pytest.raises(ValueError, match="already registered"):
+        domains.register(DomainSpec("physics", "high", ("other",), ("case-2",)))
