@@ -8,11 +8,11 @@ This is **not a commercial SaaS product**. Its guiding objective is to contribut
 
 ## Current status
 
-**Phases 0–4 have recorded passing implementation CI checks. Phase 5 — Mathematics & Scientific Tools has passed its implementation and pull-request CI checks and is available as [draft Pull Request #5](https://github.com/MDJTalha/Artificial-Scientist/pull/5) for review. All phase pull requests remain unmerged by design.**
+**Phases 0–5 have recorded implementation CI evidence on their respective historical commits. Phase 5 is available as [draft Pull Request #5](https://github.com/MDJTalha/Artificial-Scientist/pull/5). Phase 6 — Controlled Computational Laboratory now includes a declarative runner, SQLite-backed run history, canonical full-record integrity checks, and atomic JSON result artifacts with SHA-256 verification and run/plan/step provenance. Artifact APIs are implemented on `phase-6-controlled-lab`; latest-head backend CI is still running and full exit criteria remain pending. All phase pull requests remain unmerged by design.**
 
 The foundation includes a FastAPI backend, health/readiness endpoints, a React + TypeScript overview dashboard that checks the actual local API, typed research records, SQLite provenance storage, and GitHub Actions verification.
 
-Phase 3 adds OpenAlex and Crossref metadata search adapters, source normalization, DOI-based deduplication, and optional persistent source records. Phase 4 adds typed scientific concepts, a controlled vocabulary, evidence-linked relationship assertions, server-side concept search, and bounded graph-neighborhood traversal. Phase 4 CI passed 46 backend tests on Python 3.12 and 46 on Python 3.13, plus frontend type-checking, 6 frontend tests, and the production build; see the [verified run](https://github.com/MDJTalha/Artificial-Scientist/actions/runs/40265564598). Phase 5 adds bounded symbolic and numerical math, descriptive statistics, allowlisted unit conversion, dimensional checks, and in-memory PNG plotting. Its implementation CI passed 75 backend tests on Python 3.12 and 75 on Python 3.13, plus frontend type-checking, 6 frontend tests, and the production build; see the [verified code run](https://github.com/MDJTalha/Artificial-Scientist/actions/runs/40266731194) and [passing pull-request run](https://github.com/MDJTalha/Artificial-Scientist/actions/runs/40266895491). Full-text ingestion, automated claim verification, autonomous hypothesis generation, a secured general-purpose experiment lab, and agent orchestration **are not implemented yet**. Planned capabilities are not presented as active features.
+Phase 3 adds OpenAlex and Crossref metadata search adapters, source normalization, DOI-based deduplication, and optional persistent source records. Phase 4 adds typed scientific concepts, a controlled vocabulary, evidence-linked relationship assertions, server-side concept search, and bounded graph-neighborhood traversal. Phase 4 CI passed 46 backend tests on Python 3.12 and 46 on Python 3.13, plus frontend type-checking, 6 frontend tests, and the production build; see the [verified run](https://github.com/MDJTalha/Artificial-Scientist/actions/runs/40265564598). Phase 5 adds bounded symbolic and numerical math, descriptive statistics, allowlisted unit conversion, dimensional checks, and in-memory PNG plotting. Its implementation CI passed 75 backend tests on Python 3.12 and 75 on Python 3.13, plus frontend type-checking, 6 frontend tests, and the production build; see the [verified code run](https://github.com/MDJTalha/Artificial-Scientist/actions/runs/40266731194) and [passing pull-request run](https://github.com/MDJTalha/Artificial-Scientist/actions/runs/40266895491). Full-text ingestion, automated claim verification, autonomous hypothesis generation, durable and OS-isolated experiment execution, and agent orchestration **are not implemented yet**. Phase 6 is an allowlisted declarative runner with persisted run history, not a general-purpose sandbox. Planned capabilities are not presented as active features.
 
 ## Scientific principles
 
@@ -79,6 +79,7 @@ Run one command at a time from the repository root:
     .\\.venv\\Scripts\\Activate.ps1
     python -m pip install --upgrade pip
     pip install -e ".[dev]"
+    $env:ARTIFICIAL_SCIENTIST_ENV = "development"
     python -m uvicorn artificial_scientist.main:app --reload
 
 API: http://127.0.0.1:8000  
@@ -124,7 +125,7 @@ Passing these checks verifies the current application foundation only; it does n
 - [backend/README.md](backend/README.md) — backend setup and endpoint reference
 - [docs/PHASE_3_LITERATURE.md](docs/PHASE_3_LITERATURE.md) — scholarly search API, provenance, rate limits, and acceptance criteria
 - [docs/PHASE_4_KNOWLEDGE_GRAPH.md](docs/PHASE_4_KNOWLEDGE_GRAPH.md) — concept schemas, controlled relations, graph API, verified CI results, and acceptance criteria
-- [docs/PHASE_5_MATH_TOOLS.md](docs/PHASE_5_MATH_TOOLS.md) — mathematical API contracts, supported operations, safety bounds, numerical reference cases, CI evidence, and acceptance criteria
+- [docs/PHASE_5_MATH_TOOLS.md](docs/PHASE_5_MATH_TOOLS.md) — mathematical API contracts, supported operations, safety bounds, numerical reference cases, CI evidence, and acceptance criteria\n- [docs/PHASE_6_CONTROLLED_LAB.md](docs/PHASE_6_CONTROLLED_LAB.md) — declarative lab API, integrity hashes, security limitations, and phase exit gates
 
 ## Development approach
 

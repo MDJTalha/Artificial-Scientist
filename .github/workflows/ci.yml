@@ -9,6 +9,7 @@ on:
       - phase-3-literature-retrieval
       - phase-4-knowledge-graph
       - phase-5-mathematical-tools
+      - phase-6-controlled-lab
   pull_request:
     branches:
       - main
@@ -17,6 +18,7 @@ on:
       - phase-3-literature-retrieval
       - phase-4-knowledge-graph
       - phase-5-mathematical-tools
+      - phase-6-controlled-lab
   workflow_dispatch:
 
 permissions:
