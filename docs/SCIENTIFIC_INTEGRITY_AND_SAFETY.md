@@ -1,6 +1,6 @@
 # Scientific Integrity and Safe Autonomy
 
-**Status:** Foundational requirements; implementation pending
+**Status:** Repository policy baseline implemented and mapped to tested controls; deployment/external review remains separately gated
 
 ## 1. Evidence and claim integrity
 
@@ -87,4 +87,6 @@ When a material integrity or safety failure is detected:
 
 ## 10. Implementation status
 
-This policy is a design requirement, not proof that technical controls already exist. Each requirement must be mapped to code, tests, logs, and release gates as implementation proceeds.
+The repository now maps these requirements to concrete controls across records/provenance, discovery, authorization, controlled lab execution, bounded autonomy, governance, audit, and publication approval. Phase-specific tests cover fail-closed behavior, tenant isolation, evidence linkage, approval gates, verification, contradiction history, and physical-action blocking.
+
+Remaining evidence is explicitly external where the policy requires a deployment boundary or qualified review: OS-level sandbox certification, live identity-provider validation, operational deployment controls, independent security review, and domain/scientific expert validation. The absence of such evidence is treated as an open release gate rather than an implementation claim.
