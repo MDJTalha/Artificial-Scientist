@@ -605,7 +605,8 @@ class RecordStore:
                 )
                 if isinstance(record, SourceRecord):
                     connection.execute(
-                        "INSERT INTO source_identity(" \n                        "identity_key, tenant_id, record_id) VALUES (?, ?, ?)",
+                        "INSERT INTO source_identity("
+                        "identity_key, tenant_id, record_id) VALUES (?, ?, ?)",
                         (lookup_key, tenant_id, record_id),
                     )
                 connection.execute(
@@ -614,8 +615,14 @@ class RecordStore:
                         (event_id, tenant_id, occurred_at, action, actor, record_id,
                          record_type, content_sha256)
                     VALUES (?, ?, ?, 'record.created', 'local-api-client', ?, ?, ?)
-                    """,
-                    (\n                        str(uuid4()), tenant_id, created_at, record_id,\n                        record.record_type, content_sha256,\n                    ),
+                    (
+                        str(uuid4()),
+                        tenant_id,
+                        created_at,
+                        record_id,
+                        record.record_type,
+                        content_sha256,
+                    ),
                 )
                 connection.commit()
         except sqlite3.IntegrityError as exc:
