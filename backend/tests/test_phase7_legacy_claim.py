@@ -12,7 +12,7 @@ from artificial_scientist.records.legacy_claim import (
     claim_legacy_records,
 )
 from artificial_scientist.records.models import ResearchTaskRecord, SourceRecord
-from artificial_scientist.records.store import RecordStore
+from artificial_scientist.records.store import RecordNotFound, RecordStore
 
 
 def _tenant_and_operator(database: Path) -> tuple[str, str]:
@@ -70,7 +70,7 @@ def test_apply_assigns_record_and_writes_security_audit(tmp_path: Path) -> None:
     )
 
     assert result["mode"] == "apply"
-    with pytest.raises(Exception):
+    with pytest.raises(RecordNotFound):
         store.get(record.id, tenant_id=None)
     assert store.get(record.id, tenant_id=tenant_id).id == record.id
     with sqlite3.connect(database) as connection:
