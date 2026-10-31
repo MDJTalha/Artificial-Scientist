@@ -558,88 +558,67 @@ class RecordStore:
             ).fetchall()
         return [self._row_to_envelope(row) for row in rows], total
 
-    def create(self, record: RecordBase) -> RecordEnvelope:
-        """Atomically persist a validated record and its server-generated audit event."""
+    def create(self, record: RecordBase, *, tenant_id: str | None = None) -> RecordEnvelope:
+        """Atomically persist a record and audit event within one tenant."""
         payload_json = _canonical_payload(record)
         content_sha256 = _sha256_text(payload_json)
         created_at = _utc_iso()
         record_id = str(record.id)
-
         try:
             with self._connect() as connection:
                 connection.execute("BEGIN IMMEDIATE")
                 if isinstance(record, SourceRecord):
-                    identity_key = source_identity_key(record)
+                    lookup_key = _source_identity_lookup_key(record, tenant_id)
                     duplicate = connection.execute(
                         "SELECT record_id FROM source_identity WHERE identity_key = ?",
-                        (identity_key,),
+                        (lookup_key,),
                     ).fetchone()
                     if duplicate is not None:
                         raise DuplicateSource(UUID(str(duplicate["record_id"])))
-                self._validate_relationships(connection, record)
+                self._validate_relationships(connection, record, tenant_id=tenant_id)
                 connection.execute(
                     """
                     INSERT INTO research_records
-                        (id, record_type, schema_version, created_at, content_sha256, payload_json)
-                    VALUES (?, ?, ?, ?, ?, ?)
+                        (id, tenant_id, record_type, schema_version, created_at, content_sha256, payload_json)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
                     """,
-                    (
-                        record_id,
-                        record.record_type,
-                        record.schema_version,
-                        created_at,
-                        content_sha256,
-                        payload_json,
-                    ),
+                    (record_id, tenant_id, record.record_type, record.schema_version,
+                     created_at, content_sha256, payload_json),
                 )
                 if isinstance(record, SourceRecord):
                     connection.execute(
-                        "INSERT INTO source_identity(identity_key, record_id) VALUES (?, ?)",
-                        (source_identity_key(record), record_id),
+                        "INSERT INTO source_identity(identity_key, tenant_id, record_id) VALUES (?, ?, ?)",
+                        (lookup_key, tenant_id, record_id),
                     )
                 connection.execute(
                     """
                     INSERT INTO audit_events
-                        (
-                            event_id, occurred_at, action, actor, record_id,
-                            record_type, content_sha256
-                        )
-                    VALUES (?, ?, 'record.created', 'local-api-client', ?, ?, ?)
+                        (event_id, tenant_id, occurred_at, action, actor, record_id,
+                         record_type, content_sha256)
+                    VALUES (?, ?, ?, 'record.created', 'local-api-client', ?, ?, ?)
                     """,
-                    (
-                        str(uuid4()),
-                        created_at,
-                        record_id,
-                        record.record_type,
-                        content_sha256,
-                    ),
+                    (str(uuid4()), tenant_id, created_at, record_id, record.record_type, content_sha256),
                 )
                 connection.commit()
         except sqlite3.IntegrityError as exc:
             if "research_records.id" in str(exc) or "UNIQUE constraint failed" in str(exc):
                 raise RecordConflict(f"Record {record.id} already exists.") from exc
             raise RecordStoreError("Could not persist the record and audit event.") from exc
-
         return RecordEnvelope(
-            id=record.id,
-            record_type=record.record_type,
-            schema_version=record.schema_version,
-            created_at=datetime.fromisoformat(created_at),
-            content_sha256=content_sha256,
+            id=record.id, record_type=record.record_type, schema_version=record.schema_version,
+            created_at=datetime.fromisoformat(created_at), content_sha256=content_sha256,
             payload=record.model_dump(mode="json"),
         )
 
-    def create_many(self, records: list[RecordBase]) -> list[RecordEnvelope]:
-        """Atomically persist a bounded batch and its audit events in one transaction."""
+    def create_many(
+        self, records: list[RecordBase], *, tenant_id: str | None = None
+    ) -> list[RecordEnvelope]:
+        """Atomically persist a bounded batch and its audit events within one tenant."""
         if not records:
             raise ValueError("records must not be empty")
         if len(records) > 10:
             raise ValueError("a record batch may contain at most 10 items")
-
-        prepared = [
-            (record, _canonical_payload(record), _utc_iso())
-            for record in records
-        ]
+        prepared = [(record, _canonical_payload(record), _utc_iso()) for record in records]
         envelopes: list[RecordEnvelope] = []
         try:
             with closing(self._connect()) as connection:
@@ -647,57 +626,43 @@ class RecordStore:
                 for record, payload_json, created_at in prepared:
                     record_id = str(record.id)
                     if isinstance(record, SourceRecord):
-                        identity_key = source_identity_key(record)
+                        lookup_key = _source_identity_lookup_key(record, tenant_id)
                         duplicate = connection.execute(
                             "SELECT record_id FROM source_identity WHERE identity_key = ?",
-                            (identity_key,),
+                            (lookup_key,),
                         ).fetchone()
                         if duplicate is not None:
                             raise DuplicateSource(UUID(str(duplicate["record_id"])))
-                    self._validate_relationships(connection, record)
+                    self._validate_relationships(connection, record, tenant_id=tenant_id)
+                    digest = _sha256_text(payload_json)
                     connection.execute(
                         """
                         INSERT INTO research_records
-                            (id, record_type, schema_version, created_at, content_sha256,
-                             payload_json)
-                        VALUES (?, ?, ?, ?, ?, ?)
+                            (id, tenant_id, record_type, schema_version, created_at,
+                             content_sha256, payload_json)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
                         """,
-                        (
-                            record_id,
-                            record.record_type,
-                            record.schema_version,
-                            created_at,
-                            _sha256_text(payload_json),
-                            payload_json,
-                        ),
+                        (record_id, tenant_id, record.record_type, record.schema_version,
+                         created_at, digest, payload_json),
                     )
                     if isinstance(record, SourceRecord):
                         connection.execute(
-                            "INSERT INTO source_identity(identity_key, record_id) VALUES (?, ?)",
-                            (source_identity_key(record), record_id),
+                            "INSERT INTO source_identity(identity_key, tenant_id, record_id) VALUES (?, ?, ?)",
+                            (lookup_key, tenant_id, record_id),
                         )
                     connection.execute(
                         """
                         INSERT INTO audit_events
-                            (event_id, occurred_at, action, actor, record_id, record_type,
-                             content_sha256)
-                        VALUES (?, ?, 'record.created', 'local-api-client', ?, ?, ?)
+                            (event_id, tenant_id, occurred_at, action, actor, record_id,
+                             record_type, content_sha256)
+                        VALUES (?, ?, ?, 'record.created', 'local-api-client', ?, ?, ?)
                         """,
-                        (
-                            str(uuid4()),
-                            created_at,
-                            record_id,
-                            record.record_type,
-                            _sha256_text(payload_json),
-                        ),
+                        (str(uuid4()), tenant_id, created_at, record_id, record.record_type, digest),
                     )
                     envelopes.append(
                         RecordEnvelope(
-                            id=record.id,
-                            record_type=record.record_type,
-                            schema_version=record.schema_version,
-                            created_at=datetime.fromisoformat(created_at),
-                            content_sha256=_sha256_text(payload_json),
+                            id=record.id, record_type=record.record_type, schema_version=record.schema_version,
+                            created_at=datetime.fromisoformat(created_at), content_sha256=digest,
                             payload=record.model_dump(mode="json"),
                         )
                     )
