@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from artificial_scientist.api.routes.autonomy import router as autonomy_router
 from artificial_scientist.api.routes.discovery import router as discovery_router
 from artificial_scientist.api.routes.health import router as health_router
 from artificial_scientist.api.routes.knowledge import router as knowledge_router
@@ -288,6 +289,7 @@ app.add_middleware(
 )
 
 app.include_router(health_router)
+app.include_router(autonomy_router)
 app.include_router(discovery_router)
 app.include_router(literature_router)
 app.include_router(math_tools_router)
