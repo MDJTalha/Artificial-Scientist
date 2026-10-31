@@ -101,7 +101,35 @@ jobs:
       - name: Build production assets
         run: npm run build
       - name: Run accessibility and conference workspace E2E
-        run: npx playwright test
+        id: frontend-e2e
+        shell: bash
+        run: |
+          set +e
+          npx playwright test 2>&1 | tee e2e-test.log
+          status=${PIPESTATUS[0]}
+          exit ${status}
+      - name: Publish frontend E2E diagnostics to PR
+        if: failure()
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const fs = require('fs')
+            const logPath = 'frontend/e2e-test.log'
+            const log = fs.existsSync(logPath) ? fs.readFileSync(logPath, 'utf8') : 'e2e-test.log was not produced'
+            const body = [
+              '### Frontend E2E diagnostic',
+              '',
+              'Temporary CI diagnostic for the release-hardening run.',
+              '',
+              'E2E-TEST-LOG',
+              log.slice(-12000),
+            ].join('\n')
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body,
+            })
 
   release-gates:
     name: Release-gate policy and hardened regression checks
