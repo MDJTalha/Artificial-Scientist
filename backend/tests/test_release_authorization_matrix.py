@@ -33,7 +33,7 @@ def _dependency_names(route) -> set[str]:
     [
         (records_routes.router, set()),
         (discovery_routes.router, set()),
-        (knowledge_routes.router, {"/vocabulary"}),
+        (knowledge_routes.router, {"/api/v1/knowledge/vocabulary"}),
         (autonomy_routes.router, set()),
     ],
 )
