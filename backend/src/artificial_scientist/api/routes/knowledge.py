@@ -4,7 +4,7 @@ from collections import deque
 from typing import Annotated, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from artificial_scientist.api.routes.records import get_record_store, record_access
 from artificial_scientist.knowledge.schemas import (
