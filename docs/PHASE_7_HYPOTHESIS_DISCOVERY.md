@@ -82,3 +82,10 @@ Phase 7 code acceptance requires the latest branch SHA to pass frontend type-che
 Discovery POST requests are capped at 1 MiB before JSON parsing. The guard enforces both declared `Content-Length` and streamed body size, so chunked requests cannot bypass the limit. Requests above the limit receive HTTP 413 and are not passed to Pydantic or route handlers. Regression coverage verifies rejection of an oversized body.
 
 This limit is a resource-abuse guard, not authentication, rate limiting, or a substitute for an upstream proxy/server request limit. Deployments should also configure reverse-proxy body limits, connection/timeouts, per-principal rate limits, and monitoring. Tenant-scoped authorization and cross-tenant negative tests are implemented for the integrated research-record/discovery paths. Do not treat repository tests as a substitute for live deployment validation or independent security review.
+
+
+## Bounded hypothesis generation
+
+The integrated discovery service also exposes `POST /api/v1/discovery/generate`. It accepts an explicitly structured independent variable, dependent variable, system/population, and optional context, then produces a small deterministic set of directional and null candidates. Every generated candidate is marked `requires_human_review` and contains assumptions, alternatives, predictions, falsification criteria, and a discriminating test.
+
+This is intentionally **bounded hypothesis synthesis**, not autonomous scientific discovery. It does not invent evidence, retrieve literature, estimate truth probabilities, claim novelty, or execute experiments. Generated candidates must pass the normal assessment, prior-work screening, Phase 8 planning, and Phase 9 independent-verification controls before they can influence a research conclusion.
