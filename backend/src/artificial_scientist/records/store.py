@@ -247,10 +247,14 @@ class RecordStore:
                         "during migration."
                     ) from exc
                 connection.execute(
-                    "INSERT OR IGNORE INTO source_identity(identity_key, tenant_id, record_id) VALUES (?, ?, ?)",
-                    (source_identity_key(source_record), source_row["tenant_id"], str(source_record.id)),
-                )
-            connection.execute(
+                    "INSERT OR IGNORE INTO source_identity("
+                        identity_key, tenant_id, record_id
+                    ) VALUES (?, ?, ?)",
+                    (
+                        source_identity_key(source_record),
+                        source_row["tenant_id"],
+                        str(source_record.id),
+                    ),
                 """
                 CREATE TRIGGER IF NOT EXISTS research_records_no_update
                 BEFORE UPDATE ON research_records
@@ -591,8 +595,10 @@ class RecordStore:
                 connection.execute(
                     """
                     INSERT INTO research_records
-                        (id, tenant_id, record_type, schema_version, created_at, content_sha256, payload_json)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                        (
+                            id, tenant_id, record_type, schema_version, created_at,
+                            content_sha256, payload_json
+                        )
                     """,
                     (record_id, tenant_id, record.record_type, record.schema_version,
                      created_at, content_sha256, payload_json),
