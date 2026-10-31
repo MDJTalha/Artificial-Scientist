@@ -22,12 +22,12 @@ This register separates **repository verification evidence** from **external rel
 
 - Branch: `phase-release-verification-hardening`
 - Implementation commit: `20681adc2520464a6735628bd0ddf78a3cfa9f61`
-- Verified branch head: `597d3d8c43affb2c4794189c9f60a6400fb034ba`
+- Previously verified branch head: `f3a8661bcf9f2d5c6117e2193d4852896c471c36`
 - GitHub Actions workflow: **Continuous Integration**, run **1242** / ID **41225031000**
 - Backend: Python 3.12 and 3.13 full test suites + Ruff passed.
 - Frontend: TypeScript type-check, unit tests, production build, Playwright/axe accessibility and conference-workspace E2E passed.
 - Release-gate job: policy validation, Phase 6 hardening regressions, Phase 7 authorization/tenant regressions, and Phases 8–14 regressions passed.
-- The verified CI run exercised the current branch head; the implementation under test remains the repository-side hardening commit above, with later documentation-only synchronization.
+- The previously verified CI run exercised the repository-side hardening baseline. The current branch additionally contains the production-validation runbook, configuration preflight, SQLite backup/restore helper, sanitized OIDC/JWKS probe, deterministic scientific smoke benchmark, independent security-review scope, scientific-validation protocol, and operations acceptance checklist. A new CI run is required before those additions are recorded as CI-verified.
 
 ## Evidence rules
 
