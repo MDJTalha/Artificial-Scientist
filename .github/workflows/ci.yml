@@ -101,7 +101,7 @@ jobs:
       - name: Smoke-test fixed laboratory sandbox
         run: |
           printf '%s\n' '{"operation":"statistics","inputs":{"values":[1,2,3],"variance_mode":"population"}}' |
-            docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges               --pids-limit 64 --memory 512m --cpus 1.0 --tmpfs /tmp:rw,noexec,nosuid,nodev,size=64m               --user 65532:65532 asds-lab-sandbox:ci
+            docker run --rm -i --network none --read-only --cap-drop ALL --security-opt no-new-privileges               --pids-limit 64 --memory 512m --cpus 1.0 --tmpfs /tmp:rw,noexec,nosuid,nodev,size=64m               --user 65532:65532 asds-lab-sandbox:ci
       - name: Install backend test tools
         working-directory: backend
         run: |
