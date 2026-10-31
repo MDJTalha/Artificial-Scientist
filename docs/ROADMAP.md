@@ -6,7 +6,7 @@ The project is organized into **15 phases, Phase 0 through Phase 14**. These are
 
 **Build:** mission, scientific constitution, scope, initial architecture, technology decisions, risk register, and acceptance strategy.  
 **Exit criteria:** project goals and non-goals documented; system boundaries identified; initial threat model written; first research workflow and measures defined.  
-**Current status:** foundational documentation started; formal risk register and evaluation baseline still need completion.
+**Current status:** repository-side charter, risk register, and evaluation baseline are documented in `docs/PHASE_0_RISK_REGISTER.md`. Operational risk evidence and scientific validation remain external release gates.
 
 ## Phase 1 — Core application foundation
 
