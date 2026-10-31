@@ -174,7 +174,7 @@ def screen_prior_work(
 )
 def generate_hypothesis_candidates(
     request: HypothesisGenerationRequest,
-    tenant_id: Annotated[str | None, Depends(record_access("discovery:decompose"))],
+    tenant_id: Annotated[str | None, Depends(record_access("discovery:generate"))],
 ) -> HypothesisGenerationResponse:
     """Generate deterministic suggestions that always require human review."""
     return generate_hypotheses(request)
