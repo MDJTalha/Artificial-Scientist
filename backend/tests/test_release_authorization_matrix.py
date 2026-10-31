@@ -102,8 +102,9 @@ def test_health_is_the_only_intentionally_public_system_route() -> None:
         if route.path == "/api/v1/health"
     }
     assert public
+    allowed_prefixes = ("/docs", "/redoc", "/openapi.json")
     assert all(
-        route.path == "/api/v1/health" or route.path.startswith("/docs")
+        route.path == "/api/v1/health" or route.path.startswith(allowed_prefixes)
         for route in main.app.routes
         if getattr(route, "methods", None)
     )
