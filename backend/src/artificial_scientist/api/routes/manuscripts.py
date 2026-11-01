@@ -8,6 +8,11 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, ConfigDict, Field
 
+from artificial_scientist.autonomy.writing import (
+    Citation,
+    ScientificWriter,
+    WritingError,
+)
 from artificial_scientist.api.routes.records import get_record_store, record_access
 from artificial_scientist.records.models import (
     ManuscriptClaim,
@@ -19,11 +24,6 @@ from artificial_scientist.records.store import (
     RecordNotFound,
     RecordStore,
     RecordStoreError,
-)
-from artificial_scientist.autonomy.writing import (
-    Citation,
-    ScientificWriter,
-    WritingError,
 )
 
 router = APIRouter(prefix="/api/v1/manuscripts", tags=["scientific manuscripts"])
