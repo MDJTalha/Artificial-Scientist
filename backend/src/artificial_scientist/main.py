@@ -13,6 +13,7 @@ from artificial_scientist.api.routes.knowledge import router as knowledge_router
 from artificial_scientist.api.routes.lab import router as lab_router
 from artificial_scientist.api.routes.literature import router as literature_router
 from artificial_scientist.api.routes.math_tools import router as math_tools_router
+from artificial_scientist.api.routes.memory import router as memory_router
 from artificial_scientist.api.routes.records import router as records_router
 from artificial_scientist.authorization import TenantDirectory
 from artificial_scientist.config import get_settings
@@ -293,6 +294,7 @@ app.include_router(autonomy_router)
 app.include_router(discovery_router)
 app.include_router(literature_router)
 app.include_router(math_tools_router)
+app.include_router(memory_router)
 app.include_router(lab_router)
 app.include_router(knowledge_router)
 app.include_router(records_router)
