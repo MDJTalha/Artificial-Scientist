@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { API_BASE_URL, apiRequest, getHealth, getOpenApi, getReadiness, getVocabulary, searchConcepts, searchLiterature, createConcept } from './lib/api';
+import { beginCognitoLogin, cognitoConfigured, completeCognitoCallback, signOutCognito } from './lib/cognito';
 
 type Tab = 'overview'|'literature'|'knowledge'|'discovery'|'mathematics'|'laboratory'|'experiments'|'memory'|'collaboration'|'writing'|'governance'|'api';
 type Result = unknown;
@@ -36,6 +37,9 @@ function ErrorPanel({error}:{error:string}){return <div className="notice notice
 function Metric({label,value,detail}:{label:string;value:string;detail:string}){return <article className="metric"><span>{label}</span><strong>{value}</strong><small>{detail}</small></article>}
 function App(){
  const [tab,setTab]=useState<Tab>('overview');
+ const [authStatus,setAuthStatus]=useState<'checking'|'signed-in'|'signed-out'>('checking');
+ const [authError,setAuthError]=useState('');
+ const callbackStarted=useRef(false);
  const [health,setHealth]=useState<any>(null),[ready,setReady]=useState<any>(null),[apiError,setApiError]=useState('');
  const [loading,setLoading]=useState(false),[lastUpdated,setLastUpdated]=useState('');
  const [openApi,setOpenApi]=useState<Record<string,any>|null>(null);
@@ -48,7 +52,8 @@ function App(){
  const [apiPath,setApiPath]=useState('/api/v1/ready'); const [apiMethod,setApiMethod]=useState('GET'); const [apiBody,setApiBody]=useState('{}'); const [apiResult,setApiResult]=useState<Result>(null);
  const [mobileNav,setMobileNav]=useState(false);
  const refresh=useCallback(async()=>{setLoading(true);setApiError('');try{const [h,r]=await Promise.all([getHealth(),getReadiness()]);setHealth(h);setReady(r);setLastUpdated(new Date().toLocaleTimeString());}catch(e){setHealth(null);setReady(null);setApiError(e instanceof Error?e.message:'API connection failed');}finally{setLoading(false);}},[]);
- useEffect(()=>{void refresh();void getVocabulary().then(setVocabulary).catch(()=>{});},[refresh]);
+ useEffect(()=>{if(callbackStarted.current)return;callbackStarted.current=true;void completeCognitoCallback().then(()=>setAuthStatus('signed-in')).catch(e=>{setAuthError(e instanceof Error?e.message:'Cognito sign-in failed');setAuthStatus('signed-out')});},[]);
+ useEffect(()=>{if(authStatus==='signed-in'){void refresh();void getVocabulary().then(setVocabulary).catch(()=>{});}},[authStatus,refresh]);
  const paths=useMemo(()=>Object.entries(openApi?.paths??{}).flatMap(([path,methods]:[string,any])=>Object.entries(methods??{}).filter(([method])=>['get','post','put','patch','delete'].includes(method)).map(([method,op]:[string,any])=>({path,method:method.toUpperCase(),summary:op.summary??op.operationId??''}))),[openApi]);
  const loadSpec=async()=>{try{setOpenApi(await getOpenApi());}catch(e){setApiError(e instanceof Error?e.message:'Unable to load API contract');}};
  const run=async(fn:()=>Promise<any>,setter:(v:any)=>void)=>{setLoading(true);setApiError('');try{setter(await fn());}catch(e){setApiError(e instanceof Error?e.message:'Request failed');}finally{setLoading(false);}};
@@ -56,6 +61,7 @@ function App(){
  const runMath=async()=>{let body:any;try{body=JSON.parse(mathBody);}catch{setApiError('Enter valid JSON for the mathematical operation.');return;}await run(()=>apiRequest('/api/v1/math'+mathPath,{method:'POST',body:JSON.stringify(body)}),setMathResult);};
  const runApi=async()=>{let body:any;try{body=JSON.parse(apiBody);}catch{setApiError('Request body must be valid JSON.');return;}await run(()=>apiRequest(apiPath,{method:apiMethod,body:apiMethod==='GET'||apiMethod==='DELETE'?undefined:JSON.stringify(body)}),setApiResult);};
  const active=navigation.find(n=>n.id===tab)!;
+ if(authStatus!=='signed-in') return <div className="auth-shell"><div className="auth-card"><div className="brand-symbol"><i/><i/><i/></div><div className="eyebrow">ASDS · SECURE RESEARCH ACCESS</div><h1>Artificial Scientist</h1><p>Sign in with the ASDS Amazon Cognito identity provider to access protected research workspaces.</p>{authError&&<div className="notice notice-error">{authError}</div>}{!cognitoConfigured&&<div className="notice notice-error">Cognito is not configured for this deployment. Set the VITE_COGNITO_* variables in the frontend hosting environment and redeploy.</div>}<button className="primary-button" disabled={!cognitoConfigured||authStatus==='checking'} onClick={()=>void beginCognitoLogin().catch(e=>setAuthError(e instanceof Error?e.message:'Unable to start sign-in'))}>{authStatus==='checking'?'Checking sign-in…':'Continue with Amazon Cognito ↗'}</button><small>OAuth 2.0 authorization code flow with PKCE. No client secret is stored in the browser.</small></div></div>;
  return <div className="shell">
   <aside className={mobileNav?'sidebar sidebar-open':'sidebar'}>
    <div className="brand"><div className="brand-symbol"><i/><i/><i/></div><div><b>ARTIFICIAL</b><b className="brand-accent">SCIENTIST</b><small>ASDS RESEARCH SYSTEM</small></div><button className="mobile-close" onClick={()=>setMobileNav(false)}>×</button></div>
@@ -64,7 +70,7 @@ function App(){
   </aside>
   {mobileNav&&<button className="scrim" aria-label="Close navigation" onClick={()=>setMobileNav(false)}/>}
   <main className="main">
-   <header className="topbar"><button className="menu-toggle" onClick={()=>setMobileNav(true)}>☰</button><div className="crumb">ASDS <span>/</span> <b>{active.label}</b></div><div className="top-actions"><span className={health?'api-indicator online':'api-indicator'}></span><span>{health?'API CONNECTED':'API DISCONNECTED'}</span><button className="icon-button" onClick={()=>void refresh()} title="Refresh service status">↻</button></div></header>
+   <header className="topbar"><button className="menu-toggle" onClick={()=>setMobileNav(true)}>☰</button><div className="crumb">ASDS <span>/</span> <b>{active.label}</b></div><div className="top-actions"><span className={health?'api-indicator online':'api-indicator'}></span><span>{health?'API CONNECTED':'API DISCONNECTED'}</span><button className="icon-button" onClick={()=>void refresh()} title="Refresh service status">↻</button><button className="text-button" onClick={signOutCognito}>Sign out</button></div></header>
    <div className="page-wrap"><div className="page-heading"><div><div className="eyebrow">ARTIFICIAL SCIENTIST / {active.group}</div><h1>{active.label}</h1><p>{descriptions[tab]}</p></div><div className="heading-meta"><span className="live-dot"></span> GOVERNED RESEARCH <small>{lastUpdated?'UPDATED '+lastUpdated:'STATUS PENDING'}</small></div></div>
    {apiError&&<ErrorPanel error={apiError}/>}
    {tab==='overview'&&<section className="view">
