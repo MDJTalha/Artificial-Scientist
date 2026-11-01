@@ -70,6 +70,7 @@ jobs:
         working-directory: backend
     env:
       ARTIFICIAL_SCIENTIST_DATABASE_URL: postgresql+psycopg://asds_test:asds_test@localhost:5432/asds_test
+      ASDS_POSTGRES_TEST_DATABASE: "1"
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
