@@ -32,6 +32,10 @@ test.describe('research workspace', () => {
     await expect(page.getByRole('heading', { name: 'Inspect the computational evidence trail' })).toBeVisible()
     await expect(page.getByText(/computational reproducibility/i)).toBeVisible()
 
+    await navigation.getByRole('button', { name: 'Scientific memory' }).click()
+    await expect(page.getByRole('heading', { name: 'Maintain evidence-linked research memory' })).toBeVisible()
+    await expect(page.getByText(/does not confer scientific validity/i)).toBeVisible()
+
     await navigation.getByRole('button', { name: 'Data analysis' }).click()
     await expect(page.getByRole('heading', { name: 'Explore numerical evidence' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Analyze a numeric sample' })).toBeVisible()
@@ -42,7 +46,7 @@ test.describe('research workspace', () => {
 
   test('states which capabilities and external boundaries are actually available', async ({ page }) => {
     await page.goto('/')
-    await expect(page.locator('.workspace-stat').nth(1).locator('strong')).toContainText('9')
+    await expect(page.locator('.workspace-stat').nth(1).locator('strong')).toContainText('10')
     await expect(page.getByText('Not connected', { exact: true })).toBeVisible()
     await expect(page.getByText(/hypothesis suggestions use deterministic templates/i)).toBeVisible()
     await expect(page.getByText(/identity, sandbox deployment, operations and external scientific review remain open/i)).toBeVisible()
