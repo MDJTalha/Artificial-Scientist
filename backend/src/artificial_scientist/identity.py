@@ -36,6 +36,8 @@ def validate_oidc_bearer_token(
     issuer: str,
     audience: str,
     jwks_url: str,
+    audience_claim: str = "aud",
+    expected_token_use: str | None = None,
 ) -> AuthenticatedPrincipal:
     """Validate a signed OIDC access token using only RS256 and configured trust values."""
     if (
@@ -75,7 +77,7 @@ def validate_oidc_bearer_token(
             token,
             signing_key.key,
             algorithms=["RS256"],
-            audience=audience,
+            audience=audience if audience_claim == "aud" else None,
             issuer=issuer,
             options={
                 "require": ["exp", "iat", "iss", "aud", "sub"],
@@ -83,7 +85,7 @@ def validate_oidc_bearer_token(
                 "verify_exp": True,
                 "verify_iat": True,
                 "verify_iss": True,
-                "verify_aud": True,
+                "verify_aud": audience_claim == "aud",
             },
             leeway=0,
         )
@@ -92,7 +94,7 @@ def validate_oidc_bearer_token(
 
     subject = claims.get("sub")
     claim_issuer = claims.get("iss")
-    claim_audience = claims.get("aud")
+    claim_audience = claims.get(audience_claim)
     if not isinstance(subject, str) or not subject.strip() or len(subject) > 255:
         raise InvalidIdentityError("Bearer token subject is missing or invalid.")
     if (
@@ -106,6 +108,8 @@ def validate_oidc_bearer_token(
             raise InvalidIdentityError("Bearer token audience is invalid.")
     elif claim_audience != audience:
         raise InvalidIdentityError("Bearer token audience is invalid.")
+    if expected_token_use is not None and claims.get("token_use") != expected_token_use:
+        raise InvalidIdentityError("Bearer token type is invalid.")
 
     return AuthenticatedPrincipal(
         subject=subject,
