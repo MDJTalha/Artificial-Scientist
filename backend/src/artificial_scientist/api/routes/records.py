@@ -65,6 +65,8 @@ def require_record_access(
             issuer=issuer, audience=audience, jwks_url=jwks_url,
             audience_claim=getattr(settings, "oidc_audience_claim", "aud"),
             expected_token_use=getattr(settings, "oidc_token_use", None),
+            expected_scope=getattr(settings, "oidc_required_scope", None),
+                expected_scope=getattr(settings, "oidc_required_scope", None),
         )
         principal_id = stable_principal_id(principal.issuer, principal.subject)
         TenantDirectory(settings.database_path).authorize(principal_id, x_tenant_id, action)
