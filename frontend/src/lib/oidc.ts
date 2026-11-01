@@ -11,6 +11,7 @@ export interface OidcEnvironment {
   clientId?: string
   redirectUri?: string
   scopes?: string
+  resource?: string
 }
 
 export interface OidcClientConfiguration {
@@ -18,6 +19,7 @@ export interface OidcClientConfiguration {
   clientId: string
   redirectUri: string
   scopes: string[]
+  resource: string | null
   production: boolean
 }
 
@@ -154,11 +156,16 @@ export function resolveOidcConfiguration(
   if (!scopes.includes("openid") || scopes.length > 20) {
     throw new Error("OIDC scopes must include openid and contain no more than 20 entries.")
   }
+  const resourceValue = environment.resource?.trim()
+  const resource = resourceValue
+    ? validateEndpoint(resourceValue, production, 'OIDC resource indicator').toString()
+    : null
   return {
     issuer: issuer.toString(),
     clientId,
     redirectUri: redirectUri.toString(),
     scopes: [...new Set(scopes)],
+    resource,
     production,
   }
 }
@@ -246,6 +253,7 @@ export async function beginOidcLogin(
   authorizationUrl.searchParams.set("nonce", pending.nonce)
   authorizationUrl.searchParams.set("code_challenge", challenge)
   authorizationUrl.searchParams.set("code_challenge_method", "S256")
+  if (config.resource) authorizationUrl.searchParams.set("resource", config.resource)
   window.location.assign(authorizationUrl.toString())
 }
 
@@ -449,6 +457,7 @@ export function oidcConfigurationFromVite(
         import.meta.env.VITE_OIDC_REDIRECT_URI ||
         currentOrigin + currentPath,
       scopes: import.meta.env.VITE_OIDC_SCOPES,
+      resource: import.meta.env.VITE_OIDC_RESOURCE,
     },
     production,
     currentOrigin,
