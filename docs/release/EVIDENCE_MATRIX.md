@@ -1,4 +1,4 @@
-# Release Evidence Matrix — 2026-10-31
+# Release Evidence Matrix — 2026-11-01
 
 This register separates **repository verification evidence** from **external release certification**. A green CI job is never treated as proof of an external gate.
 
@@ -28,6 +28,25 @@ This register separates **repository verification evidence** from **external rel
 - Frontend: TypeScript type-check, unit tests, production build, Playwright/axe accessibility and conference-workspace E2E passed.
 - Release-gate job: policy validation, Phase 6 hardening regressions, Phase 7 authorization/tenant regressions, and Phases 8–14 regressions passed.
 - The previously verified CI run exercised the repository-side hardening baseline. The current branch additionally contains the production-validation runbook, configuration preflight, SQLite backup/restore helper, sanitized OIDC/JWKS probe, deterministic scientific smoke benchmark, independent security-review scope, scientific-validation protocol, and operations acceptance checklist. A new CI run is required before those additions are recorded as CI-verified.
+
+## Additional integration-branch evidence
+
+| Gate / work item | Repository evidence | Verification protocol | Status |
+|---|---|---|---|
+| Browser OIDC Authorization Code + PKCE | `frontend/src/lib/oidc.ts`, OIDC configuration/cryptographic tests, `App.tsx` session flow and `/api/v1/auth/session` backend route | Frontend unit/E2E; actual provider discovery, callback, token CORS, audience and JWKS rotation tests on the chosen provider | Repository implementation added; **live provider gate open** |
+| Server-side tenant discovery and operator provisioning | `api/routes/auth.py`, `authorization.py`, `backend/scripts/provision_tenant.py`, session API tests | Provision multiple tenants/roles, authenticate, revoke membership and test cross-tenant denials | Repository implementation added; **operator provisioning and live membership evidence open** |
+| Production readiness checks | `api/routes/health.py`, `tests/test_readiness.py` | Production-mode SQLite quick_check/write probe, OIDC configuration and HTTPS CORS negative/positive tests | Repository tests added; **target-host readiness open** |
+| API container packaging | `deploy/api.Dockerfile`, `deploy/api.compose.yml`, API image/readiness CI job | Build image, run as non-root with read-only root, named persistent volume and readiness endpoint | CI image build/runtime smoke test pending on exact latest head; **host deployment open** |
+| Single-node API deployment guide | `docs/deployment/API_CONTAINER_DEPLOYMENT.md` | Configure a real host, TLS reverse proxy, persistent volume, secrets, monitoring and restore | Documentation/template only; **external operations gate open** |
+| Browser session and tenant authorization | In-memory token API client; server-side membership/action validation | Test every protected endpoint with each role and tenant, including invalid/revoked tokens and attempts to override tenant headers | Existing unit/regression coverage plus new tests; **full live browser role acceptance pending** |
+
+### Current candidate and CI freshness
+
+- Feature branch: `feat/research-workspace-v1`
+- Draft integration PR: [#38](https://github.com/MDJTalha/Artificial-Scientist/pull/38), based on `phase-release-verification-hardening`; it remains unmerged.
+- Run **1432** / workflow ID **41268749966** tested code commit `3e3e1e973a29f7a44e8d8b07585aaa2e0f66937e`; the frontend passed while Python 3.12/3.13 tests were still running at the time of the status record.
+- Subsequent changes to the preflight validator and architecture/current-status documentation require a new passing run on the final branch head before this integration update is considered repository-verified.
+- The previously successful run **1395** on `05f9634` validates the earlier UI/release-hardening scope only; it does not certify the subsequently added OIDC/readiness/container code.
 
 ## Evidence rules
 
