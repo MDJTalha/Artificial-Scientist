@@ -192,7 +192,7 @@ def upgrade() -> None:
     # even when a future application path bypasses the Python store contract.
     for table in (
         "autonomy_transitions", "autonomy_checkpoints", "autonomy_memory",
-        "lab_artifacts", "lab_binary_artifacts", "lab_run_retention_events",
+        "lab_run_retention_events",
     ):
         op.execute(
             f"""
@@ -205,7 +205,7 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     for table in (
-        "lab_run_retention_events", "lab_binary_artifacts", "lab_artifacts",
+        "lab_run_retention_events",
         "autonomy_memory", "autonomy_checkpoints", "autonomy_transitions",
     ):
         op.execute(f"DROP TRIGGER IF EXISTS {table}_append_only ON {table}")
