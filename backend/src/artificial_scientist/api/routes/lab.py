@@ -125,7 +125,16 @@ router = APIRouter(
 @lru_cache(maxsize=1)
 def get_lab_store() -> LabRunStore:
     """Create the SQLite store for persisted lab-run records."""
-    return LabRunStore(get_settings().database_path)
+    settings = get_settings()
+    if getattr(settings, "database_url", None):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                "PostgreSQL is configured, but the laboratory persistence adapter "
+                "is not migrated. Requests are blocked to prevent split-database writes."
+            ),
+        )
+    return LabRunStore(settings.database_path)
 
 
 def require_tenant_access(request: Request, action: str) -> str | None:
