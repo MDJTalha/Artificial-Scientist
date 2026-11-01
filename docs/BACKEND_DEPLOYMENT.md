@@ -43,9 +43,39 @@ The named Docker volume `asds-backend-data` retains local SQLite data across con
 
 Never commit real secrets or put credentials in the image. Inject them from a managed secret store at runtime.
 
+## Amazon Cognito identity provider
+
+The repository includes `infra/aws/cognito-user-pool.yaml`. It provisions an Amazon Cognito User Pool, a public OAuth authorization-code client (no client secret), PKCE-compatible hosted UI domain, and the `asds-api/access` resource-server scope. Self-registration defaults to disabled; create users through a controlled administrator workflow until tenant onboarding and abuse controls are accepted.
+
+Configure the API with the CloudFormation outputs:
+
+- `ARTIFICIAL_SCIENTIST_OIDC_ISSUER`: `https://cognito-idp.<region>.amazonaws.com/<user-pool-id>`
+- `ARTIFICIAL_SCIENTIST_OIDC_AUDIENCE`: User Pool app client ID
+- `ARTIFICIAL_SCIENTIST_OIDC_JWKS_URL`: `<issuer>/.well-known/jwks.json`
+- `ARTIFICIAL_SCIENTIST_OIDC_AUDIENCE_CLAIM=client_id`
+- `ARTIFICIAL_SCIENTIST_OIDC_TOKEN_USE=access`
+- `ARTIFICIAL_SCIENTIST_OIDC_REQUIRED_SCOPE=asds-api/access`
+
+The browser uses the Cognito hosted UI authorization-code flow with PKCE and sends the short-lived access token as a bearer token. Configure `VITE_COGNITO_DOMAIN`, `VITE_COGNITO_CLIENT_ID`, `VITE_COGNITO_REDIRECT_URI`, `VITE_COGNITO_LOGOUT_URI`, and `VITE_COGNITO_SCOPES` in the frontend hosting environment. Callback and logout URLs must exactly match the Cognito app-client allowlists and use HTTPS in hosted environments. The web client has no embedded secret.
+
+### Tenant onboarding
+
+Authentication is not tenant membership. Research-record, knowledge-write, and lab APIs continue to require an active server-side tenant membership. After verifying the Cognito user `sub` in the User Pool, run the trusted operator command against the same persistent authorization database used by the API:
+
+\`\`\`bash
+PYTHONPATH=backend/src python backend/scripts/bootstrap_tenant_membership.py \\
+  --database /app/data/asds.sqlite3 \\
+  --issuer https://cognito-idp.<region>.amazonaws.com/<user-pool-id> \\
+  --subject <verified-cognito-sub> \\
+  --tenant-key <operator-controlled-tenant-key> \\
+  --tenant-name "ASDS Research"
+\`\`\`
+
+Set the resulting tenant ID as `VITE_ASDS_TENANT_ID` in the frontend deployment. Never accept a tenant ID as proof of membership; the API checks membership and role against its own directory. The current SQLite-backed directory means this bootstrap procedure is only suitable for controlled staging until the persistence migration is complete.
+
 ## AWS deployment target
 
-The intended container target is ECS on Fargate behind an HTTPS Application Load Balancer, with ECR for image storage, CloudWatch for logs/metrics, Secrets Manager for runtime secrets, and a managed relational database after the persistence layer has been migrated and tested.
+The intended container target is ECS on Fargate behind an HTTPS Application Load Balancer, with ECR for image storage, CloudWatch for logs/metrics, Secrets Manager for runtime secrets, and a managed relational database after the persistence layer has been migrated and tested. Cognito provisioning is also currently blocked by the AWS account's `SubscriptionRequiredException` response.
 
 No ECS cluster or ECR repository was found in the connected AWS account. ECS and EC2 API calls currently return account subscription/opt-in errors in the regions probed. The account connection also identifies itself as the AWS root principal. For those reasons, no AWS resources were created and no public endpoint was opened. Enable the required AWS services in the chosen region and establish a dedicated deployment role before proceeding.
 
