@@ -36,7 +36,10 @@ def test_readiness_endpoint_discloses_its_scope() -> None:
     assert response.status_code == 200
     body = response.json()
     assert body["status"] == "ready"
-    assert body["scope"] == "application_only"
+    assert body["scope"] == "core_api_configuration_and_storage"
+    assert body["checks"] == {"development_mode": True}
+    assert "Do not expose" in body["details"]["development_mode"]
+    assert "capability_gates" in body
 
 
 def test_openapi_schema_is_available() -> None:
