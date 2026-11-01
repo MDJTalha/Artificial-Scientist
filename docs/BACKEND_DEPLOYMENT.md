@@ -79,6 +79,12 @@ The intended container target is ECS on Fargate behind an HTTPS Application Load
 
 No ECS cluster or ECR repository was found in the connected AWS account. ECS and EC2 API calls currently return account subscription/opt-in errors in the regions probed. The account connection also identifies itself as the AWS root principal. For those reasons, no AWS resources were created and no public endpoint was opened. Enable the required AWS services in the chosen region and establish a dedicated deployment role before proceeding.
 
+## GitHub OIDC deployment automation
+
+The repository includes `infra/aws/github-actions-deploy-role.yaml` and `.github/workflows/deploy-backend-ecs.yml`. An AWS administrator must apply the role template using an existing GitHub Actions OIDC provider, a pre-created ECR repository, ECS cluster/service, and the exact task execution/application role ARNs. The trust policy is restricted to `MDJTalha/Artificial-Scientist` on the configured deployment branch (default `main`). The role can push to one ECR repository, register task-definition revisions, update one ECS service, and pass only the two configured ECS task roles.
+
+Configure these GitHub **repository or production-environment variables** before using the manual workflow: `AWS_REGION`, `AWS_DEPLOY_ROLE_ARN`, `ECR_REPOSITORY`, `ECS_CLUSTER`, `ECS_SERVICE`, `ECS_TASK_DEFINITION_FAMILY`, and `ECS_CONTAINER_NAME`. Protect the GitHub `production` environment with required reviewers. The workflow only runs from `main` via manual dispatch, builds an immutable image tagged with the commit SHA, registers a new task-definition revision, updates the ECS service, and waits for service stability. It does not create the VPC, load balancer, ECS service, database, secrets, or Cognito pool.
+
 ## Release verification
 
 A backend deployment is not accepted until all of these have evidence:
