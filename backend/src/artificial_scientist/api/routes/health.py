@@ -3,7 +3,7 @@
 from fastapi import APIRouter, HTTPException, status
 
 from artificial_scientist.config import get_settings
-from artificial_scientist.database import DatabaseConfigurationError, check_database_connection
+from artificial_scientist.database import check_database_connection
 
 router = APIRouter(prefix="/api/v1", tags=["system"])
 
@@ -37,7 +37,7 @@ def readiness_check() -> dict[str, str]:
 
     try:
         check_database_connection(settings.database_url)
-    except (DatabaseConfigurationError, Exception) as error:
+    except Exception as error:
         # Return no connection details, credentials, hostnames, or SQL diagnostics.
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
