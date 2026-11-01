@@ -132,3 +132,60 @@ def test_postgresql_append_only_triggers_reject_mutation(database_url: str) -> N
         with pytest.raises(DBAPIError):
             with engine.begin() as connection:
                 connection.execute(text(statement), {"id": identifier})
+
+
+def test_postgresql_tenant_directory_persists_membership_and_audit(
+    database_url: str,
+) -> None:
+    from uuid import uuid4
+
+    from artificial_scientist.authorization import (
+        AuthorizationDenied,
+        TenantDirectory,
+        stable_principal_id,
+        stable_tenant_id,
+    )
+
+    suffix = str(uuid4())
+    directory = TenantDirectory(database_url)
+    principal_id = directory.register_principal(
+        "https://integration.example/", f"subject:{suffix}"
+    )
+    tenant_id = directory.create_tenant(f"tenant:{suffix}", f"Integration {suffix}")
+    assert principal_id == stable_principal_id(
+        "https://integration.example/", f"subject:{suffix}"
+    )
+    assert tenant_id == stable_tenant_id(f"tenant:{suffix}")
+
+    directory.grant_membership(principal_id, tenant_id, "researcher")
+    membership = directory.authorize(principal_id, tenant_id, "run:read")
+    assert membership.role == "researcher"
+
+    with pytest.raises(AuthorizationDenied):
+        directory.authorize(principal_id, tenant_id, "retention:purge")
+
+    directory.revoke_membership(principal_id, tenant_id)
+    with pytest.raises(AuthorizationDenied):
+        directory.authorize(principal_id, tenant_id, "run:read")
+
+    events = directory.list_audit_events(tenant_id, limit=20)
+    assert {event["outcome"] for event in events} == {"allowed", "denied"}
+    assert all(event["tenant_id"] == tenant_id for event in events)
+
+
+def test_postgresql_tenant_directory_rejects_sensitive_audit_metadata(
+    database_url: str,
+) -> None:
+    from artificial_scientist.authorization import TenantDirectory
+
+    directory = TenantDirectory(database_url)
+    with pytest.raises(ValueError, match="credentials or payloads"):
+        directory.audit(
+            principal_id=None,
+            tenant_id=None,
+            action="run:read",
+            target_type="run",
+            target_id="run-1",
+            outcome="failed",
+            metadata={"access_token": "must-not-be-stored"},
+        )
