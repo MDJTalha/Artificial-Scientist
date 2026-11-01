@@ -287,7 +287,7 @@ def test_cognito_access_token_rejects_missing_required_scope(monkeypatch):
             "signed-cognito-access-token",
             issuer="https://cognito-idp.ap-southeast-1.amazonaws.com/ap-southeast-1_example",
             audience="asds-public-client",
-            jwks_url="https://cognito-idp.ap-southeast-1.amazonaws.com/ap-southeast-1_example/.well-known/jwks.json",
+            jwks_url=COGNITO_JWKS,
             audience_claim="client_id",
             expected_token_use="access",
             expected_scope="asds-api/access",
