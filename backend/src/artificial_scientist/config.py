@@ -25,6 +25,8 @@ class Settings:
     model_api_key: str | None = None
     model_timeout_seconds: str = "30"
     model_max_tokens: str = "1200"
+    model_daily_request_limit: str = "20"
+    model_daily_token_budget: str = "20000"
 
 
 def get_settings() -> Settings:
@@ -59,4 +61,6 @@ def get_settings() -> Settings:
         model_api_key=os.getenv("ARTIFICIAL_SCIENTIST_MODEL_API_KEY") or None,
         model_timeout_seconds=os.getenv("ARTIFICIAL_SCIENTIST_MODEL_TIMEOUT_SECONDS", "30"),
         model_max_tokens=os.getenv("ARTIFICIAL_SCIENTIST_MODEL_MAX_TOKENS", "1200"),
+        model_daily_request_limit=os.getenv("ARTIFICIAL_SCIENTIST_MODEL_DAILY_REQUEST_LIMIT", "20"),
+        model_daily_token_budget=os.getenv("ARTIFICIAL_SCIENTIST_MODEL_DAILY_TOKEN_BUDGET", "20000"),
     )
