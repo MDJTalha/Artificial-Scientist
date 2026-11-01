@@ -100,5 +100,4 @@ function App(){
  </div>
 }
 function ResultCard({title,data}:{title:string;data:unknown}){return <div className="result-card"><div className="card-title"><h2>{title}</h2><button className="text-button" onClick={()=>navigator.clipboard?.writeText(pretty(data))}>Copy JSON</button></div><pre>{pretty(data)}</pre></div>}
-function ComingSoon({title,text,onInspect}:{title:string;text:string;onInspect:()=>void}){return <section className="view"><div className="gate-panel"><span className="eyebrow">WORKSPACE INTEGRATION IN PROGRESS</span><h2>{title}</h2><p>{text}</p><button className="secondary-button" onClick={onInspect}>Inspect available backend endpoints ↗</button></div></section>}
 export default App;
