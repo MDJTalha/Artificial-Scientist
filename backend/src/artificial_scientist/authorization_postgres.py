@@ -149,12 +149,51 @@ class PostgresTenantDirectory:
         target_type: str, target_id: str | None, outcome: str,
         correlation_id: str | None = None, metadata: dict[str, Any] | None = None,
     ) -> str:
-        # Reuse the exact validation policy of the SQLite implementation.
-        from artificial_scientist.authorization import validate_audit_metadata
+        import math
+        import re
 
-        encoded = validate_audit_metadata(
-            action=action, target_type=target_type, outcome=outcome, metadata=metadata
+        if outcome not in {"allowed", "denied", "failed"}:
+            raise ValueError("Unknown audit outcome.")
+        if not re.fullmatch(r"[a-z][a-z0-9:_-]{0,79}", action):
+            raise ValueError("Audit action must be a bounded identifier.")
+        if not re.fullmatch(r"[a-z][a-z0-9_-]{0,39}", target_type):
+            raise ValueError("Audit target type must be a bounded identifier.")
+        safe_metadata = metadata or {}
+        if not isinstance(safe_metadata, dict):
+            raise ValueError("Audit metadata must be a JSON object.")
+        forbidden = ("password", "secret", "token", "authorization", "credential",
+                     "cookie", "payload", "request_body", "content")
+
+        def validate(value: Any, depth: int = 0) -> None:
+            if depth > 5:
+                raise ValueError("Audit metadata nesting exceeds five levels.")
+            if isinstance(value, dict):
+                for key, item in value.items():
+                    if not isinstance(key, str) or len(key) > 80:
+                        raise ValueError("Audit metadata keys must be bounded strings.")
+                    normalized = key.lower().replace("-", "_")
+                    if any(fragment in normalized for fragment in forbidden):
+                        raise ValueError("Audit metadata must not contain credentials or payloads.")
+                    validate(item, depth + 1)
+            elif isinstance(value, list):
+                if len(value) > 100:
+                    raise ValueError("Audit metadata lists are limited to 100 items.")
+                for item in value:
+                    validate(item, depth + 1)
+            elif value is None or isinstance(value, (str, int, float, bool)):
+                if isinstance(value, str) and len(value) > 1000:
+                    raise ValueError("Audit metadata strings are limited to 1000 characters.")
+                if isinstance(value, float) and not math.isfinite(value):
+                    raise ValueError("Audit metadata numbers must be finite.")
+            else:
+                raise ValueError("Audit metadata must contain only JSON-compatible values.")
+
+        validate(safe_metadata)
+        encoded = json.dumps(
+            safe_metadata, sort_keys=True, separators=(",", ":"), allow_nan=False
         )
+        if len(encoded.encode("utf-8")) > 4096:
+            raise ValueError("Audit metadata exceeds 4 KiB.")
         event_id = str(uuid4())
         with self.engine.begin() as connection:
             connection.execute(
