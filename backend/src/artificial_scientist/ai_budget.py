@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 from contextlib import closing
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
 
@@ -83,7 +83,6 @@ class AiInvocationBudgetStore:
 
         now = datetime.now(UTC)
         day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-        day_end = day_start + timedelta(days=1)
         reservation_id = str(uuid4())
         with closing(self._connect()) as connection:
             connection.execute("BEGIN IMMEDIATE")
