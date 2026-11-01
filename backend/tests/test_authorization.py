@@ -173,7 +173,8 @@ def test_audit_accepts_bounded_operational_metadata(tmp_path):
                 "discovery:assess",
                 "autonomy:workflow:create", "autonomy:workflow:read",
                 "autonomy:workflow:write", "autonomy:workflow:approve",
-                "memory:list", "memory:read", "memory:write", "memory:contradict", "memory:rollback",
+                "memory:list", "memory:read", "memory:write",
+                "memory:contradict", "memory:rollback",
             },
         ),
         (
