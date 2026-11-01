@@ -664,3 +664,42 @@ h1 span { color: #82a5aa; font-weight: 430; }
   .memory-index-item { align-items: flex-start; }
   .memory-index-item > .result-chip { flex: 0 0 auto; }
 }
+
+
+/* Scientific manuscript studio */
+.manuscript-draft-list { display: grid; gap: 7px; }
+.manuscript-draft-item {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 11px;
+  color: #d0e0e2;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: rgba(5, 16, 24, .34);
+  text-align: left;
+  cursor: pointer;
+}
+.manuscript-draft-item:hover { border-color: rgba(118, 226, 189, .38); }
+.manuscript-draft-item > span:first-child { display: grid; gap: 5px; min-width: 0; }
+.manuscript-draft-item strong { color: #d4e2e4; font-size: 10px; overflow-wrap: anywhere; }
+.manuscript-draft-item small { color: #7e98a2; font-size: 8px; line-height: 1.5; }
+.manuscript-edit-grid { align-items: start; margin-top: 13px; }
+.manuscript-claims-heading { align-items: center; margin: 12px 0 3px; }
+.manuscript-claims-heading h2 { margin: 6px 0; font-size: 12px; }
+.manuscript-claims-heading .secondary-button { margin: 0; }
+.manuscript-claim-fieldset { display: grid; gap: 8px; min-width: 0; margin: 3px 0 8px; padding: 12px; border: 1px solid #2b414c; border-radius: 6px; }
+.manuscript-claim-fieldset legend { padding: 0 5px; color: #8eb3a8; font-size: 9px; font-weight: 700; }
+.manuscript-claim-fieldset label { color: #9cb0b8; font-size: 9px; }
+.manuscript-claim-fieldset small { color: #77919a; font-size: 8px; line-height: 1.55; }
+.text-button { justify-self: start; padding: 0; color: #d69b91; border: 0; background: transparent; font-size: 8px; cursor: pointer; }
+.text-button:hover { text-decoration: underline; }
+.manuscript-markdown-preview { max-height: 780px; overflow: auto; margin: 14px 0; padding: 14px; color: #c0d2d5; border: 1px solid var(--line); border-radius: 5px; background: #07141d; font-size: 9px; line-height: 1.75; white-space: pre-wrap; overflow-wrap: anywhere; }
+.manuscript-approval-state { color: #7e9a93; font-size: 8px; line-height: 1.5; }
+.manuscript-preview-card { min-width: 0; }
+@media (max-width: 760px) {
+  .manuscript-draft-item { align-items: flex-start; }
+  .manuscript-markdown-preview { max-height: 520px; padding: 10px; font-size: 8px; }
+}
