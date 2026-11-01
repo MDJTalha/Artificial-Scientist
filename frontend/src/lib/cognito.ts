@@ -1,5 +1,3 @@
-import { setApiAccessToken } from './api';
-
 type CognitoTokenResponse = {
   access_token?: string;
   token_type?: string;
@@ -14,6 +12,9 @@ const clientId = (env.VITE_COGNITO_CLIENT_ID ?? '').trim();
 const redirectUri = (env.VITE_COGNITO_REDIRECT_URI ?? '').trim() || `${window.location.origin}/auth/callback`;
 const logoutUri = (env.VITE_COGNITO_LOGOUT_URI ?? '').trim() || window.location.origin;
 const scopes = (env.VITE_COGNITO_SCOPES ?? 'openid email profile asds-api/access').trim();
+let accessToken: string | null = null;
+let refreshToken: string | null = null;
+let accessTokenExpiresAt = 0;
 
 export const cognitoConfigured = Boolean(domain && clientId && redirectUri.startsWith('https://') && logoutUri.startsWith('https://'));
 
@@ -91,12 +92,34 @@ export async function completeCognitoCallback(): Promise<boolean> {
   if (!response.ok || !result.access_token || result.token_type?.toLowerCase() !== 'bearer') {
     throw new Error(result.error_description ?? result.error ?? 'Cognito token exchange failed.');
   }
-  setApiAccessToken(result.access_token);
+  accessToken = result.access_token;
+  refreshToken = typeof (result as CognitoTokenResponse & {refresh_token?:string}).refresh_token === 'string' ? (result as CognitoTokenResponse & {refresh_token:string}).refresh_token : null;
+  accessTokenExpiresAt = Date.now() + Math.max(60, result.expires_in ?? 900) * 1000;
   return true;
 }
 
+export async function getCognitoAccessToken(): Promise<string | null> {
+  if (!accessToken) return null;
+  if (Date.now() < accessTokenExpiresAt - 60_000) return accessToken;
+  if (!refreshToken) { accessToken = null; accessTokenExpiresAt = 0; return null; }
+  const response = await fetch(`${domain}/oauth2/token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
+    body: new URLSearchParams({ grant_type: 'refresh_token', client_id: clientId, refresh_token: refreshToken }),
+    credentials: 'omit',
+  });
+  const result = await response.json() as CognitoTokenResponse;
+  if (!response.ok || !result.access_token) {
+    accessToken = null; refreshToken = null; accessTokenExpiresAt = 0;
+    return null;
+  }
+  accessToken = result.access_token;
+  accessTokenExpiresAt = Date.now() + Math.max(60, result.expires_in ?? 900) * 1000;
+  return accessToken;
+}
+
 export function signOutCognito(): void {
-  setApiAccessToken(null);
+  accessToken = null; refreshToken = null; accessTokenExpiresAt = 0;
   const url = new URL(`${domain}/logout`);
   url.search = new URLSearchParams({
     client_id: clientId,
