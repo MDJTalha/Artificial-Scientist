@@ -262,7 +262,9 @@ def contradict_memory(
     tenant_id: Annotated[str | None, Depends(record_access("memory:contradict"))],
     records: Annotated[RecordStore, Depends(get_record_store)],
 ) -> MemoryVersionResponse:
-    evidence = _validate_evidence(request.evidence_record_ids, records, tenant_id=tenant_id)
+    evidence = _validate_evidence(
+        request.evidence_record_ids, records, tenant_id=tenant_id
+    )
     try:
         item = _memory(tenant_id).contradict(
             key,
