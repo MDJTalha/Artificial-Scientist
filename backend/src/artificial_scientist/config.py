@@ -19,6 +19,8 @@ class Settings:
     oidc_issuer: str | None
     oidc_audience: str | None
     oidc_jwks_url: str | None
+    oidc_audience_claim: str
+    oidc_token_use: str | None
 
 
 def get_settings() -> Settings:
@@ -47,4 +49,6 @@ def get_settings() -> Settings:
         oidc_issuer=os.getenv("ARTIFICIAL_SCIENTIST_OIDC_ISSUER") or None,
         oidc_audience=os.getenv("ARTIFICIAL_SCIENTIST_OIDC_AUDIENCE") or None,
         oidc_jwks_url=os.getenv("ARTIFICIAL_SCIENTIST_OIDC_JWKS_URL") or None,
+        oidc_audience_claim=os.getenv("ARTIFICIAL_SCIENTIST_OIDC_AUDIENCE_CLAIM", "aud"),
+        oidc_token_use=os.getenv("ARTIFICIAL_SCIENTIST_OIDC_TOKEN_USE") or None,
     )
