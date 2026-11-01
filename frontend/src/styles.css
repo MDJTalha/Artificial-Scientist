@@ -722,3 +722,50 @@ h1 span { color: #82a5aa; font-weight: 430; }
   .governance-stats { grid-template-columns: 1fr; }
   .governance-definition-list > div { grid-template-columns: 1fr; gap: 3px; }
 }
+
+
+/* OIDC session and explicit tenant selection */
+.topbar { flex-wrap: wrap; row-gap: 9px; }
+.auth-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+  margin-left: auto;
+}
+.auth-controls select {
+  max-width: 260px;
+  min-width: 145px;
+  padding: 7px 9px;
+  color: #d6e5e7;
+  border: 1px solid #2b414c;
+  border-radius: 4px;
+  background: #0b1924;
+  font-size: 9px;
+}
+.auth-controls select:focus {
+  outline: 2px solid rgba(118, 226, 189, .5);
+  outline-offset: 1px;
+  border-color: var(--mint);
+}
+.auth-session-label {
+  color: #92b8ad;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: .55px;
+}
+.auth-signin-button {
+  min-height: 31px;
+  margin: 0;
+  padding: 6px 10px;
+  font-size: 9px;
+}
+@media (max-width: 900px) {
+  .auth-controls { flex-basis: 100%; justify-content: flex-start; margin-left: 0; }
+}
+@media (max-width: 760px) {
+  .auth-controls select { flex: 1; max-width: none; }
+  .auth-session-label { font-size: 7px; }
+}
