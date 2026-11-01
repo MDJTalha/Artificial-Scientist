@@ -559,3 +559,17 @@ h1 span { color: #82a5aa; font-weight: 430; }
   .knowledge-concept-grid, .vocabulary-summary { grid-template-columns: 1fr; }
   .knowledge-bottom-grid { margin-top: 12px; }
 }
+
+
+/* Data analysis and results */
+.statistics-result { margin-top: 16px; }
+.statistics-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+.statistics-cell { display: grid; gap: 5px; padding: 10px; border: 1px solid var(--line); border-radius: 5px; background: rgba(5, 16, 24, .4); }
+.statistics-cell span { color: #7f98a2; font-size: 8px; }
+.statistics-cell strong { color: #d5e9e4; font-size: 15px; font-weight: 650; overflow-wrap: anywhere; }
+.plot-result { margin: 16px 0 0; padding: 10px; border: 1px solid var(--line); border-radius: 6px; background: #f8fafb; }
+.plot-result img { display: block; width: 100%; height: auto; }
+.plot-result figcaption { padding-top: 8px; color: #586b73; font-size: 8px; line-height: 1.5; }
+@media (max-width: 760px) {
+  .statistics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
