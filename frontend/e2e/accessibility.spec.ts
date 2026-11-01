@@ -38,7 +38,7 @@ test.describe('research workspace', () => {
 
     await navigation.getByRole('button', { name: 'Manuscript studio' }).click()
     await expect(page.getByRole('heading', { name: 'Prepare an evidence-linked research draft' })).toBeVisible()
-    await expect(page.getByText(/external submission disabled/i)).toBeVisible()
+    await expect(page.getByText(/This studio creates research drafts only/i)).toBeVisible()
 
     await navigation.getByRole('button', { name: 'Data analysis' }).click()
     await expect(page.getByRole('heading', { name: 'Explore numerical evidence' })).toBeVisible()
