@@ -3,8 +3,8 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { apiClient, apiConfiguration } from '../lib/api'
 import type { ServiceStatus } from '../lib/status'
 
-type WorkspaceView = 'overview' | 'missions' | 'literature' | 'knowledge' | 'hypotheses' | 'lab' | 'analysis' | 'journal' | 'math' | 'records'
-type BusyAction = 'create-task' | 'decompose' | 'literature' | 'save-sources' | 'knowledge-search' | 'knowledge-create' | 'knowledge-relation' | 'knowledge-graph' | 'generate' | 'prior-work' | 'assess' | 'statistics' | 'plot' | 'lab-run' | 'lab-history' | 'lab-verify' | 'math' | null
+type WorkspaceView = 'overview' | 'missions' | 'literature' | 'knowledge' | 'hypotheses' | 'lab' | 'analysis' | 'journal' | 'memory' | 'math' | 'records'
+type BusyAction = 'create-task' | 'decompose' | 'literature' | 'save-sources' | 'knowledge-search' | 'knowledge-create' | 'knowledge-relation' | 'knowledge-graph' | 'generate' | 'prior-work' | 'assess' | 'statistics' | 'plot' | 'lab-run' | 'lab-history' | 'lab-verify' | 'memory-load' | 'memory-save' | 'memory-history' | 'memory-contradict' | 'memory-rollback' | 'math' | null
 
 interface ResearchWorkspaceProps {
   apiStatus: ServiceStatus
@@ -224,6 +224,39 @@ interface LabVerificationResponse {
   current_environment: Record<string, string>
 }
 
+interface MemorySummary {
+  key: string
+  version: number
+  status: string
+  created_at: string
+  digest: string
+  evidence_count: number
+}
+
+interface MemoryListResponse {
+  items: MemorySummary[]
+  total: number
+  limit: number
+  offset: number
+}
+
+interface MemoryVersion {
+  key: string
+  version: number
+  value: Record<string, unknown>
+  status: string
+  evidence: string[]
+  created_at: string
+  digest: string
+  supersedes: number | null
+}
+
+interface MemoryHistoryResponse {
+  key: string
+  items: MemoryVersion[]
+  total: number
+}
+
 const navigation: { id: WorkspaceView; label: string; symbol: string; detail: string }[] = [
   { id: 'overview', label: 'Command center', symbol: '◫', detail: 'System overview and workspace maturity' },
   { id: 'missions', label: 'Research agenda', symbol: '⌖', detail: 'Create and structure research questions' },
@@ -232,6 +265,7 @@ const navigation: { id: WorkspaceView; label: string; symbol: string; detail: st
   { id: 'hypotheses', label: 'Hypothesis lab', symbol: '◇', detail: 'Compare, screen and assess candidate hypotheses' },
   { id: 'lab', label: 'Computational lab', symbol: '⌬', detail: 'Run bounded, allowlisted computational experiments' },
   { id: 'journal', label: 'Experiment journal', symbol: '▧', detail: 'Inspect run history, artifacts and reproducibility evidence' },
+  { id: 'memory', label: 'Scientific memory', symbol: '◈', detail: 'Maintain evidence-linked, versioned scientific knowledge' },
   { id: 'analysis', label: 'Data analysis', symbol: '∿', detail: 'Descriptive statistics and mathematical plots' },
   { id: 'math', label: 'Mathematics workbench', symbol: '∑', detail: 'Bounded symbolic calculations' },
   { id: 'records', label: 'Research records', symbol: '▤', detail: 'Browse immutable, provenance-aware records' },
@@ -248,7 +282,7 @@ const workspaceRoadmap = [
   { name: 'Computational Laboratory & Simulation Center', status: 'DEV UI / NOT PRODUCTION CERTIFIED', note: 'Bounded allowlisted operations only; production execution remains blocked pending reviewed OS sandbox and identity controls.' },
   { name: 'Data Analysis & Results Observatory', status: 'AVAILABLE', note: 'Descriptive statistics and bounded function plots.' },
   { name: 'Experiment Journal & Reproducibility', status: 'AVAILABLE / DEV ONLY', note: 'Browse run history, hashes and artifacts; replay and export remain disabled in production pending identity and sandbox review.' },
-  { name: 'Scientific Memory & Learning', status: 'BACKEND READY / UI NEXT', note: 'Versioned memory and contradiction review.' },
+  { name: 'Scientific Memory & Learning', status: 'AVAILABLE / TENANT GATED', note: 'Evidence-linked versioning, contradiction tracking and rollback; protected access requires identity integration.' },
   { name: 'Scientific Manuscript & Publication Studio', status: 'BACKEND READY / UI NEXT', note: 'Evidence-linked writing; external submission stays gated.' },
   { name: 'Independent Review, Evaluation & Governance', status: 'NEXT', note: 'Review queues, benchmark evidence and approvals.' },
 ]
@@ -358,6 +392,18 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
   const [labVerification, setLabVerification] = useState<LabVerificationResponse | null>(null)
   const [journalArtifacts, setJournalArtifacts] = useState<LabArtifactMetadata[]>([])
 
+  const [memoryItems, setMemoryItems] = useState<MemorySummary[]>([])
+  const [memoryTotal, setMemoryTotal] = useState(0)
+  const [memoryHistory, setMemoryHistory] = useState<MemoryVersion[]>([])
+  const [memoryRecords, setMemoryRecords] = useState<RecordEnvelope[]>([])
+  const [memoryKey, setMemoryKey] = useState('research-note-001')
+  const [memoryValueJson, setMemoryValueJson] = useState(`{\n  "note": "Researcher-authored note; inspect the linked evidence before reuse.",\n  "scope": "Define the system, population and conditions where this note may apply.",\n  "review_required": true\n}`)
+  const [memoryEvidenceIds, setMemoryEvidenceIds] = useState<string[]>([])
+  const [memoryContradictionReason, setMemoryContradictionReason] = useState('')
+  const [memoryRollbackVersion, setMemoryRollbackVersion] = useState('1')
+  const [memoryError, setMemoryError] = useState<string | null>(null)
+  const [memoryRefresh, setMemoryRefresh] = useState(0)
+
   const [mathOperation, setMathOperation] = useState<'simplify' | 'differentiate' | 'integrate' | 'solve' | 'evaluate'>('simplify')
   const [mathExpression, setMathExpression] = useState('x**2 + 2*x + 1')
   const [mathVariable, setMathVariable] = useState('x')
@@ -384,6 +430,30 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
 
     return () => controller.abort()
   }, [activeView, recordsRefresh, protectedActionsAvailable])
+
+  useEffect(() => {
+    if (activeView !== 'memory' || !protectedActionsAvailable) return
+
+    const controller = new AbortController()
+    setMemoryError(null)
+    Promise.all([
+      apiClient.get<MemoryListResponse>('/api/v1/memory?limit=50&offset=0', { signal: controller.signal }),
+      apiClient.get<RecordListResponse>('/api/v1/records?limit=50&offset=0', { signal: controller.signal }),
+    ])
+      .then(([memoryResult, recordResult]) => {
+        setMemoryItems(memoryResult.items)
+        setMemoryTotal(memoryResult.total)
+        setMemoryRecords(recordResult.items)
+        setMemoryEvidenceIds((current) => current.length > 0
+          ? current.filter((id) => recordResult.items.some((record) => record.id === id))
+          : recordResult.items.slice(0, 1).map((record) => record.id))
+      })
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted) setMemoryError(errorText(error))
+      })
+
+    return () => controller.abort()
+  }, [activeView, memoryRefresh, protectedActionsAvailable])
 
   useEffect(() => {
     if (!['lab', 'journal'].includes(activeView) || !labExecutionAvailable) return
@@ -785,6 +855,91 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
     }
   }
 
+  async function openMemoryHistory(key: string) {
+    beginAction('memory-history')
+    setMemoryError(null)
+    try {
+      const result = await apiClient.get<MemoryHistoryResponse>(`/api/v1/memory/${encodeURIComponent(key)}`)
+      setMemoryKey(result.key)
+      setMemoryHistory(result.items)
+      setMemoryRollbackVersion(String(result.items[0]?.version ?? 1))
+    } catch (error) {
+      setMemoryError(errorText(error))
+    } finally {
+      finishAction()
+    }
+  }
+
+  async function saveMemoryVersion(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    beginAction('memory-save')
+    setMemoryError(null)
+    try {
+      const value: unknown = JSON.parse(memoryValueJson)
+      if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+        throw new Error('Memory value must be a JSON object.')
+      }
+      if (memoryEvidenceIds.length === 0) {
+        throw new Error('Select at least one existing research record as evidence.')
+      }
+      const result = await apiClient.post<MemoryVersion>(`/api/v1/memory/${encodeURIComponent(memoryKey.trim())}`, {
+        value,
+        evidence_record_ids: memoryEvidenceIds,
+        status: 'active',
+      })
+      setMemoryHistory((current) => [...current, result])
+      setMemoryRollbackVersion(String(result.version))
+      setMemoryRefresh((value) => value + 1)
+      setNotice('A new immutable memory version was saved with tenant-validated research evidence. The linked record is not automatically scientifically verified.')
+    } catch (error) {
+      setMemoryError(errorText(error))
+    } finally {
+      finishAction()
+    }
+  }
+
+  async function contradictMemory(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (memoryEvidenceIds.length === 0) {
+      setMemoryError('Select at least one existing research record that supports the contradiction.')
+      return
+    }
+    beginAction('memory-contradict')
+    setMemoryError(null)
+    try {
+      const result = await apiClient.post<MemoryVersion>(`/api/v1/memory/${encodeURIComponent(memoryKey.trim())}/contradict`, {
+        reason: memoryContradictionReason.trim(),
+        evidence_record_ids: memoryEvidenceIds,
+      })
+      setMemoryHistory((current) => [...current, result])
+      setMemoryContradictionReason('')
+      setMemoryRefresh((value) => value + 1)
+      setNotice('Contradiction recorded as a new disputed memory version. Earlier versions remain available in the history.')
+    } catch (error) {
+      setMemoryError(errorText(error))
+    } finally {
+      finishAction()
+    }
+  }
+
+  async function rollbackMemory(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    beginAction('memory-rollback')
+    setMemoryError(null)
+    try {
+      const result = await apiClient.post<MemoryVersion>(`/api/v1/memory/${encodeURIComponent(memoryKey.trim())}/rollback`, {
+        version: Number(memoryRollbackVersion),
+      })
+      setMemoryHistory((current) => [...current, result])
+      setMemoryRefresh((value) => value + 1)
+      setNotice('Rollback created a new immutable version. It did not delete or rewrite the historical versions.')
+    } catch (error) {
+      setMemoryError(errorText(error))
+    } finally {
+      finishAction()
+    }
+  }
+
   async function runLab(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     beginAction('lab-run')
@@ -907,6 +1062,7 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
     setPageError(null)
     if (view === 'records') setRecordsRefresh((value) => value + 1)
     if (view === 'lab' || view === 'journal') setLabHistoryRefresh((value) => value + 1)
+    if (view === 'memory') setMemoryRefresh((value) => value + 1)
   }
 
   const savedForCurrentSearch = literatureResponse?.results.filter((item) => savedSourceUrls.includes(item.source_url)).length ?? 0
@@ -996,8 +1152,8 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
               </article>
               <article className="workspace-stat">
                 <span className="card-label">WORKSPACES IMPLEMENTED</span>
-                <strong>9 <small>/ 12</small></strong>
-                <p>Nine workspace screens implemented. Protected record workflows and computational execution remain restricted until production identity and sandbox evidence is complete.</p>
+                <strong>10 <small>/ 12</small></strong>
+                <p>Ten workspace screens implemented. Protected research records and memory remain disabled in production until reviewed OIDC identity and tenant access are integrated.</p>
               </article>
               <article className="workspace-stat">
                 <span className="card-label">AI INFERENCE</span>
@@ -1451,6 +1607,63 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
               </div>
             )}
             {labVerification && <section className="workspace-card lab-verification"><div className="section-heading"><div><p className="card-label">REPRODUCIBILITY RESULT</p><h2>{labVerification.reproducible ? 'Replay matched' : 'Replay differences detected'}</h2></div><span className="section-index">RUN REPLAY</span></div><div className="vocabulary-tags"><span>Configuration: {labVerification.configuration_matches ? 'MATCH' : 'DIFFERENT'}</span><span>Environment: {labVerification.environment_matches ? 'MATCH' : 'DIFFERENT'}</span><span>Outputs: {labVerification.outputs_match ? 'MATCH' : 'DIFFERENT'}</span></div><p className="workspace-caveat">A matching replay supports computational reproducibility under the recorded runtime. It does not certify scientific truth or source validity.</p></section>}
+          </section>
+        )}
+
+        {activeView === 'memory' && (
+          <section className="workspace-page">
+            <div className="page-heading">
+              <p className="card-label">SCIENTIFIC MEMORY & LEARNING</p>
+              <h1>Maintain evidence-linked research memory</h1>
+              <p>Record a research note or structured finding as an immutable version, link it to existing tenant research records, track contradictions and roll back by appending a new version.</p>
+            </div>
+            {!protectedActionsAvailable && <div className="workspace-alert workspace-alert-warning" role="note"><strong>Memory is protected and unavailable in this production build.</strong><span>Authenticated tenant access is required. OIDC login and tenant selection are not yet connected to this frontend.</span></div>}
+            {memoryError && <div className="workspace-alert workspace-alert-error" role="alert">{memoryError}</div>}
+            <section className="workspace-card">
+              <div className="section-heading"><div><p className="card-label">PERSISTENT MEMORY INDEX</p><h2>{memoryTotal} memory key(s)</h2></div><button className="secondary-button" type="button" onClick={() => setMemoryRefresh((value) => value + 1)} disabled={!protectedActionsAvailable || busy !== null}>Refresh memory</button></div>
+              {protectedActionsAvailable && memoryItems.length === 0 ? <div className="empty-state"><span>◈</span><strong>No saved memory entries</strong><p>Create a versioned memory note linked to an existing source, claim or research record.</p></div> : null}
+              {memoryItems.length > 0 && <div className="memory-index-list">{memoryItems.map((item) => <button className={'memory-index-item' + (memoryKey === item.key ? ' memory-index-active' : '')} type="button" key={item.key} onClick={() => void openMemoryHistory(item.key)} disabled={busy !== null}><span><strong>{item.key}</strong><small>Version {item.version} · {item.evidence_count} evidence record(s) · {formatDate(item.created_at)}</small></span><span className="result-chip">{item.status}</span></button>)}</div>}
+            </section>
+            <div className="workspace-two-column memory-form-grid">
+              <section className="workspace-card">
+                <div className="section-heading"><div><p className="card-label">CREATE A MEMORY VERSION</p><h2>Research note or finding</h2></div><span className="section-index">APPEND-ONLY</span></div>
+                <form className="workspace-form" onSubmit={saveMemoryVersion}>
+                  <label htmlFor="memory-key">Memory key</label>
+                  <input id="memory-key" value={memoryKey} onChange={(event) => setMemoryKey(event.target.value)} minLength={1} maxLength={200} pattern="[A-Za-z0-9._:-]+" required />
+                  <label htmlFor="memory-value">Memory value (JSON object)</label>
+                  <textarea id="memory-value" className="lab-json-editor" value={memoryValueJson} onChange={(event) => setMemoryValueJson(event.target.value)} rows={10} maxLength={65536} spellCheck={false} required />
+                  <label htmlFor="memory-evidence">Evidence records (select one or more)</label>
+                  <select id="memory-evidence" className="memory-evidence-select" multiple value={memoryEvidenceIds} onChange={(event) => setMemoryEvidenceIds(Array.from(event.currentTarget.selectedOptions).map((option) => option.value))} size={Math.min(8, Math.max(3, memoryRecords.length))}>
+                    {memoryRecords.map((record) => <option key={record.id} value={record.id}>{recordTitle(record)} · {record.record_type}</option>)}
+                  </select>
+                  <p className="form-help">Evidence IDs are validated against records owned by the same tenant. A link records provenance; it does not confer scientific validity or prove the linked record's claims.</p>
+                  <button className="primary-button" type="submit" disabled={!protectedActionsAvailable || busy !== null || memoryEvidenceIds.length === 0}>{busy === 'memory-save' ? 'Saving version…' : 'Save memory version'}</button>
+                </form>
+              </section>
+              <section className="workspace-card">
+                <div className="section-heading"><div><p className="card-label">VERSION HISTORY</p><h2>{memoryHistory.length} version(s)</h2></div><span className="section-index">CHECKSUMMED</span></div>
+                {memoryHistory.length > 0 ? <div className="memory-version-list">{memoryHistory.map((item) => <article className="memory-version-item" key={item.version}><div><strong>Version {item.version}</strong><span className="result-chip">{item.status}</span></div><small>{formatDate(item.created_at)}{item.supersedes ? ' · supersedes v' + item.supersedes : ' · first version'}</small><pre>{JSON.stringify(item.value, null, 2)}</pre><code>{item.digest}</code><small>Evidence: {item.evidence.join(', ')}</small></article>)}</div> : <div className="empty-state"><span>◈</span><strong>No memory history selected</strong><p>Select a saved key from the memory index or create the first version.</p></div>}
+              </section>
+            </div>
+            <div className="workspace-two-column memory-action-grid">
+              <section className="workspace-card">
+                <div className="section-heading"><div><p className="card-label">CONTRADICTION TRACKING</p><h2>Dispute a current memory entry</h2></div><span className="section-index">NEW DISPUTED VERSION</span></div>
+                <form className="workspace-form" onSubmit={contradictMemory}>
+                  <label htmlFor="memory-contradiction">Reason for contradiction</label>
+                  <textarea id="memory-contradiction" value={memoryContradictionReason} onChange={(event) => setMemoryContradictionReason(event.target.value)} minLength={5} maxLength={2000} rows={3} required placeholder="Describe the conflicting evidence and what it challenges." />
+                  <button className="secondary-button" type="submit" disabled={!protectedActionsAvailable || busy !== null || memoryHistory.length === 0 || memoryEvidenceIds.length === 0}>{busy === 'memory-contradict' ? 'Recording contradiction…' : 'Record contradiction'}</button>
+                </form>
+              </section>
+              <section className="workspace-card">
+                <div className="section-heading"><div><p className="card-label">VERSION ROLLBACK</p><h2>Restore an earlier value</h2></div><span className="section-index">NON-DESTRUCTIVE</span></div>
+                <form className="workspace-form" onSubmit={rollbackMemory}>
+                  <label htmlFor="memory-rollback-version">Historical version</label>
+                  <select id="memory-rollback-version" value={memoryRollbackVersion} onChange={(event) => setMemoryRollbackVersion(event.target.value)}>{memoryHistory.map((item) => <option key={item.version} value={item.version}>Version {item.version} · {item.status}</option>)}</select>
+                  <p className="form-help">Rollback appends a new version containing the selected historical value and its prior evidence references. It never erases the audit trail.</p>
+                  <button className="secondary-button" type="submit" disabled={!protectedActionsAvailable || busy !== null || memoryHistory.length === 0}>{busy === 'memory-rollback' ? 'Creating rollback…' : 'Create rollback version'}</button>
+                </form>
+              </section>
+            </div>
           </section>
         )}
 
