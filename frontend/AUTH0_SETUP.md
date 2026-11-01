@@ -29,9 +29,9 @@ For local development, the application must allow this exact origin:
 
 - Allowed Callback URLs: `http://localhost:5173/`
 - Allowed Logout URLs: `http://localhost:5173/`
-- Allowed Web Origins: `http://localhost:5173`
+- Allowed Web Origins: `http://localhost:5173` (origins do not include a path or trailing slash)
 
-The SDK uses `window.location.origin` for both the redirect URI and logout return URL. Add each hosted HTTPS origin separately before enabling login on Vercel; do not assume a preview deployment origin is covered by the localhost entry.
+The SDK uses the current browser origin plus `/` for the callback and logout return URL, matching the configured trailing slash. Add each hosted HTTPS origin separately before enabling login on Vercel; do not assume a preview deployment origin is covered by the localhost entry.
 
 ## Backend API access is a separate configuration
 
