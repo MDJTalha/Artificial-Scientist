@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
 from typing import Annotated, Literal
 from uuid import UUID
 
@@ -147,10 +146,10 @@ def _validate_evidence(
     return tuple(validated)
 
 
-def _key(value: str = Path(min_length=1, max_length=200)) -> str:
-    if not value.strip() or "/" in value or "\\" in value:
+def _key(key: str = Path(min_length=1, max_length=200)) -> str:
+    if not key.strip() or "/" in key or "\\" in key:
         raise HTTPException(status_code=422, detail="Memory key must be a bounded identifier.")
-    return value
+    return key
 
 
 @router.get("", response_model=MemoryListResponse)
