@@ -181,7 +181,8 @@ def _render_markdown(
             "",
             "This document is a researcher-authored draft assembled from structured "
             "inputs. A citation resolves to a tenant-owned, integrity-checked "
-            "bibliographic metadata record with an external identifier. This check does "
+            "bibliographic metadata record with an external identifier. This " 
+            "check does "
             "not establish that the source supports the associated claim, validate the "
             "source's scientific conclusions, prove novelty, or constitute independent "
             "peer review. Inspect each original source.",
