@@ -11,7 +11,12 @@ from artificial_scientist.records.models import SourceRecord
 from artificial_scientist.records.store import RecordStore
 
 
-def _source(store: RecordStore, *, tenant_id: str | None = None, status: str = "unassessed"):
+def _source(
+    store: RecordStore,
+    *,
+    tenant_id: str | None = None,
+    status: str = "unassessed",
+):
     return store.create(
         SourceRecord(
             title="A scholarly metadata record",
@@ -34,8 +39,12 @@ def _request_payload(source_id):
             }
         ],
         "methods": "The researcher describes the methods and analysis approach here.",
-        "limitations": "The available evidence and methodological limitations are stated here.",
-        "data_statement": "Data availability and access restrictions are described here.",
+        "limitations": (
+            "The available evidence and methodological limitations are stated here."
+        ),
+        "data_statement": (
+            "Data availability and access restrictions are described here."
+        ),
     }
 
 
