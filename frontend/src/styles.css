@@ -629,3 +629,38 @@ h1 span { color: #82a5aa; font-weight: 430; }
   .manifest-list > div { grid-template-columns: 1fr; }
   .journal-detail-grid { margin-top: 12px; }
 }
+
+
+/* Scientific memory */
+.memory-index-list, .memory-version-list { display: grid; gap: 8px; }
+.memory-index-item {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px;
+  color: #d0e0e2;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: rgba(5, 16, 24, .34);
+  text-align: left;
+  cursor: pointer;
+}
+.memory-index-item:hover, .memory-index-active { border-color: rgba(118, 226, 189, .38); background: rgba(118, 226, 189, .05); }
+.memory-index-item > span:first-child { display: grid; gap: 5px; min-width: 0; }
+.memory-index-item strong { font-size: 10px; overflow-wrap: anywhere; }
+.memory-index-item small, .memory-version-item small { color: #7a939d; font-size: 8px; line-height: 1.5; }
+.memory-evidence-select { min-height: 130px; color-scheme: dark; }
+.memory-version-item { display: grid; gap: 7px; padding: 11px; border: 1px solid var(--line); border-radius: 5px; background: rgba(5, 16, 24, .34); }
+.memory-version-item > div { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.memory-version-item > div > strong { color: #d0e1e3; font-size: 10px; }
+.memory-version-item pre { max-height: 220px; overflow: auto; margin: 0; padding: 10px; color: #b7d2ca; background: #06111a; border-radius: 4px; font-size: 8px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+.memory-version-item code { color: #9dbbbb; font-size: 8px; overflow-wrap: anywhere; }
+.memory-version-item > small:last-child { overflow-wrap: anywhere; }
+.memory-action-grid { margin-top: 13px; }
+@media (max-width: 760px) {
+  .memory-index-item { align-items: flex-start; }
+  .memory-index-item > .result-chip { flex: 0 0 auto; }
+}
