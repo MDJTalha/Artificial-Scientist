@@ -17,6 +17,27 @@ export class ApiError extends Error {
   }
 }
 
+export interface ApiCredentials {
+  accessToken: string
+  tenantId: string | null
+}
+
+let activeCredentials: ApiCredentials | null = null
+
+export function setApiCredentials(credentials: ApiCredentials | null): void {
+  if (credentials === null) {
+    activeCredentials = null
+    return
+  }
+  if (!credentials.accessToken || credentials.accessToken.length > 16_384) {
+    throw new Error('An access token between 1 and 16,384 characters is required.')
+  }
+  if (credentials.tenantId !== null && (!credentials.tenantId || credentials.tenantId.length > 200)) {
+    throw new Error('Tenant identifier must contain 1 to 200 characters.')
+  }
+  activeCredentials = { ...credentials }
+}
+
 export interface ApiClient {
   get<T>(path: string, options?: ApiRequestOptions): Promise<T>
   post<T>(path: string, body: unknown, options?: ApiRequestOptions): Promise<T>
@@ -46,6 +67,12 @@ export function createApiClient(baseUrl: string | null): ApiClient {
     }
 
     const headers = new Headers(options.headers)
+    headers.delete('Authorization')
+    headers.delete('X-Tenant-ID')
+    if (activeCredentials) {
+      headers.set('Authorization', 'Bearer ' + activeCredentials.accessToken)
+      if (activeCredentials.tenantId) headers.set('X-Tenant-ID', activeCredentials.tenantId)
+    }
     headers.set('Accept', 'application/json')
     if (body !== undefined) headers.set('Content-Type', 'application/json')
 
@@ -111,6 +138,12 @@ export function createApiClient(baseUrl: string | null): ApiClient {
     }
 
     const headers = new Headers(options.headers)
+    headers.delete('Authorization')
+    headers.delete('X-Tenant-ID')
+    if (activeCredentials) {
+      headers.set('Authorization', 'Bearer ' + activeCredentials.accessToken)
+      if (activeCredentials.tenantId) headers.set('X-Tenant-ID', activeCredentials.tenantId)
+    }
     headers.set('Accept', 'image/png')
     headers.set('Content-Type', 'application/json')
 
@@ -173,6 +206,12 @@ export function createApiClient(baseUrl: string | null): ApiClient {
     }
 
     const headers = new Headers(options.headers)
+    headers.delete('Authorization')
+    headers.delete('X-Tenant-ID')
+    if (activeCredentials) {
+      headers.set('Authorization', 'Bearer ' + activeCredentials.accessToken)
+      if (activeCredentials.tenantId) headers.set('X-Tenant-ID', activeCredentials.tenantId)
+    }
     headers.set('Accept', expectedContentType)
 
     let response: Response
