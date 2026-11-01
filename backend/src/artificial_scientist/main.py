@@ -12,9 +12,9 @@ from artificial_scientist.api.routes.health import router as health_router
 from artificial_scientist.api.routes.knowledge import router as knowledge_router
 from artificial_scientist.api.routes.lab import router as lab_router
 from artificial_scientist.api.routes.literature import router as literature_router
+from artificial_scientist.api.routes.manuscripts import router as manuscripts_router
 from artificial_scientist.api.routes.math_tools import router as math_tools_router
 from artificial_scientist.api.routes.memory import router as memory_router
-from artificial_scientist.api.routes.manuscripts import router as manuscripts_router
 from artificial_scientist.api.routes.records import router as records_router
 from artificial_scientist.authorization import TenantDirectory
 from artificial_scientist.config import get_settings
