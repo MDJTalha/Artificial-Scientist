@@ -32,3 +32,37 @@ def test_readiness_reports_postgresql_connected(
     assert response.status_code == 200
     assert response.json()["scope"] == "postgresql"
     assert response.json()["database"] == "connected"
+
+
+def test_alembic_schema_and_append_only_guards_are_installed(database_url: str) -> None:
+    from sqlalchemy import inspect, text
+
+    from artificial_scientist.database import get_database_engine
+
+    engine = get_database_engine(database_url)
+    expected = {
+        "research_records",
+        "audit_events",
+        "source_identity",
+        "asds_principals",
+        "asds_tenants",
+        "asds_memberships",
+        "asds_security_audit",
+        "alembic_version",
+    }
+    assert expected.issubset(set(inspect(engine).get_table_names()))
+
+    with engine.connect() as connection:
+        triggers = set(
+            connection.execute(
+                text(
+                    "SELECT tgname FROM pg_trigger "
+                    "WHERE NOT tgisinternal AND tgname LIKE '%_append_only'"
+                )
+            ).scalars()
+        )
+    assert {
+        "research_records_append_only",
+        "audit_events_append_only",
+        "source_identity_append_only",
+    }.issubset(triggers)
