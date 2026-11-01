@@ -216,6 +216,10 @@ def test_oidc_validator_rejects_blank_trust_values(issuer, audience):
 
 
 
+COGNITO_ISSUER = "https://cognito-idp.ap-southeast-1.amazonaws.com/ap-southeast-1_example"
+COGNITO_JWKS = f"{COGNITO_ISSUER}/.well-known/jwks.json"
+
+
 def test_cognito_access_token_uses_client_id_token_use_and_required_scope(monkeypatch):
     captured = {}
 
@@ -230,7 +234,7 @@ def test_cognito_access_token_uses_client_id_token_use_and_required_scope(monkey
         captured["decode"] = kwargs
         return {
             "sub": "cognito-sub-123",
-            "iss": "https://cognito-idp.ap-southeast-1.amazonaws.com/ap-southeast-1_example",
+            "iss": COGNITO_ISSUER,
             "client_id": "asds-public-client",
             "token_use": "access",
             "scope": "openid email asds-api/access",
@@ -244,7 +248,7 @@ def test_cognito_access_token_uses_client_id_token_use_and_required_scope(monkey
         "signed-cognito-access-token",
         issuer="https://cognito-idp.ap-southeast-1.amazonaws.com/ap-southeast-1_example",
         audience="asds-public-client",
-        jwks_url="https://cognito-idp.ap-southeast-1.amazonaws.com/ap-southeast-1_example/.well-known/jwks.json",
+        jwks_url=COGNITO_JWKS,
         audience_claim="client_id",
         expected_token_use="access",
         expected_scope="asds-api/access",
