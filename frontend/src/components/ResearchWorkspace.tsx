@@ -3,8 +3,8 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { apiClient, apiConfiguration } from '../lib/api'
 import type { ServiceStatus } from '../lib/status'
 
-type WorkspaceView = 'overview' | 'missions' | 'literature' | 'knowledge' | 'hypotheses' | 'analysis' | 'math' | 'records'
-type BusyAction = 'create-task' | 'decompose' | 'literature' | 'save-sources' | 'knowledge-search' | 'knowledge-create' | 'knowledge-relation' | 'knowledge-graph' | 'generate' | 'prior-work' | 'assess' | 'statistics' | 'plot' | 'math' | null
+type WorkspaceView = 'overview' | 'missions' | 'literature' | 'knowledge' | 'hypotheses' | 'lab' | 'analysis' | 'math' | 'records'
+type BusyAction = 'create-task' | 'decompose' | 'literature' | 'save-sources' | 'knowledge-search' | 'knowledge-create' | 'knowledge-relation' | 'knowledge-graph' | 'generate' | 'prior-work' | 'assess' | 'statistics' | 'plot' | 'lab-run' | 'lab-history' | 'lab-verify' | 'math' | null
 
 interface ResearchWorkspaceProps {
   apiStatus: ServiceStatus
@@ -170,12 +170,56 @@ interface StatisticsResponse {
   note: string
 }
 
+interface LabStepResult {
+  step_id: string
+  operation: string
+  status: 'completed' | 'failed' | 'skipped'
+  output?: Record<string, unknown> | null
+  error?: string | null
+  duration_ms: number
+}
+
+interface LabRunResponse {
+  run_id: string
+  title: string
+  status: 'completed' | 'failed'
+  configuration_sha256: string
+  result_sha256: string
+  started_at: string
+  completed_at: string
+  duration_ms: number
+  steps: LabStepResult[]
+  logs: string[]
+  configuration: Record<string, unknown>
+  environment_manifest: Record<string, string>
+  limitations: string[]
+}
+
+interface LabRunListResponse {
+  items: LabRunResponse[]
+  total: number
+  limit: number
+  offset: number
+}
+
+interface LabVerificationResponse {
+  run_id: string
+  reproducible: boolean
+  configuration_matches: boolean
+  environment_matches: boolean
+  outputs_match: boolean
+  differences: string[]
+  recorded_environment: Record<string, string>
+  current_environment: Record<string, string>
+}
+
 const navigation: { id: WorkspaceView; label: string; symbol: string; detail: string }[] = [
   { id: 'overview', label: 'Command center', symbol: '◫', detail: 'System overview and workspace maturity' },
   { id: 'missions', label: 'Research agenda', symbol: '⌖', detail: 'Create and structure research questions' },
   { id: 'literature', label: 'Literature explorer', symbol: '⌕', detail: 'Search scholarly metadata and save evidence' },
   { id: 'knowledge', label: 'Knowledge graph', symbol: '⌘', detail: 'Create concepts, controlled vocabulary and evidence-linked relationships' },
   { id: 'hypotheses', label: 'Hypothesis lab', symbol: '◇', detail: 'Compare, screen and assess candidate hypotheses' },
+  { id: 'lab', label: 'Computational lab', symbol: '⌬', detail: 'Run bounded, allowlisted computational experiments' },
   { id: 'analysis', label: 'Data analysis', symbol: '∿', detail: 'Descriptive statistics and mathematical plots' },
   { id: 'math', label: 'Mathematics workbench', symbol: '∑', detail: 'Bounded symbolic calculations' },
   { id: 'records', label: 'Research records', symbol: '▤', detail: 'Browse immutable, provenance-aware records' },
@@ -189,7 +233,7 @@ const workspaceRoadmap = [
 
   { name: 'Hypothesis & Discovery Lab', status: 'AVAILABLE', note: 'Bounded templates, prior-work screen and assessment.' },
   { name: 'Mathematics & Formal Reasoning Workbench', status: 'AVAILABLE', note: 'Bounded symbolic calculation and review notes.' },
-  { name: 'Computational Laboratory & Simulation Center', status: 'BACKEND READY / UI NEXT', note: 'Execution UI remains gated on reviewed sandbox deployment.' },
+  { name: 'Computational Laboratory & Simulation Center', status: 'DEV UI / NOT PRODUCTION CERTIFIED', note: 'Bounded allowlisted operations only; production execution remains blocked pending reviewed OS sandbox and identity controls.' },
   { name: 'Data Analysis & Results Observatory', status: 'AVAILABLE', note: 'Descriptive statistics and bounded function plots.' },
   { name: 'Experiment Journal & Reproducibility', status: 'NEXT', note: 'Run history, manifests, verification and exports.' },
   { name: 'Scientific Memory & Learning', status: 'BACKEND READY / UI NEXT', note: 'Versioned memory and contradiction review.' },
@@ -270,6 +314,37 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
   const [plotUpper, setPlotUpper] = useState('10')
   const [plotUrl, setPlotUrl] = useState<string | null>(null)
 
+  const [labConfigJson, setLabConfigJson] = useState(`{
+  "title": "Polynomial simplification and sample statistics",
+  "steps": [
+    {
+      "step_id": "simplify",
+      "operation": "symbolic",
+      "inputs": {
+        "operation": "simplify",
+        "expression": "x**2 + 2*x + 1",
+        "symbols": ["x"]
+      }
+    },
+    {
+      "step_id": "sample_stats",
+      "operation": "statistics",
+      "inputs": {
+        "values": [2, 4, 4, 6, 8],
+        "variance_mode": "sample"
+      }
+    }
+  ],
+  "random_seed": 42,
+  "step_timeout_seconds": 10
+}`)
+  const [labRunResponse, setLabRunResponse] = useState<LabRunResponse | null>(null)
+  const [labHistory, setLabHistory] = useState<LabRunResponse[]>([])
+  const [labTotal, setLabTotal] = useState(0)
+  const [labError, setLabError] = useState<string | null>(null)
+  const [labHistoryRefresh, setLabHistoryRefresh] = useState(0)
+  const [labVerification, setLabVerification] = useState<LabVerificationResponse | null>(null)
+
   const [mathOperation, setMathOperation] = useState<'simplify' | 'differentiate' | 'integrate' | 'solve' | 'evaluate'>('simplify')
   const [mathExpression, setMathExpression] = useState('x**2 + 2*x + 1')
   const [mathVariable, setMathVariable] = useState('x')
@@ -277,6 +352,7 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
 
   const apiConfigured = Boolean(apiConfiguration.baseUrl)
   const protectedActionsAvailable = apiConfigured && !import.meta.env.PROD
+  const labExecutionAvailable = apiConfigured && !import.meta.env.PROD
 
   useEffect(() => {
     if (activeView !== 'records' || !protectedActionsAvailable) return
@@ -295,6 +371,24 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
 
     return () => controller.abort()
   }, [activeView, recordsRefresh, protectedActionsAvailable])
+
+  useEffect(() => {
+    if (activeView !== 'lab' || !labExecutionAvailable) return
+
+    const controller = new AbortController()
+    setLabError(null)
+    apiClient
+      .get<LabRunListResponse>('/api/v1/lab/runs?limit=20&offset=0', { signal: controller.signal })
+      .then((result) => {
+        setLabHistory(result.items)
+        setLabTotal(result.total)
+      })
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted) setLabError(errorText(error))
+      })
+
+    return () => controller.abort()
+  }, [activeView, labHistoryRefresh, labExecutionAvailable])
 
   useEffect(() => {
     if (!plotUrl) return
@@ -678,6 +772,60 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
     }
   }
 
+  async function runLab(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    beginAction('lab-run')
+    setLabError(null)
+    setLabVerification(null)
+    try {
+      const payload: unknown = JSON.parse(labConfigJson)
+      if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) {
+        throw new Error('The run configuration must be a JSON object.')
+      }
+      const result = await apiClient.post<LabRunResponse>('/api/v1/lab/runs', payload)
+      setLabRunResponse(result)
+      setLabHistoryRefresh((value) => value + 1)
+      setNotice(result.status === 'completed'
+        ? 'Bounded computational run completed and persisted. Review each step and the recorded environment before relying on results.'
+        : 'The run completed with a failed step. Later steps were skipped; inspect the returned error and configuration.')
+    } catch (error) {
+      setLabError(errorText(error))
+    } finally {
+      finishAction()
+    }
+  }
+
+  async function verifyLabRun(runId: string) {
+    beginAction('lab-verify')
+    setLabError(null)
+    setLabVerification(null)
+    try {
+      const result = await apiClient.post<LabVerificationResponse>(`/api/v1/lab/runs/${encodeURIComponent(runId)}/verify`, {})
+      setLabVerification(result)
+      setNotice(result.reproducible
+        ? 'Replay outputs and environment matched. This supports computational reproducibility, not scientific validity.'
+        : 'Replay differences were detected. Compare the configuration, runtime manifest and step outputs.')
+    } catch (error) {
+      setLabError(errorText(error))
+    } finally {
+      finishAction()
+    }
+  }
+
+  async function loadLabRun(runId: string) {
+    beginAction('lab-history')
+    setLabError(null)
+    try {
+      const result = await apiClient.get<LabRunResponse>(`/api/v1/lab/runs/${encodeURIComponent(runId)}`)
+      setLabRunResponse(result)
+      setLabVerification(null)
+    } catch (error) {
+      setLabError(errorText(error))
+    } finally {
+      finishAction()
+    }
+  }
+
   async function runSymbolicTool(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     beginAction('math')
@@ -793,8 +941,8 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
               </article>
               <article className="workspace-stat">
                 <span className="card-label">WORKSPACES IMPLEMENTED</span>
-                <strong>7 <small>/ 12</small></strong>
-                <p>Seven implemented screens. Protected records and discovery actions remain gated until reviewed OIDC sign-in and tenant selection are connected.</p>
+                <strong>8 <small>/ 12</small></strong>
+                <p>Eight screens implemented. Protected workspaces and lab execution remain gated until reviewed identity and sandbox controls are available.</p>
               </article>
               <article className="workspace-stat">
                 <span className="card-label">AI INFERENCE</span>
@@ -1154,6 +1302,66 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
                 )}
               </>
             )}
+          </section>
+        )}
+
+        {activeView === 'lab' && (
+          <section className="workspace-page">
+            <div className="page-heading">
+              <p className="card-label">COMPUTATIONAL LABORATORY & SIMULATION CENTER</p>
+              <h1>Run a controlled computational experiment</h1>
+              <p>Submit a declarative sequence of allowlisted mathematical operations. The laboratory accepts structured inputs only; it does not execute arbitrary code, notebooks, shell commands or generated scripts.</p>
+            </div>
+            {!labExecutionAvailable && <div className="workspace-alert workspace-alert-warning" role="note"><strong>Execution is disabled in this environment.</strong><span>A configured API and development-mode backend are required for this workspace. Production execution remains blocked until a reviewed OS-level sandbox, adversarial isolation evidence and authenticated tenant session are deployed.</span></div>}
+            {labError && <div className="workspace-alert workspace-alert-error" role="alert">{labError}</div>}
+            <div className="workspace-alert workspace-alert-warning"><strong>Execution boundary</strong><span>Supported operations: symbolic math, numerical integration, bracketed root finding, descriptive statistics and unit conversion. POSIX resource limits are not full filesystem, network, syscall or kernel isolation. Use trusted development infrastructure only.</span></div>
+            <div className="workspace-two-column">
+              <section className="workspace-card">
+                <div className="section-heading"><div><p className="card-label">DECLARATIVE RUN CONFIGURATION</p><h2>Experiment definition</h2></div><span className="section-index">JSON / 64 KiB MAX</span></div>
+                <form className="workspace-form" onSubmit={runLab}>
+                  <label htmlFor="lab-config">Run configuration JSON</label>
+                  <textarea id="lab-config" className="lab-json-editor" value={labConfigJson} onChange={(event) => setLabConfigJson(event.target.value)} rows={22} maxLength={65536} spellCheck={false} required aria-describedby="lab-config-help" />
+                  <p id="lab-config-help" className="form-help">The backend validates every field and operation. Each run may contain 1–20 steps; each operation has a per-step timeout of up to 30 seconds.</p>
+                  <button className="primary-button" type="submit" disabled={busy !== null || !labExecutionAvailable || labConfigJson.length === 0}>{busy === 'lab-run' ? 'Running controlled experiment…' : 'Run controlled experiment'}</button>
+                </form>
+              </section>
+              <section className="workspace-card">
+                <div className="section-heading"><div><p className="card-label">EXECUTION RESULT</p><h2>Run outcome</h2></div><span className="section-index">PERSISTED / TRACEABLE</span></div>
+                {labRunResponse ? (
+                  <div className="lab-result">
+                    <div className="literature-result-top"><span className="result-chip">{labRunResponse.status.toUpperCase()}</span><span className="result-chip">{labRunResponse.steps.length} step(s)</span></div>
+                    <h3>{labRunResponse.title}</h3>
+                    <p className="lab-run-id">Run ID: {labRunResponse.run_id}</p>
+                    <div className="lab-hash-grid"><div><span>Configuration SHA-256</span><code>{labRunResponse.configuration_sha256}</code></div><div><span>Result SHA-256</span><code>{labRunResponse.result_sha256}</code></div></div>
+                    <div className="lab-step-list">
+                      {labRunResponse.steps.map((step) => (
+                        <article className="lab-step" key={step.step_id}>
+                          <div><strong>{step.step_id}</strong><span className={'result-chip ' + (step.status === 'completed' ? '' : 'result-chip-warning')}>{step.status}</span></div>
+                          <small>{step.operation} · {Number(step.duration_ms.toFixed(2))} ms</small>
+                          {step.output && <pre>{JSON.stringify(step.output, null, 2)}</pre>}
+                          {step.error && <p className="lab-step-error">{step.error}</p>}
+                        </article>
+                      ))}
+                    </div>
+                    <div className="form-actions"><button className="secondary-button" type="button" onClick={() => void verifyLabRun(labRunResponse.run_id)} disabled={busy !== null || !labExecutionAvailable}>{busy === 'lab-verify' ? 'Replaying…' : 'Replay & compare'}</button></div>
+                    <p className="form-help">{labRunResponse.limitations.join(' ')}</p>
+                  </div>
+                ) : <div className="empty-state"><span>⌬</span><strong>No execution result yet</strong><p>Submit the bounded example or a reviewed declarative configuration to create a persisted run.</p></div>}
+              </section>
+            </div>
+            {labVerification && (
+              <section className="workspace-card lab-verification">
+                <div className="section-heading"><div><p className="card-label">REPRODUCIBILITY CHECK</p><h2>{labVerification.reproducible ? 'Replay matched' : 'Replay differences detected'}</h2></div><span className="section-index">COMPARE / VERIFY</span></div>
+                <div className="vocabulary-tags"><span>Configuration: {labVerification.configuration_matches ? 'MATCH' : 'DIFFERENT'}</span><span>Environment: {labVerification.environment_matches ? 'MATCH' : 'DIFFERENT'}</span><span>Step outputs: {labVerification.outputs_match ? 'MATCH' : 'DIFFERENT'}</span></div>
+                {labVerification.differences.length > 0 && <ul className="workspace-list">{labVerification.differences.map((item) => <li key={item}>{item.replaceAll('_', ' ')}</li>)}</ul>}
+                <p className="workspace-caveat">A matching replay supports reproducibility under the recorded software/runtime assumptions. It does not prove model correctness, source validity or a scientific conclusion.</p>
+              </section>
+            )}
+            <section className="workspace-card lab-history">
+              <div className="section-heading"><div><p className="card-label">EXPERIMENT HISTORY</p><h2>{labTotal} recorded run(s)</h2></div><button className="secondary-button" type="button" onClick={() => setLabHistoryRefresh((value) => value + 1)} disabled={!labExecutionAvailable || busy !== null}>Refresh history</button></div>
+              {labExecutionAvailable && labHistory.length === 0 ? <div className="empty-state"><strong>No prior runs returned</strong><p>Completed and failed runs are retained by the backend store and appear here when available.</p></div> : null}
+              {labHistory.length > 0 && <div className="lab-history-list">{labHistory.map((run) => <article className="lab-history-item" key={run.run_id}><div><strong>{run.title}</strong><span className="lab-run-id">{run.run_id}</span></div><span className={'result-chip ' + (run.status === 'completed' ? '' : 'result-chip-warning')}>{run.status}</span><div className="lab-history-actions"><button className="secondary-button" type="button" onClick={() => void loadLabRun(run.run_id)} disabled={busy !== null}>Open run</button><button className="secondary-button" type="button" onClick={() => void verifyLabRun(run.run_id)} disabled={busy !== null || !labExecutionAvailable}>Replay</button></div></article>)}</div>}
+            </section>
           </section>
         )}
 
