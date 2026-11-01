@@ -99,7 +99,14 @@ def role_allows(role: str, action: str) -> bool:
 
 
 class TenantDirectory:
-    """SQLite-backed tenant directory; membership grants are explicit and audited."""
+    """Tenant directory facade; SQLite remains the local default."""
+
+    def __new__(cls, database_path: str):
+        if database_path.startswith(("postgres://", "postgresql://", "postgresql+psycopg://")):
+            from artificial_scientist.authorization_postgres import PostgresTenantDirectory
+
+            return PostgresTenantDirectory(database_path)
+        return super().__new__(cls)
 
     def __init__(self, database_path: str) -> None:
         self.database_path = database_path

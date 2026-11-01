@@ -377,7 +377,9 @@ app = FastAPI(
 app.add_middleware(LabRequestBodyLimitMiddleware)
 app.add_middleware(Phase7RecordIsolationGateMiddleware)
 app.add_middleware(OIDCAuthenticationMiddleware)
-app.add_middleware(LabSecurityAuditMiddleware, database_path=settings.database_path)
+app.add_middleware(
+    LabSecurityAuditMiddleware, database_path=settings.database_url or settings.database_path
+)
 
 app.add_middleware(
     CORSMiddleware,

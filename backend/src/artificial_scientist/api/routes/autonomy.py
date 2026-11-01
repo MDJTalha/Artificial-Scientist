@@ -34,9 +34,10 @@ class WorkflowCheckpointRequest(BaseModel):
 
 
 def _engine(tenant_id: str | None) -> WorkflowEngine:
+    settings = get_settings()
     effective_tenant = tenant_id or "development"
     return WorkflowEngine(
-        AutonomyStore(get_settings().database_path),
+        AutonomyStore(settings.database_url or settings.database_path),
         tenant_id=effective_tenant,
     )
 

@@ -10,7 +10,14 @@ from uuid import uuid4
 
 
 class AutonomyStore:
-    """Transactional journal with fail-closed tenant ownership."""
+    """Transactional journal; PostgreSQL is selected for configured production URLs."""
+
+    def __new__(cls, database_path: str | Path):
+        value = str(database_path)
+        if value.startswith(("postgres://", "postgresql://", "postgresql+psycopg://")):
+            from artificial_scientist.autonomy.postgres_store import PostgresAutonomyStore
+            return PostgresAutonomyStore(value)
+        return super().__new__(cls)
 
     def __init__(self, database_path: str | Path):
         self.path = Path(database_path)

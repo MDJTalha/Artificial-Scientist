@@ -39,6 +39,16 @@ def test_readiness_endpoint_discloses_its_scope() -> None:
     assert body["scope"] == "application_only"
 
 
+def test_production_readiness_fails_closed_without_postgresql(monkeypatch) -> None:
+    monkeypatch.setenv("ARTIFICIAL_SCIENTIST_ENV", "production")
+    monkeypatch.delenv("ARTIFICIAL_SCIENTIST_DATABASE_URL", raising=False)
+
+    response = client.get("/api/v1/ready")
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "Required PostgreSQL database is not configured."
+
+
 def test_openapi_schema_is_available() -> None:
     response = client.get("/openapi.json")
 

@@ -68,7 +68,9 @@ def require_record_access(
             expected_scope=getattr(settings, "oidc_required_scope", None),
         )
         principal_id = stable_principal_id(principal.issuer, principal.subject)
-        TenantDirectory(settings.database_path).authorize(principal_id, x_tenant_id, action)
+        TenantDirectory(
+            getattr(settings, "database_url", None) or getattr(settings, "database_path", None)
+        ).authorize(principal_id, x_tenant_id, action)
     except IdentityConfigurationError as error:
         raise HTTPException(
             status_code=503, detail="OIDC authentication configuration is invalid."
@@ -102,7 +104,16 @@ def record_access(action: str):
 @lru_cache(maxsize=1)
 def get_record_store() -> RecordStore:
     """Create a short-lived store facade; every operation opens its own connection."""
-    return RecordStore(get_settings().database_path)
+    settings = get_settings()
+    if getattr(settings, "database_url", None):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                "PostgreSQL is configured, but the research-record persistence adapter "
+                "is not migrated. Requests are blocked to prevent split-database writes."
+            ),
+        )
+    return RecordStore(settings.database_path)
 
 
 def _translate_store_error(error: RecordStoreError) -> HTTPException:

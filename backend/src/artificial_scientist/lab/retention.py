@@ -54,6 +54,11 @@ def main() -> int:
     except ValueError as error:
         raise SystemExit("ARTIFICIAL_SCIENTIST_LAB_RETENTION_DAYS must be an integer.") from error
     settings = get_settings()
+    if settings.database_url:
+        raise SystemExit(
+            "Retention is blocked: the laboratory PostgreSQL persistence adapter "
+            "has not been migrated. No SQLite fallback is permitted."
+        )
     store = LabRunStore(settings.database_path)
     deleted_count = run_retention(store, retention_days)
     print(f"Retention job complete: deleted {deleted_count} expired run(s).")
