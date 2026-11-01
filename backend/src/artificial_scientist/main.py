@@ -27,7 +27,7 @@ LAB_RUN_BODY_LIMIT_BYTES = 64 * 1024
 DISCOVERY_BODY_LIMIT_BYTES = 1024 * 1024
 
 
-class CognitoAuthenticationMiddleware:
+class OIDCAuthenticationMiddleware:
     """Require a configured OIDC access token on every non-public API route."""
 
     def __init__(self, app: ASGIApp) -> None:
@@ -39,14 +39,9 @@ class CognitoAuthenticationMiddleware:
             return
         path = scope.get("path", "")
         public_paths = {"/api/v1/health", "/api/v1/ready", "/api/v1/knowledge/vocabulary"}
-        route_guarded_prefixes = (
-            "/api/v1/lab",
-            "/api/v1/records",
-            "/api/v1/knowledge",
-            "/api/v1/literature",
-            "/api/v1/discovery",
-            "/api/v1/autonomy",
-        )
+        # Lab and records routers validate OIDC and tenant membership in their own
+        # dependencies. All other versioned API routes must pass this middleware.
+        route_guarded_prefixes = ("/api/v1/lab", "/api/v1/records")
         if (
             not path.startswith("/api/v1/")
             or path in public_paths
