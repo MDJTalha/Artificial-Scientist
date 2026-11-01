@@ -15,6 +15,7 @@ const scopes = (env.VITE_COGNITO_SCOPES ?? 'openid email profile asds-api/access
 let accessToken: string | null = null;
 let refreshToken: string | null = null;
 let accessTokenExpiresAt = 0;
+let refreshPromise: Promise<string | null> | null = null;
 
 export const cognitoConfigured = Boolean(domain.startsWith('https://') && clientId && redirectUri.startsWith('https://') && logoutUri.startsWith('https://'));
 
@@ -102,25 +103,46 @@ export async function completeCognitoCallback(): Promise<boolean> {
 export async function getCognitoAccessToken(): Promise<string | null> {
   if (!accessToken) return null;
   if (Date.now() < accessTokenExpiresAt - 60_000) return accessToken;
-  if (!refreshToken) { accessToken = null; accessTokenExpiresAt = 0; return null; }
-  const response = await fetch(`${domain}/oauth2/token`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
-    body: new URLSearchParams({ grant_type: 'refresh_token', client_id: clientId, refresh_token: refreshToken }),
-    credentials: 'omit',
-  });
-  const result = await response.json() as CognitoTokenResponse;
-  if (!response.ok || !result.access_token) {
-    accessToken = null; refreshToken = null; accessTokenExpiresAt = 0;
+  if (!refreshToken) {
+    accessToken = null;
+    accessTokenExpiresAt = 0;
     return null;
   }
-  accessToken = result.access_token;
-  accessTokenExpiresAt = Date.now() + Math.max(60, result.expires_in ?? 900) * 1000;
-  return accessToken;
+  if (!refreshPromise) {
+    refreshPromise = (async () => {
+      const response = await fetch(`${domain}/oauth2/token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
+        body: new URLSearchParams({
+          grant_type: 'refresh_token',
+          client_id: clientId,
+          refresh_token: refreshToken!,
+        }),
+        credentials: 'omit',
+      });
+      const result = await response.json() as CognitoTokenResponse;
+      if (!response.ok || !result.access_token) {
+        accessToken = null;
+        refreshToken = null;
+        accessTokenExpiresAt = 0;
+        return null;
+      }
+      accessToken = result.access_token;
+      accessTokenExpiresAt = Date.now() + Math.max(60, result.expires_in ?? 900) * 1000;
+      return accessToken;
+    })();
+  }
+  try {
+    return await refreshPromise;
+  } finally {
+    refreshPromise = null;
+  }
 }
 
 export function signOutCognito(): void {
-  accessToken = null; refreshToken = null; accessTokenExpiresAt = 0;
+  accessToken = null; refreshToken = null; accessTokenExpiresAt = 0; refreshPromise = null;
+  sessionStorage.removeItem('asds.cognito.state');
+  sessionStorage.removeItem('asds.cognito.verifier');
   const url = new URL(`${domain}/logout`);
   url.search = new URLSearchParams({
     client_id: clientId,
