@@ -110,7 +110,10 @@ def readiness_check(response: Response) -> dict[str, object]:
         details["https_cors_origins"] = (
             "All allowed browser origins use HTTPS."
             if origins_ok
-            else "Production CORS must contain one or more explicit HTTPS origins; wildcards are not allowed."
+            else (
+                "Production CORS must contain explicit HTTPS origins; "
+                "wildcards are not allowed."
+            )
         )
     else:
         checks["development_mode"] = True
