@@ -17,12 +17,15 @@ from artificial_scientist.records.tenant_policy import (
             {
                 "record:read", "record:list", "record:search",
                 "discovery:decompose", "discovery:prior-work-screen",
-                "memory:list", "memory:read",
+                "memory:list", "memory:read", "manuscript:list", "manuscript:read",
             },
         ),
         (
             "auditor",
-            {"record:read", "record:list", "record:audit:read", "memory:list", "memory:read"},
+            {
+                "record:read", "record:list", "record:audit:read",
+                "memory:list", "memory:read", "manuscript:list", "manuscript:read",
+            },
         ),
     ],
 )
