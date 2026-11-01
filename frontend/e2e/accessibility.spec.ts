@@ -69,9 +69,32 @@ test.describe('research workspace', () => {
     await expect(page.getByText(/content SHA-256 digest/i)).toBeVisible()
   })
 
-  test('has no automated WCAG violations in the command center', async ({ page }) => {
+  test('has no automated WCAG violations across all 12 workspace screens', async ({ page }) => {
     await page.goto('/')
-    const results = await new AxeBuilder({ page }).analyze()
-    expect(results.violations).toEqual([])
+    const navigation = page.getByRole('navigation', { name: 'Research workspaces' })
+    const screens = [
+      { label: 'Research agenda', heading: /Define a research mission/i },
+      { label: 'Literature explorer', heading: /Find scholarly metadata/i },
+      { label: 'Knowledge graph', heading: /Build a traceable concept graph/i },
+      { label: 'Hypothesis lab', heading: /Develop competing explanations/i },
+      { label: 'Computational lab', heading: /Run a controlled computational experiment/i },
+      { label: 'Data analysis', heading: /Explore numerical evidence/i },
+      { label: 'Experiment journal', heading: /Inspect the computational evidence trail/i },
+      { label: 'Scientific memory', heading: /Maintain evidence-linked research memory/i },
+      { label: 'Manuscript studio', heading: /Prepare an evidence-linked research draft/i },
+      { label: 'Review & governance', heading: /Inspect governance evidence/i },
+      { label: 'Mathematics workbench', heading: /Run a bounded symbolic calculation/i },
+      { label: 'Research records', heading: /Research records/i },
+    ]
+
+    const commandCenter = await new AxeBuilder({ page }).analyze()
+    expect(commandCenter.violations, 'Command Center accessibility violations').toEqual([])
+
+    for (const screen of screens) {
+      await navigation.getByRole('button', { name: screen.label }).click()
+      await expect(page.getByRole('heading', { name: screen.heading })).toBeVisible()
+      const results = await new AxeBuilder({ page }).analyze()
+      expect(results.violations, screen.label + ' accessibility violations').toEqual([])
+    }
   })
 })
