@@ -51,10 +51,9 @@ from artificial_scientist.lab.store import (
 
 def require_lab_access(
     request: Request,
-    x_lab_api_key: str | None = Header(default=None),
     authorization: str | None = Header(default=None),
 ) -> None:
-    """Require configured OIDC identity or the legacy deployment-level API key."""
+    """Require a validated, per-user OIDC identity for non-development lab access."""
     settings = get_settings()
     database_path = getattr(settings, "database_path", None)
     if database_path:
@@ -72,71 +71,46 @@ def require_lab_access(
         getattr(settings, "oidc_audience", None),
         getattr(settings, "oidc_jwks_url", None),
     )
-    if any(oidc_values):
-        if not all(oidc_values):
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="OIDC authentication is not fully configured.",
-            )
-        if not authorization or not authorization.startswith("Bearer "):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Valid bearer token required.",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-        token = authorization.removeprefix("Bearer ").strip()
-        if not token or " " in token:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Valid bearer token required.",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-        try:
-            principal = validate_oidc_bearer_token(
-                token,
-                issuer=oidc_values[0],
-                audience=oidc_values[1],
-                jwks_url=oidc_values[2],
-                audience_claim=getattr(settings, "oidc_audience_claim", "aud"),
-                expected_token_use=getattr(settings, "oidc_token_use", None),
-                expected_scope=getattr(settings, "oidc_required_scope", None),
-            )
-        except IdentityConfigurationError as error:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="OIDC authentication configuration is invalid.",
-            ) from error
-        except InvalidIdentityError as error:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Bearer token validation failed.",
-                headers={"WWW-Authenticate": "Bearer"},
-            ) from error
-        if request is not None:
-            request.state.authenticated_principal = principal
-        return
-    if not settings.lab_api_key:
+    if not all(oidc_values):
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Lab API authentication is not configured.",
+            detail="OIDC authentication is not fully configured.",
         )
-    if len(settings.lab_api_key) < 32:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Lab API authentication requires a configured key of at least 32 characters.",
-        )
-    if not x_lab_api_key or not hmac.compare_digest(x_lab_api_key, settings.lab_api_key):
+    if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Valid lab API key required.",
-            headers={"WWW-Authenticate": "ApiKey"},
+            detail="Valid bearer token required.",
+            headers={"WWW-Authenticate": "Bearer"},
         )
-    if request is not None:
-        request.state.authenticated_principal = AuthenticatedPrincipal(
-            subject="legacy-shared-api-key",
-            issuer="deployment-configured",
-            audience="artificial-scientist-lab",
+    token = authorization.removeprefix("Bearer ").strip()
+    if not token or " " in token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Valid bearer token required.",
+            headers={"WWW-Authenticate": "Bearer"},
         )
+    try:
+        principal = validate_oidc_bearer_token(
+            token,
+            issuer=oidc_values[0],
+            audience=oidc_values[1],
+            jwks_url=oidc_values[2],
+            audience_claim=getattr(settings, "oidc_audience_claim", "aud"),
+            expected_token_use=getattr(settings, "oidc_token_use", None),
+            expected_scope=getattr(settings, "oidc_required_scope", None),
+        )
+    except IdentityConfigurationError as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="OIDC authentication configuration is invalid.",
+        ) from error
+    except InvalidIdentityError as error:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Bearer token validation failed.",
+            headers={"WWW-Authenticate": "Bearer"},
+        ) from error
+    request.state.authenticated_principal = principal
 
 
 router = APIRouter(
