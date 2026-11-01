@@ -32,8 +32,10 @@ class PostgresAutonomyStore:
         with self.engine.begin() as connection:
             connection.execute(text("""
                 INSERT INTO autonomy_workflows
-                (workflow_id,state,consequential,approval_token_hash,tenant_id,created_at,updated_at)
-                VALUES (:workflow_id,:state,:consequential,:approval_token_hash,\n                        :tenant_id,:now,:now)
+                (workflow_id,state,consequential,approval_token_hash,tenant_id,
+                 created_at,updated_at)
+                VALUES (:workflow_id,:state,:consequential,:approval_token_hash,
+                        :tenant_id,:now,:now)
             """), {
                 "workflow_id": workflow_id, "state": state,
                 "consequential": consequential, "approval_token_hash": approval_token_hash,
@@ -97,7 +99,8 @@ class PostgresAutonomyStore:
         tenant = self._require_tenant(tenant_id)
         with self.engine.begin() as connection:
             owned = connection.execute(text("""
-                SELECT 1 FROM autonomy_workflows\n                WHERE workflow_id=:workflow_id AND tenant_id=:tenant_id
+                SELECT 1 FROM autonomy_workflows
+                WHERE workflow_id=:workflow_id AND tenant_id=:tenant_id
             """), {"workflow_id": workflow_id, "tenant_id": tenant}).first()
             if owned is None:
                 raise KeyError(workflow_id)
@@ -114,7 +117,8 @@ class PostgresAutonomyStore:
         tenant = self._require_tenant(tenant_id)
         with self.engine.connect() as connection:
             row = connection.execute(text("""
-                SELECT * FROM autonomy_workflows\n                WHERE workflow_id=:workflow_id AND tenant_id=:tenant_id
+                SELECT * FROM autonomy_workflows
+                WHERE workflow_id=:workflow_id AND tenant_id=:tenant_id
             """), {"workflow_id": workflow_id, "tenant_id": tenant}).mappings().first()
         if row is None:
             raise KeyError(workflow_id)
