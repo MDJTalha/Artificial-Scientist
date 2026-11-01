@@ -276,7 +276,11 @@ class AutonomyStore:
                 "WHERE key_name=? AND tenant_id=?",
                 (storage_key, tenant),
             ).fetchone()
-            version = int(row[0]) + 1
+            latest_version = int(row[0])
+            if supersedes_version != (latest_version or None):
+                connection.rollback()
+                raise ValueError("memory version changed concurrently; reload before writing")
+            version = latest_version + 1
             connection.execute(
                 "INSERT INTO autonomy_memory "
                 "(memory_id,key_name,version,status,value_json,evidence_json,digest,"
