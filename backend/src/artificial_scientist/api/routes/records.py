@@ -68,7 +68,9 @@ def require_record_access(
             expected_scope=getattr(settings, "oidc_required_scope", None),
         )
         principal_id = stable_principal_id(principal.issuer, principal.subject)
-        TenantDirectory(settings.database_url or settings.database_path).authorize(principal_id, x_tenant_id, action)
+        TenantDirectory(
+            settings.database_url or settings.database_path
+        ).authorize(principal_id, x_tenant_id, action)
     except IdentityConfigurationError as error:
         raise HTTPException(
             status_code=503, detail="OIDC authentication configuration is invalid."
