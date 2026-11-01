@@ -32,6 +32,7 @@ _RECORD_ACTIONS = frozenset({
     "discovery:assess", "autonomy:workflow:create", "autonomy:workflow:read",
     "autonomy:workflow:write", "autonomy:workflow:approve",
     "memory:list", "memory:read", "memory:write", "memory:contradict", "memory:rollback",
+    "manuscript:list", "manuscript:read", "manuscript:create",
 })
 _ALLOWED_ACTIONS = _LAB_ACTIONS | _RECORD_ACTIONS
 
@@ -82,16 +83,18 @@ def role_allows(role: str, action: str) -> bool:
                 "autonomy:workflow:approve",
                 "memory:list", "memory:read", "memory:write",
                 "memory:contradict", "memory:rollback",
+                "manuscript:list", "manuscript:read", "manuscript:create",
             }
         if role == "viewer":
             return action in {
                 "record:read", "record:list", "record:search",
                 "discovery:decompose", "discovery:prior-work-screen", "autonomy:workflow:read",
-                "memory:list", "memory:read",
+                "memory:list", "memory:read", "manuscript:list", "manuscript:read",
             }
         if role == "auditor":
             return action in {
-                "record:read", "record:list", "record:audit:read", "memory:list", "memory:read"
+                "record:read", "record:list", "record:audit:read", "memory:list", "memory:read",
+                "manuscript:list", "manuscript:read"
             }
         return False
     if role == "researcher":
