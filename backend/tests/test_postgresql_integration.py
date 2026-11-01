@@ -220,3 +220,51 @@ def test_postgresql_tenant_directory_rejects_sensitive_audit_metadata(
             outcome="failed",
             metadata={"access_token": "must-not-be-stored"},
         )
+
+
+
+def test_postgresql_autonomy_store_is_transactional_and_tenant_scoped(
+    database_url: str,
+) -> None:
+    from uuid import uuid4
+
+    from sqlalchemy import text
+    from sqlalchemy.exc import DBAPIError
+
+    from artificial_scientist.autonomy.store import AutonomyStore
+
+    suffix = str(uuid4())
+    tenant_a = f"tenant-a:{suffix}"
+    tenant_b = f"tenant-b:{suffix}"
+    workflow_id = f"workflow:{suffix}"
+    store = AutonomyStore(database_url)
+    store.save_workflow(workflow_id, "created", True, None, tenant_id=tenant_a)
+    store.transition(
+        workflow_id, "created", "running", "integration-test",
+        "start workflow", tenant_id=tenant_a,
+    )
+    store.checkpoint(workflow_id, "a" * 64, tenant_id=tenant_a)
+
+    assert store.workflow(workflow_id, tenant_id=tenant_a)["state"] == "running"
+    assert store.transitions(workflow_id, tenant_id=tenant_a)[0]["to_state"] == "running"
+    assert len(store.checkpoints(workflow_id, tenant_id=tenant_a)) == 1
+    with pytest.raises(KeyError):
+        store.workflow(workflow_id, tenant_id=tenant_b)
+
+    assert store.memory_put(
+        "research-goal", {"goal": "verify"}, "active", ("evidence-1",),
+        "b" * 64, None, tenant_id=tenant_a,
+    ) == 1
+    assert store.memory_put(
+        "research-goal", {"goal": "refine"}, "active", ("evidence-2",),
+        "c" * 64, 1, tenant_id=tenant_a,
+    ) == 2
+    assert store.memory_keys(tenant_id=tenant_a) == ["research-goal"]
+    assert store.memory_history("research-goal", tenant_id=tenant_b) == []
+
+    with pytest.raises(DBAPIError):
+        with store.engine.begin() as connection:
+            connection.execute(
+                text("DELETE FROM autonomy_transitions WHERE workflow_id=:id"),
+                {"id": workflow_id},
+            )
