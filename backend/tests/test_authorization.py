@@ -64,7 +64,15 @@ def test_revoked_membership_denies_access_and_audits_both_outcomes(tmp_path):
         directory.authorize(principal, tenant, "run:read")
 
     events = directory.list_audit_events(tenant)
-    assert [event["outcome"] for event in events] == ["denied", "allowed"]
+    run_events = [event for event in events if event["action"] == "run:read"]
+    membership_events = [
+        event for event in events if event["action"] in {"membership:grant", "membership:revoke"}
+    ]
+    assert [event["outcome"] for event in run_events] == ["denied", "allowed"]
+    assert {event["action"] for event in membership_events} == {
+        "membership:grant",
+        "membership:revoke",
+    }
     assert all(event["principal_id"] == principal for event in events)
     assert all("metadata_json" in event for event in events)
 
