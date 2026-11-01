@@ -21,6 +21,7 @@ export interface ApiClient {
   get<T>(path: string, options?: ApiRequestOptions): Promise<T>
   post<T>(path: string, body: unknown, options?: ApiRequestOptions): Promise<T>
   postBlob(path: string, body: unknown, options?: ApiRequestOptions): Promise<Blob>
+  getBlob(path: string, expectedContentType: string, options?: ApiRequestOptions): Promise<Blob>
 }
 
 /**
@@ -155,6 +156,67 @@ export function createApiClient(baseUrl: string | null): ApiClient {
     return response.blob()
   }
 
+
+  async function getBlob(
+    path: string,
+    expectedContentType: string,
+    options: ApiRequestOptions = {},
+  ): Promise<Blob> {
+    if (!baseUrl) {
+      throw new ApiError(0, 'The ASDS API URL is not configured for this environment.')
+    }
+    if (!path.startsWith('/') || path.startsWith('//')) {
+      throw new ApiError(0, 'API paths must be same-origin relative paths.')
+    }
+    if (!expectedContentType || expectedContentType.includes('*')) {
+      throw new ApiError(0, 'An exact expected response content type is required.')
+    }
+
+    const headers = new Headers(options.headers)
+    headers.set('Accept', expectedContentType)
+
+    let response: Response
+    try {
+      response = await fetch(baseUrl + path, {
+        method: 'GET',
+        headers,
+        signal: options.signal,
+        credentials: 'omit',
+        cache: 'no-store',
+        redirect: 'error',
+      })
+    } catch (error) {
+      if (options.signal?.aborted) throw error
+      throw new ApiError(0, 'The API could not be reached.')
+    }
+
+    const contentType = (response.headers.get('content-type') ?? '').split(';', 1)[0].trim().toLowerCase()
+    if (!response.ok) {
+      let detail = 'The API request failed with HTTP ' + response.status + '.'
+      if (contentType.includes('application/json')) {
+        try {
+          const payload: unknown = await response.json()
+          if (
+            typeof payload === 'object' &&
+            payload !== null &&
+            'detail' in payload &&
+            typeof (payload as { detail?: unknown }).detail === 'string'
+          ) {
+            detail = (payload as { detail: string }).detail
+          }
+        } catch {
+          throw new ApiError(response.status, 'The API returned malformed error JSON.')
+        }
+      }
+      throw new ApiError(response.status, detail)
+    }
+
+    if (contentType !== expectedContentType.toLowerCase()) {
+      throw new ApiError(response.status, 'The API did not return the expected ' + expectedContentType + ' content type.')
+    }
+    return response.blob()
+  }
+
   return {
     get: <T>(path: string, options?: ApiRequestOptions) =>
       request<T>('GET', path, undefined, options),
@@ -162,6 +224,8 @@ export function createApiClient(baseUrl: string | null): ApiClient {
       request<T>('POST', path, body, options),
     postBlob: (path: string, body: unknown, options?: ApiRequestOptions) =>
       requestBlob(path, body, options),
+    getBlob: (path: string, expectedContentType: string, options?: ApiRequestOptions) =>
+      getBlob(path, expectedContentType, options),
   }
 }
 
