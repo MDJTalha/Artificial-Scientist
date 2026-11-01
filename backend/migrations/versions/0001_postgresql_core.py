@@ -141,7 +141,7 @@ def upgrade() -> None:
         $$
         """
     )
-    for table in ("research_records", "audit_events", "source_identity"):
+    for table in ("research_records", "audit_events", "source_identity", "asds_security_audit"):
         op.execute(
             f"""
             CREATE TRIGGER {table}_append_only
@@ -152,7 +152,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    for table in ("source_identity", "audit_events", "research_records"):
+    for table in ("asds_security_audit", "source_identity", "audit_events", "research_records"):
         op.execute(f"DROP TRIGGER IF EXISTS {table}_append_only ON {table}")
     op.execute("DROP FUNCTION IF EXISTS asds_reject_immutable_mutation()")
     op.drop_table("asds_security_audit")
