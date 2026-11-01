@@ -66,7 +66,10 @@ def _capabilities() -> AiCapabilityResponse:
             max_output_tokens=0,
             daily_request_limit=0,
             daily_token_budget=0,
-            note="Model provider settings are incomplete or invalid; AI inference remains disabled.",
+            note=(
+                "Model provider settings are incomplete or invalid; "
+                "AI inference remains disabled."
+            ),
         )
     if config is None:
         return AiCapabilityResponse(
@@ -235,8 +238,17 @@ def generate_ai_assistance(
         finish_reason=generation.finish_reason,
         limitations=[
             "This text is model-generated research assistance, not a verified scientific result.",
-            "The model was not given access to literature retrieval, laboratory instruments or external tools by this endpoint.",
-            "No generated citations, observations, measurements or claims should be treated as evidence without independent verification.",
-            "Review the full prompt and output before storing any content in a research record or manuscript.",
+            (
+                "The model was not given access to literature retrieval, laboratory "
+                "instruments or external tools by this endpoint."
+            ),
+            (
+                "No generated citations, observations, measurements or claims should "
+                "be treated as evidence without independent verification."
+            ),
+            (
+                "Review the full prompt and output before storing any content in a "
+                "research record or manuscript."
+            ),
         ],
     )
