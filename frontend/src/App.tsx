@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
 import AdvancedWorkspaces from './AdvancedWorkspaces';
-import AdvancedWorkspaces from './AdvancedWorkspaces';
 import { API_BASE_URL, apiRequest, getHealth, getOpenApi, getReadiness, getVocabulary, searchConcepts, searchLiterature, createConcept, setAccessTokenProvider } from './lib/api';
 
 type Tab = 'overview'|'literature'|'knowledge'|'discovery'|'mathematics'|'laboratory'|'experiments'|'memory'|'collaboration'|'writing'|'governance'|'api';
@@ -53,7 +52,7 @@ function App(){
  const [apiPath,setApiPath]=useState('/api/v1/ready'); const [apiMethod,setApiMethod]=useState('GET'); const [apiBody,setApiBody]=useState('{}'); const [apiResult,setApiResult]=useState<Result>(null);
  const [mobileNav,setMobileNav]=useState(false);
  const refresh=useCallback(async()=>{setLoading(true);setApiError('');try{const [h,r]=await Promise.all([getHealth(),getReadiness()]);setHealth(h);setReady(r);setLastUpdated(new Date().toLocaleTimeString());}catch(e){setHealth(null);setReady(null);setApiError(e instanceof Error?e.message:'API connection failed');}finally{setLoading(false);}},[]);
- useEffect(()=>{setAccessTokenProvider(auth0Audience ? async()=>getAccessTokenSilently({authorizationParams:{audience:auth0Audience}}) : null);return()=>setAccessTokenProvider(null);},[auth0Audience,getAccessTokenSilently]);
+ useEffect(()=>{setAccessTokenProvider(auth0Audience ? async()=> (await getAccessTokenSilently({authorizationParams:{audience:auth0Audience}})) ?? null : null);return()=>setAccessTokenProvider(null);},[auth0Audience,getAccessTokenSilently]);
  useEffect(()=>{if(isAuthenticated){void refresh();void getVocabulary().then(setVocabulary).catch(()=>{});}},[isAuthenticated,refresh]);
  const paths=useMemo(()=>Object.entries(openApi?.paths??{}).flatMap(([path,methods]:[string,any])=>Object.entries(methods??{}).filter(([method])=>['get','post','put','patch','delete'].includes(method)).map(([method,op]:[string,any])=>({path,method:method.toUpperCase(),summary:op.summary??op.operationId??''}))),[openApi]);
  const loadSpec=async()=>{try{setOpenApi(await getOpenApi());}catch(e){setApiError(e instanceof Error?e.message:'Unable to load API contract');}};
