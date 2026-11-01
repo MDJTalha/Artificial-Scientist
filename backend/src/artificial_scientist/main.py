@@ -367,14 +367,15 @@ app = FastAPI(
     ),
 )
 app.add_middleware(LabRequestBodyLimitMiddleware)
-app.add_middleware(CognitoAuthenticationMiddleware)
+app.add_middleware(Phase7RecordIsolationGateMiddleware)
+app.add_middleware(OIDCAuthenticationMiddleware)
 app.add_middleware(LabSecurityAuditMiddleware, database_path=settings.database_path)
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=list(settings.allowed_origins),
     allow_credentials=False,
-    allow_methods=["GET", "POST"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
