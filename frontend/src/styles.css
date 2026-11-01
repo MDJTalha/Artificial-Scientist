@@ -703,3 +703,22 @@ h1 span { color: #82a5aa; font-weight: 430; }
   .manuscript-draft-item { align-items: flex-start; }
   .manuscript-markdown-preview { max-height: 520px; padding: 10px; font-size: 8px; }
 }
+
+
+/* Independent review, evaluation and governance evidence */
+.governance-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 13px 0 0; }
+.governance-lists { align-items: start; margin-top: 13px; }
+.governance-entry-list { display: grid; gap: 9px; }
+.governance-entry { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 6px; background: rgba(5, 16, 24, .35); }
+.governance-entry h3 { margin: 2px 0 0; color: #d5e3e5; font-size: 11px; line-height: 1.45; overflow-wrap: anywhere; }
+.governance-entry p { margin: 0; color: #8ca2aa; font-size: 9px; line-height: 1.65; overflow-wrap: anywhere; }
+.governance-entry > small { color: #718b95; font-size: 7px; line-height: 1.5; overflow-wrap: anywhere; }
+.governance-definition-list { display: grid; gap: 6px; margin: 3px 0; }
+.governance-definition-list > div { display: grid; grid-template-columns: minmax(90px, .7fr) minmax(0, 1.3fr); gap: 9px; }
+.governance-definition-list dt { color: #738e98; font-size: 8px; }
+.governance-definition-list dd { margin: 0; color: #b6c9ce; font-size: 8px; overflow-wrap: anywhere; }
+.governance-audit { margin-top: 13px; }
+@media (max-width: 760px) {
+  .governance-stats { grid-template-columns: 1fr; }
+  .governance-definition-list > div { grid-template-columns: 1fr; gap: 3px; }
+}
