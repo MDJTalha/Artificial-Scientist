@@ -180,13 +180,14 @@ def _render_markdown(
             "## Scientific-integrity notice",
             "",
             "This document is a researcher-authored draft assembled from structured inputs. "
-            "A citation resolves to a tenant-owned, integrity-checked bibliographic metadata "
-            "record with an external identifier. This check does not establish that the source "
-            "supports the associated claim, validate the source's scientific conclusions, "
-            "prove novelty, or constitute independent peer review. Inspect each original source.",
+            "A citation resolves to a tenant-owned, integrity-checked bibliographic "
+            "metadata record with an external identifier. This check does not establish "
+            "that the source supports the associated claim, validate the source's "
+            "scientific conclusions, prove novelty, or constitute independent peer "
+            "review. Inspect each original source.",
             "",
-            "External submission and publication are disabled. A separate authorized human "
-            "approval process is required before any consequential external action.",
+            "External submission and publication are disabled. A separate authorized "
+            "human approval process is required before any consequential external action.",
             "",
         ]
     )
@@ -255,7 +256,9 @@ def get_manuscript(
     try:
         record = store.get(manuscript_id, tenant_id=tenant_id)
     except RecordNotFound as error:
-        raise HTTPException(status_code=404, detail="Manuscript is not available.") from error
+        raise HTTPException(
+            status_code=404, detail="Manuscript is not available."
+        ) from error
     except RecordStoreError as error:
         raise HTTPException(
             status_code=500,
