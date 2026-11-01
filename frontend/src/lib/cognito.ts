@@ -16,7 +16,7 @@ let accessToken: string | null = null;
 let refreshToken: string | null = null;
 let accessTokenExpiresAt = 0;
 
-export const cognitoConfigured = Boolean(domain && clientId && redirectUri.startsWith('https://') && logoutUri.startsWith('https://'));
+export const cognitoConfigured = Boolean(domain.startsWith('https://') && clientId && redirectUri.startsWith('https://') && logoutUri.startsWith('https://'));
 
 function base64Url(bytes: Uint8Array): string {
   let binary = '';
@@ -63,6 +63,7 @@ export async function completeCognitoCallback(): Promise<boolean> {
     throw new Error(`Cognito sign-in failed: ${description}`);
   }
   if (!code) return false;
+  if (!cognitoConfigured) throw new Error('Cognito callback received but provider configuration is incomplete.');
 
   const expectedState = sessionStorage.getItem('asds.cognito.state');
   const verifier = sessionStorage.getItem('asds.cognito.verifier');
