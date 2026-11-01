@@ -17,6 +17,7 @@ RECORD_ACTIONS = frozenset({
     "discovery:prior-work-screen",
     "discovery:assess",
     "memory:list", "memory:read", "memory:write", "memory:contradict", "memory:rollback",
+    "manuscript:list", "manuscript:read", "manuscript:create",
 })
 
 # Explicit permissions prevent an unknown role or action from inheriting access.
@@ -37,11 +38,11 @@ _ROLE_ACTIONS = {
     "viewer": frozenset({
         "record:read", "record:list", "record:search",
         "discovery:decompose", "discovery:prior-work-screen",
-        "memory:list", "memory:read",
+        "memory:list", "memory:read", "manuscript:list", "manuscript:read",
     }),
     "auditor": frozenset({
         "record:read", "record:list", "record:audit:read",
-        "memory:list", "memory:read",
+        "memory:list", "memory:read", "manuscript:list", "manuscript:read",
     }),
 }
 
