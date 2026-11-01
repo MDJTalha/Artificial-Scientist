@@ -193,8 +193,7 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
 
   const [literatureQuery, setLiteratureQuery] = useState('')
   const [literatureResponse, setLiteratureResponse] = useState<LiteratureResponse | null>(null)
-  const [saveSources, setSaveSources] = useState(false)
-  const [savedSourceCount, setSavedSourceCount] = useState(0)
+  const [savedSourceUrls, setSavedSourceUrls] = useState<string[]>([])
 
   const [hypothesisResponse, setHypothesisResponse] = useState<HypothesisGenerationResponse | null>(null)
   const [priorWorkResponse, setPriorWorkResponse] = useState<PriorWorkResponse | null>(null)
@@ -290,7 +289,6 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
   async function searchLiterature(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     beginAction('literature')
-    setSavedSourceCount(0)
     try {
       const result = await apiClient.post<LiteratureResponse>('/api/v1/literature/search', {
         query: literatureQuery.trim(),
@@ -316,7 +314,9 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
     beginAction('save-sources')
     let saved = 0
     let failed = 0
+    const newlySavedUrls: string[] = []
     for (const result of literatureResponse.results) {
+      if (savedSourceUrls.includes(result.source_url)) continue
       try {
         await apiClient.post<RecordEnvelope>('/api/v1/records', {
           record_type: 'source',
@@ -334,11 +334,12 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
           },
         })
         saved += 1
+        newlySavedUrls.push(result.source_url)
       } catch {
         failed += 1
       }
     }
-    setSavedSourceCount(saved)
+    setSavedSourceUrls((current) => [...current, ...newlySavedUrls])
     setRecordsRefresh((value) => value + 1)
     setNotice(
       saved + ' source record(s) saved; ' + failed +
@@ -347,8 +348,7 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
     finishAction()
   }
 
-  async function generateHypotheses(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
+  async function generateHypotheses() {
     beginAction('generate')
     setPriorWorkResponse(null)
     setAssessmentResponse(null)
@@ -721,7 +721,7 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
                 {literatureResponse.results.length > 0 && (
                   <section className="workspace-card source-save-panel">
                     <div><p className="card-label">PROVENANCE CAPTURE</p><h2>Save retrieved sources to the record store</h2><p>Saving creates tenant-authorized source records with bibliographic provenance. It does not copy or license the full text.</p></div>
-                    <button className="primary-button" type="button" onClick={persistLiteratureSources} disabled={busy !== null || savedSourceCount === literatureResponse.results.length}>{busy === 'save-sources' ? 'Saving sources…' : 'Save source records'}</button>
+                    <button className="primary-button" type="button" onClick={persistLiteratureSources} disabled={busy !== null || savedSourceUrls.length >= literatureResponse.results.length}>{busy === 'save-sources' ? 'Saving sources…' : 'Save source records (' + savedSourceUrls.length + '/' + literatureResponse.results.length + ')'}</button>
                   </section>
                 )}
               </>
@@ -746,7 +746,7 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
                 <div><label htmlFor="hyp-context">Domain context</label><input id="hyp-context" value={domainContext} onChange={(event) => setDomainContext(event.target.value)} maxLength={1000} /></div>
               </div>
               <div className="form-actions">
-                <button className="primary-button" type="button" disabled={busy !== null || !apiConfigured || researchQuestion.trim().length < 10 || independentVariable.trim().length < 2 || dependentVariable.trim().length < 2 || systemOrPopulation.trim().length < 2} onClick={(event) => void generateHypotheses(event as unknown as FormEvent<HTMLFormElement>)}>{busy === 'generate' ? 'Generating…' : 'Generate candidate templates'}</button>
+                <button className="primary-button" type="button" disabled={busy !== null || !apiConfigured || researchQuestion.trim().length < 10 || independentVariable.trim().length < 2 || dependentVariable.trim().length < 2 || systemOrPopulation.trim().length < 2} onClick={() => void generateHypotheses()}>{busy === 'generate' ? 'Generating…' : 'Generate candidate templates'}</button>
                 <button className="secondary-button" type="button" onClick={() => selectView('missions')}>Edit research mission</button>
               </div>
             </section>
