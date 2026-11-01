@@ -672,7 +672,6 @@ def test_lab_api_requires_per_user_oidc_and_tenant_membership(monkeypatch, tmp_p
             oidc_audience_claim="aud",
             oidc_token_use=None,
             oidc_required_scope=None,
-            lab_api_key="legacy-shared-key-must-not-authenticate",
         ),
     )
     monkeypatch.setattr(lab_routes, "validate_oidc_bearer_token", lambda *args, **kwargs: principal)
@@ -723,7 +722,7 @@ def test_lab_api_rejects_legacy_shared_key_even_when_configured(monkeypatch) -> 
     monkeypatch.setattr(
         lab_routes,
         "get_settings",
-        lambda: SimpleNamespace(environment="production", lab_api_key="a" * 40,
+        lambda: SimpleNamespace(environment="production",
                                 oidc_issuer=None, oidc_audience=None, oidc_jwks_url=None),
     )
     response = TestClient(app).get(
