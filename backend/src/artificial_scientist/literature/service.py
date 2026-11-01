@@ -260,12 +260,16 @@ class LiteratureService:
                     item, query=request.query, retrieved_at=retrieved_at
                 )
                 try:
-                    existing_record = self.store.find_source_by_identity(source_record, tenant_id=tenant_id)
+                    existing_record = self.store.find_source_by_identity(
+                        source_record, tenant_id=tenant_id
+                    )
                     if existing_record is None:
                         try:
                             saved = self.store.create(source_record, tenant_id=tenant_id)
                         except DuplicateSource as duplicate:
-                            saved = self.store.get(duplicate.existing_record_id, tenant_id=tenant_id)
+                            saved = self.store.get(
+                                duplicate.existing_record_id, tenant_id=tenant_id
+                            )
                         item.saved_record_id = saved.id
                     else:
                         item.saved_record_id = existing_record.id
