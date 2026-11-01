@@ -26,59 +26,6 @@ LAB_RUN_BODY_LIMIT_BYTES = 64 * 1024
 DISCOVERY_BODY_LIMIT_BYTES = 1024 * 1024
 
 
-class Phase7RecordIsolationGateMiddleware:
-    """Fail closed on shared research records until tenant-scoped access is implemented.
-
-    Phase 6 tenant isolation currently protects lab runs and artifacts, not the general
-    append-only research-record store. Production-like deployments must not expose those
-    shared records or discovery endpoints until that store has tenant-scoped persistence
-    and authorization. Local development remains available for implementation and testing.
-    """
-
-    def __init__(self, app: ASGIApp) -> None:
-        self.app = app
-
-    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        path = scope.get("path", "")
-        guarded_path = (
-            path == "/api/v1/records"
-            or path.startswith("/api/v1/records/")
-            or path == "/api/v1/discovery"
-            or path.startswith("/api/v1/discovery/")
-        )
-        if (
-            scope.get("type") != "http"
-            or not guarded_path
-            or get_settings().environment.lower() == "development"
-        ):
-            await self.app(scope, receive, send)
-            return
-
-        import json
-
-        body = json.dumps(
-            {
-                "detail": (
-                    "Research records and discovery are disabled outside development "
-                    "until tenant-scoped record authorization is implemented and reviewed."
-                )
-            },
-            separators=(",", ":"),
-        ).encode("utf-8")
-        await send(
-            {
-                "type": "http.response.start",
-                "status": 503,
-                "headers": [
-                    (b"content-type", b"application/json"),
-                    (b"content-length", str(len(body)).encode("ascii")),
-                    (b"cache-control", b"no-store"),
-                ],
-            }
-        )
-        await send({"type": "http.response.body", "body": body})
-
-
 class LabSecurityAuditMiddleware:
     """Persist final outcomes for tenant-scoped lab requests without logging payloads."""
 
