@@ -26,7 +26,8 @@ If Python 3.12 is not installed, use an installed supported Python version (3.12
 
 - GET / — minimal API identity response
 - GET /api/v1/health — confirms the API process is responding
-- GET /api/v1/ready — confirms the API application is ready to serve requests
+- GET /api/v1/ready — checks durable SQLite storage, OIDC configuration and explicit HTTPS CORS origins in production; it does not certify external operations
+- GET /api/v1/auth/session — validate the OIDC access token and list active server-provisioned tenant memberships
 - POST /api/v1/records — create a typed, validated research record
 - GET /api/v1/records — list records, optionally filtered by record type
 - GET /api/v1/records/{record_id} — fetch and verify a record's SHA-256 payload checksum and schema
@@ -48,7 +49,7 @@ If Python 3.12 is not installed, use an installed supported Python version (3.12
 - POST /api/v1/math/units/convert — convert compatible allowlisted units
 - POST /api/v1/math/units/check — check dimensional compatibility of arithmetic expressions
 
-Readiness currently checks only application configuration; it does not assert that remote scholarly APIs, models, or computational services are available. Literature search requires outbound internet access and may return partial or unavailable provider statuses. Records default to `data/artificial_scientist.sqlite3` relative to the backend working directory. Override with `ARTIFICIAL_SCIENTIST_DB_PATH` to select another path. The API is a local development foundation and has no authentication yet; do not expose it to untrusted networks.
+Readiness checks core API storage and configuration only; it does not assert that the OIDC provider is reachable, the JWKS keys rotate correctly, the remote scholarly APIs, models, or computational services are available, or that production operations are certified. Literature search requires outbound internet access and may return partial or unavailable provider statuses. Records default to `data/artificial_scientist.sqlite3` relative to the backend working directory. Override with `ARTIFICIAL_SCIENTIST_DB_PATH` to select another path. Local development mode deliberately bypasses OIDC and tenant authorization; do not expose a service configured with ARTIFICIAL_SCIENTIST_ENV=development to untrusted networks. Production mode requires the OIDC/JWKS settings and a durable absolute SQLite path; use docs/deployment/API_CONTAINER_DEPLOYMENT.md for the current single-node container template.
 
 ## Tests and quality checks
 
