@@ -10,10 +10,18 @@ from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from artificial_scientist.api.routes.records import get_record_store, record_access
-from artificial_scientist.autonomy.memory import MemoryError, MemoryVersion, ResearchMemory
+from artificial_scientist.autonomy.memory import (
+    MemoryError,
+    MemoryVersion,
+    ResearchMemory,
+)
 from artificial_scientist.autonomy.store import AutonomyStore
 from artificial_scientist.config import get_settings
-from artificial_scientist.records.store import RecordNotFound, RecordStore, RecordStoreError
+from artificial_scientist.records.store import (
+    RecordNotFound,
+    RecordStore,
+    RecordStoreError,
+)
 
 router = APIRouter(prefix="/api/v1/memory", tags=["scientific memory"])
 
@@ -39,10 +47,16 @@ class MemoryRequest(BaseModel):
     def bounded_json_value(cls, value: dict[str, object]) -> dict[str, object]:
         try:
             encoded = json.dumps(
-                value, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False
+                value,
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=False,
+                allow_nan=False,
             )
         except (TypeError, ValueError) as error:
-            raise ValueError("memory value must be finite JSON-compatible data") from error
+            raise ValueError(
+                "memory value must be finite JSON-compatible data"
+            ) from error
         if len(encoded.encode("utf-8")) > 65_536:
             raise ValueError("memory value must not exceed 64 KiB")
         return value
@@ -148,7 +162,10 @@ def _validate_evidence(
 
 def _key(key: str = Path(min_length=1, max_length=200)) -> str:
     if not key.strip() or "/" in key or "\\" in key:
-        raise HTTPException(status_code=422, detail="Memory key must be a bounded identifier.")
+        raise HTTPException(
+            status_code=422,
+            detail="Memory key must be a bounded identifier.",
+        )
     return key
 
 
@@ -179,7 +196,12 @@ def list_memory(
     # Keys are ordered by the persistence layer; newest version timestamps are not
     # used to reorder tenant keys because one key may be revised independently.
     page = summaries[offset : offset + limit]
-    return MemoryListResponse(items=page, total=len(summaries), limit=limit, offset=offset)
+    return MemoryListResponse(
+        items=page,
+        total=len(summaries),
+        limit=limit,
+        offset=offset,
+    )
 
 
 @router.get("/{key}", response_model=MemoryHistoryResponse)
@@ -198,14 +220,20 @@ def get_memory_history(
     )
 
 
-@router.post("/{key}", response_model=MemoryVersionResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/{key}",
+    response_model=MemoryVersionResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 def create_memory_version(
     request: MemoryRequest,
     key: Annotated[str, Depends(_key)],
     tenant_id: Annotated[str | None, Depends(record_access("memory:write"))],
     records: Annotated[RecordStore, Depends(get_record_store)],
 ) -> MemoryVersionResponse:
-    evidence = _validate_evidence(request.evidence_record_ids, records, tenant_id=tenant_id)
+    evidence = _validate_evidence(
+        request.evidence_record_ids, records, tenant_id=tenant_id
+    )
     try:
         item = _memory(tenant_id).put(
             key,
