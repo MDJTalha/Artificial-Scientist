@@ -7,7 +7,7 @@ Revises: 0001_postgresql_core
 from alembic import op
 import sqlalchemy as sa
 
-revision = "0002_autonomy_and_lab_persistence"
+revision = "0002_autonomy_lab"
 down_revision = "0001_postgresql_core"
 branch_labels = None
 depends_on = None
