@@ -12,6 +12,8 @@ from artificial_scientist.main import app
 @pytest.fixture
 def database_url() -> str:
     value = os.getenv("ARTIFICIAL_SCIENTIST_DATABASE_URL")
+    if os.getenv("ASDS_POSTGRES_TEST_DATABASE") != "1":
+        pytest.skip("Destructive PostgreSQL integration tests require the explicit CI safety flag.")
     if not value:
         pytest.skip("PostgreSQL service URL is not configured.")
     return value
@@ -66,3 +68,65 @@ def test_alembic_schema_and_append_only_guards_are_installed(database_url: str) 
         "audit_events_append_only",
         "source_identity_append_only",
     }.issubset(triggers)
+
+
+
+def test_postgresql_append_only_triggers_reject_mutation(database_url: str) -> None:
+    from uuid import uuid4
+
+    from sqlalchemy import text
+    from sqlalchemy.exc import DBAPIError
+
+    from artificial_scientist.database import get_database_engine
+
+    engine = get_database_engine(database_url)
+    record_id = str(uuid4())
+    event_id = str(uuid4())
+    created_at = "2026-11-01T00:00:00+00:00"
+
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO research_records "
+                "(id, tenant_id, record_type, schema_version, created_at, "
+                "content_sha256, payload_json) "
+                "VALUES (:id, NULL, 'source', 1, :created_at, :digest, '{}')"
+            ),
+            {"id": record_id, "created_at": created_at, "digest": "a" * 64},
+        )
+
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO audit_events "
+                "(event_id, tenant_id, occurred_at, action, actor, record_id, "
+                "record_type, content_sha256) "
+                "VALUES (:event_id, NULL, :occurred_at, 'record.created', "
+                "'local-api-client', :record_id, 'source', :digest)"
+            ),
+            {
+                "event_id": event_id,
+                "occurred_at": created_at,
+                "record_id": record_id,
+                "digest": "a" * 64,
+            },
+        )
+
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO source_identity (identity_key, tenant_id, record_id) "
+                "VALUES (:identity_key, NULL, :record_id)"
+            ),
+            {"identity_key": f"integration:{record_id}", "record_id": record_id},
+        )
+
+    mutations = [
+        ("UPDATE research_records SET payload_json = '{}' WHERE id = :id", record_id),
+        ("DELETE FROM audit_events WHERE event_id = :id", event_id),
+        ("DELETE FROM source_identity WHERE record_id = :id", record_id),
+    ]
+    for statement, identifier in mutations:
+        with pytest.raises(DBAPIError):
+            with engine.begin() as connection:
+                connection.execute(text(statement), {"id": identifier})
