@@ -31,9 +31,11 @@ def test_readiness_reports_postgresql_connected(
 
     response = TestClient(app).get("/api/v1/ready")
 
-    assert response.status_code == 200
-    assert response.json()["scope"] == "postgresql"
-    assert response.json()["database"] == "connected"
+    assert response.status_code == 503
+    assert response.json()["detail"] == (
+        "PostgreSQL is reachable, but application persistence adapters have not "
+        "been migrated. Production readiness remains blocked."
+    )
 
 
 def test_alembic_schema_and_append_only_guards_are_installed(database_url: str) -> None:
