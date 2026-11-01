@@ -1,37 +1,37 @@
 # Research Workspace v1 — Implementation and Acceptance Notes
 
-**Branch:** \`feat/research-workspace-v1\`  
-**Base:** \`phase-release-verification-hardening\`  
+**Branch:** `feat/research-workspace-v1`  
+**Base:** `phase-release-verification-hardening`  
 **Status:** implementation in progress; CI and review evidence required before integration  
-**Scope:** the first usable frontend-to-API research workflow
+**Scope:** initial implementation of all 12 workspace screens, with integration and operational gates documented per capability
 
-This document records what this branch introduces. It does not supersede the external release gates in \`docs/release/EVIDENCE_MATRIX.md\`.
+This document records what this branch introduces. It does not supersede the external release gates in `docs/release/EVIDENCE_MATRIX.md`.
 
 ## Delivered user-facing surfaces
 
-The previous overview-only page is replaced by a navigable React research workspace. All twelve planned capability areas now have initial screens backed by existing API endpoints or explicit evidence-gated states:
+The previous overview-only page is replaced by a navigable React research workspace. All 12 planned workspace areas now have initial screens. Some use existing backend APIs, while others are read-only evidence views or explicitly blocked until their security and operational dependencies are available:
 
 | Surface | Frontend behavior | API integration |
 |---|---|---|
-| Scientific Command Center | Runtime health, research workflow overview, 12-panel maturity and explicit availability boundaries | \`GET /api/v1/health\` |
-| Research Agenda & Problem Observatory | Create a durable research-task record; decompose a question; edit researcher-confirmed variables | \`POST /api/v1/records\`, \`POST /api/v1/discovery/decompose\` |
-| Literature & Evidence Explorer | Search OpenAlex/Crossref metadata; inspect provider status; save bibliographic sources as unassessed records | \`POST /api/v1/literature/search\`, \`POST /api/v1/records\` |
+| Scientific Command Center | Runtime health, research workflow overview, 12-panel maturity and explicit availability boundaries | `GET /api/v1/health` |
+| Research Agenda & Problem Observatory | Create a durable research-task record; decompose a question; edit researcher-confirmed variables | `POST /api/v1/records`, `POST /api/v1/discovery/decompose` |
+| Literature & Evidence Explorer | Search OpenAlex/Crossref metadata; inspect provider status; save bibliographic sources as unassessed records | `POST /api/v1/literature/search`, `POST /api/v1/records` |
 | Scientific Knowledge Graph & Vocabulary | Create and search concepts; read the supported controlled vocabulary; add proposed relationship assertions; inspect bounded graph neighborhoods | `GET /api/v1/knowledge/vocabulary`, `GET /api/v1/knowledge/concepts`, `POST /api/v1/knowledge/concepts`, `POST /api/v1/knowledge/relationships`, `GET /api/v1/knowledge/graph/neighborhood` |
-| Hypothesis & Discovery Lab | Create deterministic directional candidate templates; perform bounded prior-work metadata screen; assess and persist candidates | \`POST /api/v1/discovery/generate\`, \`POST /api/v1/discovery/prior-work-screen\`, \`POST /api/v1/discovery/assess\` |
+| Hypothesis & Discovery Lab | Create deterministic directional candidate templates; perform bounded prior-work metadata screen; assess and persist candidates | `POST /api/v1/discovery/generate`, `POST /api/v1/discovery/prior-work-screen`, `POST /api/v1/discovery/assess` |
 | Computational Laboratory & Simulation Center | Submit bounded declarative lab runs using allowlisted operations; inspect step outcomes, hashes and run history; replay and compare outputs in development only | `POST /api/v1/lab/runs`, `GET /api/v1/lab/runs`, `GET /api/v1/lab/runs/{run_id}`, `POST /api/v1/lab/runs/{run_id}/verify` |
 | Experiment Journal & Reproducibility | Browse persisted run history; inspect run records, hashes, environment manifests and result artifacts; compare a replay; download a checksum-manifest ZIP | `GET /api/v1/lab/runs`, `GET /api/v1/lab/runs/{run_id}`, `GET /api/v1/lab/runs/{run_id}/artifacts`, `POST /api/v1/lab/runs/{run_id}/verify`, `GET /api/v1/lab/runs/{run_id}/export` |
 | Scientific Memory & Learning | Create immutable, evidence-linked versions; browse history; append contradiction and rollback versions under tenant-aware authorization | `GET /api/v1/memory`, `GET /api/v1/memory/{key}`, `POST /api/v1/memory/{key}`, `POST /api/v1/memory/{key}/contradict`, `POST /api/v1/memory/{key}/rollback` |
 | Scientific Manuscript & Publication Studio | Save and browse structured manuscript drafts; map each claim to explicit bibliographic source records; render Markdown and export locally | `POST /api/v1/manuscripts`, `GET /api/v1/manuscripts`, `GET /api/v1/manuscripts/{manuscript_id}`, `GET /api/v1/records?record_type=source` |
 | Independent Review, Evaluation & Governance | Inspect tenant-scoped review records, approval requests and server-generated record audit events; clearly distinguish stored assertions from verified reviewer identity and approvals | `GET /api/v1/records?record_type=review`, `GET /api/v1/records?record_type=approval_request`, `GET /api/v1/records/audit-events` |
 | Data Analysis & Results Observatory | Calculate descriptive statistics and bounded function plots from supplied numeric inputs | `POST /api/v1/math/statistics`, `POST /api/v1/math/plot` |
-| Mathematics & Formal Reasoning Workbench | Submit bounded symbolic simplification, differentiation, integration, solving and evaluation | \`POST /api/v1/math/symbolic\` |
-| Research Records (supporting surface) | Browse paginated immutable record envelopes and their content identifiers | \`GET /api/v1/records\` |
+| Mathematics & Formal Reasoning Workbench | Submit bounded symbolic simplification, differentiation, integration, solving and evaluation | `POST /api/v1/math/symbolic` |
+| Research Records (supporting surface) | Browse paginated immutable record envelopes and their content identifiers | `GET /api/v1/records` |
 
-The record browser is a supporting surface rather than a claim that all 12 planned panels are complete. The initial release now contains all twelve planned workspace screens, including an evidence viewer for governance; several data-mutating screens remain gated in production until OIDC is connected. The knowledge-graph UI preserves the backend's distinction between proposed, reviewed, disputed and rejected relationships; creating an edge does not establish that it is true.
+The record browser is a supporting surface rather than one of the 12 planned panels. The 12 screens are initial interface implementations, not proof that every workflow is complete or production-operational. Several data-mutating screens remain gated in production until OIDC sign-in and tenant selection are connected. The knowledge-graph UI preserves the backend's distinction between proposed, reviewed, disputed and rejected relationships; creating an edge does not establish that it is true.
 
 ## API client controls
 
-\`frontend/src/lib/api.ts\` introduces a typed JSON client with the following controls:
+`frontend/src/lib/api.ts` introduces a typed JSON/binary client with guarded JSON, PNG and ZIP responses and the following controls:
 
 - refuses to send requests when the API origin is not configured;
 - accepts only absolute same-origin-relative API paths, rejecting external and protocol-relative paths;
@@ -40,7 +40,7 @@ The record browser is a supporting surface rather than a claim that all 12 plann
 - exposes HTTP status and safe API error details to the UI;
 - does not embed a shared API key or pretend to establish an authenticated session.
 
-The production API origin continues to use the existing fail-closed \`resolveApiBaseUrl\` validation. HTTPS and a real backend origin are required in production.
+The production API origin continues to use the existing fail-closed `resolveApiBaseUrl` validation. HTTPS and a real backend origin are required in production.
 
 ## Scientific and security boundaries shown in the UI
 
@@ -50,7 +50,7 @@ The production API origin continues to use the existing fail-closed \`resolveApi
 - Literature search retrieves bibliographic metadata only. It does not download full text, extract claims or prove novelty.
 - Scientific memory uses an append-only, tenant-scoped version store. Each new or contradictory version must reference existing research records within the same tenant; the API validates ownership before writes. Contradiction and rollback operations append versions and preserve the previous history. A linked evidence record is not automatically a verified claim.
 - Knowledge graph concepts and relationships are immutable records. Newly created concepts are proposed; newly created relationships are proposed assertions without independent source verification. Neighborhood traversal is bounded and excludes rejected edges.
-- Retrieved source records are saved as \`unassessed\`; users must inspect original material.
+- Retrieved source records are saved as `unassessed`; users must inspect original material.
 - Manuscript drafts are persisted as immutable tenant records. Each claim must map to at least one source record. The API validates tenant ownership, record integrity and identifier presence; sources marked retracted, disputed or unavailable are rejected. This does not independently establish the source's scientific validity or support for the claim. External submission remains disabled.
 - The Governance workspace is an evidence viewer only. Stored review records contain reviewer labels and outcome assertions, but the generic record-creation flow does not authenticate a named reviewer or prove independence. Approval requests are not approvals. The current server-generated audit event identifies its actor as `local-api-client`, not a specific human principal.
 - The browser client does not yet have a reviewed OIDC sign-in/session or tenant-selection adapter. In production, protected write, record, discovery and knowledge-graph operations are disabled in the UI until that adapter and a real identity provider are configured. Development-only bypasses do not imply production identity readiness.
@@ -64,7 +64,8 @@ The production API origin continues to use the existing fail-closed \`resolveApi
 
 - API-client unit tests cover missing configuration, unsafe paths, JSON GET/POST behavior, response errors and refusal of non-JSON success responses.
 - Playwright covers keyboard operation across the new workspaces, visible capability boundaries, knowledge-graph, computational-lab, experiment-journal, scientific-memory, manuscript, governance and data-analysis navigation, and the research-record surface.
-- Automated axe accessibility checks remain part of the frontend workflow.
+- Automated axe accessibility checks scan the Command Center and initial state of all 12 workspace screens.
+- The current CI run for the exact feature head must pass its separate frontend, backend (Python 3.12 and 3.13) and hardened release-gate jobs before integration readiness is assessed.
 - Type-check, unit tests, production build, E2E, Python suites and release-gate jobs are required CI evidence for the exact branch head.
 
 A passing frontend test suite verifies the interface and API-client contract. It does not prove live OIDC, database operations, third-party provider availability, sandbox isolation or production operation.
