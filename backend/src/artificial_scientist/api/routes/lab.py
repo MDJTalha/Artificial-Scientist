@@ -54,7 +54,7 @@ def require_lab_access(
 ) -> None:
     """Require a validated, per-user OIDC identity for non-development lab access."""
     settings = get_settings()
-    database_path = getattr(settings, "database_path", None)
+    database_path = settings.database_url or settings.database_path
     if database_path:
         request.state.security_audit_database_path = database_path
     if settings.environment.lower() == "development":
