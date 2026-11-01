@@ -119,6 +119,7 @@ RecordType = Literal[
     "approval_request",
     "knowledge_concept",
     "knowledge_relationship",
+    "manuscript",
 ]
 
 
@@ -361,9 +362,34 @@ RecordInput = Annotated[
     | ReviewRecord
     | ApprovalRequestRecord
     | KnowledgeConceptRecord
-    | KnowledgeRelationshipRecord,
+    | KnowledgeRelationshipRecord
+    | ManuscriptRecord,
     Field(discriminator="record_type"),
 ]
+
+
+class ManuscriptClaim(BaseModel):
+    """A researcher-authored manuscript claim and its explicit source mapping."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    text: str = Field(min_length=5, max_length=5000)
+    source_record_ids: list[UUID] = Field(min_length=1, max_length=20)
+
+
+class ManuscriptRecord(RecordBase):
+    """A saved scientific draft with claim-to-source mapping and rendered content."""
+
+    record_type: Literal["manuscript"] = "manuscript"
+    title: str = Field(min_length=3, max_length=300)
+    abstract: str = Field(default="", max_length=5000)
+    claims: list[ManuscriptClaim] = Field(min_length=1, max_length=100)
+    methods: str = Field(min_length=10, max_length=12000)
+    limitations: str = Field(min_length=10, max_length=12000)
+    data_statement: str = Field(min_length=5, max_length=5000)
+    rendered_markdown: str = Field(min_length=100, max_length=100000)
+    status: Literal["draft"] = "draft"
+    submission_approved: Literal[False] = False
 
 
 class RecordEnvelope(BaseModel):
