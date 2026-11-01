@@ -148,4 +148,38 @@ describe('ASDS API client', () => {
     })
   })
 
+
+  it('downloads a ZIP artifact only when the expected content type matches', async () => {
+    const archive = new Blob(['zip bytes'], { type: 'application/zip' })
+    fetchMock.mockResolvedValue(
+      new Response(archive, { status: 200, headers: { 'content-type': 'application/zip' } }),
+    )
+    const client = createApiClient('https://api.example.test')
+
+    const result = await client.getBlob('/api/v1/lab/runs/123/export', 'application/zip')
+    expect(result.type).toBe('application/zip')
+    expect(await result.text()).toBe('zip bytes')
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.example.test/api/v1/lab/runs/123/export',
+      expect.objectContaining({
+        method: 'GET',
+        credentials: 'omit',
+        cache: 'no-store',
+        redirect: 'error',
+      }),
+    )
+  })
+
+  it('rejects a binary download with the wrong media type', async () => {
+    fetchMock.mockResolvedValue(
+      new Response('not a zip', { status: 200, headers: { 'content-type': 'text/plain' } }),
+    )
+    const client = createApiClient('https://api.example.test')
+
+    await expect(client.getBlob('/api/v1/lab/runs/123/export', 'application/zip')).rejects.toMatchObject({
+      status: 200,
+      message: 'The API did not return the expected application/zip content type.',
+    })
+  })
+
 })
