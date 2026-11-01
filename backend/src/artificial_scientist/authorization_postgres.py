@@ -9,17 +9,17 @@ from uuid import uuid4
 
 from sqlalchemy import text
 
-from artificial_scientist.database import get_database_engine
 from artificial_scientist.authorization import (
+    _ALLOWED_ROLES,
+    _TENANT_NAME_MAX,
     AuthorizationDenied,
     TenantMembership,
     TenantNotFound,
-    _ALLOWED_ROLES,
-    _TENANT_NAME_MAX,
     role_allows,
     stable_principal_id,
     stable_tenant_id,
 )
+from artificial_scientist.database import get_database_engine
 
 
 class PostgresTenantDirectory:
@@ -52,7 +52,10 @@ class PostgresTenantDirectory:
                 },
             )
             row = connection.execute(
-                text("SELECT principal_id FROM asds_principals WHERE issuer=:issuer AND subject=:subject"),
+                text(
+                    "SELECT principal_id FROM asds_principals "
+                    "WHERE issuer=:issuer AND subject=:subject"
+                ),
                 {"issuer": issuer, "subject": subject},
             ).mappings().one()
         return str(row["principal_id"])
