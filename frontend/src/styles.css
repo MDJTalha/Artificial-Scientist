@@ -516,3 +516,46 @@ h1 span { color: #82a5aa; font-weight: 430; }
   .topbar-status { gap: 5px; }
   .topbar-retry { padding: 5px 6px; font-size: 8px; }
 }
+
+
+/* Scientific knowledge graph */
+.knowledge-registry, .knowledge-bottom-grid { margin-top: 13px; }
+.knowledge-concept-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; margin-top: 15px; }
+.knowledge-concept { display: flex; min-width: 0; flex-direction: column; align-items: flex-start; padding: 13px; border: 1px solid var(--line); border-radius: 6px; background: rgba(7, 18, 26, .35); }
+.knowledge-concept h3 { margin: 12px 0 7px; color: #d7e5e7; font-size: 11px; line-height: 1.45; }
+.knowledge-concept p { flex: 1; margin: 0; color: #8da4ad; font-size: 9px; line-height: 1.7; }
+.knowledge-concept small { display: block; margin-top: 10px; color: #6f8994; font-size: 8px; line-height: 1.5; overflow-wrap: anywhere; }
+.knowledge-concept .secondary-button { margin-top: 12px; }
+.vocabulary-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; margin-bottom: 18px; }
+.vocabulary-summary > div { display: grid; gap: 5px; padding: 11px; border: 1px solid var(--line); border-radius: 5px; background: rgba(5, 16, 24, .4); }
+.vocabulary-summary strong { color: var(--mint); font-size: 18px; }
+.vocabulary-summary span { color: #8da3ac; font-size: 8px; line-height: 1.4; }
+.workspace-card > h3 { margin: 13px 0 8px; color: #bcd0d4; font-size: 10px; }
+.vocabulary-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.vocabulary-tags span, .vocabulary-tags button {
+  padding: 5px 7px;
+  color: #9eb6bc;
+  border: 1px solid #2b414c;
+  border-radius: 4px;
+  background: rgba(8, 22, 31, .45);
+  font-size: 8px;
+  line-height: 1.35;
+}
+.vocabulary-tags button { cursor: pointer; }
+.vocabulary-tags button:hover { color: var(--mint); border-color: rgba(118, 226, 189, .35); }
+.graph-root { display: grid; gap: 6px; padding: 14px; border: 1px solid rgba(118, 226, 189, .24); border-radius: 6px; background: rgba(118, 226, 189, .045); }
+.graph-root > span { color: #80a49d; font-size: 7px; font-weight: 750; letter-spacing: 1px; }
+.graph-root strong { color: #d6e9e5; font-size: 13px; }
+.graph-root small { color: #79939b; font-size: 8px; }
+.graph-edge-list { display: grid; gap: 7px; margin-top: 10px; }
+.graph-edge { display: grid; gap: 5px; padding: 10px; border-left: 2px solid #557d78; background: rgba(5, 16, 24, .38); }
+.graph-edge strong { color: #bdd6d0; font-size: 9px; text-transform: capitalize; }
+.graph-edge span { color: #c6aa77; font-size: 8px; text-transform: capitalize; }
+.graph-edge small { color: #80969f; font-size: 8px; line-height: 1.55; }
+@media (max-width: 1180px) {
+  .knowledge-concept-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 760px) {
+  .knowledge-concept-grid, .vocabulary-summary { grid-template-columns: 1fr; }
+  .knowledge-bottom-grid { margin-top: 12px; }
+}
