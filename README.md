@@ -127,6 +127,7 @@ Passing these checks verifies the current application foundation only; it does n
 - [docs/PHASE_1_FOUNDATION.md](docs/PHASE_1_FOUNDATION.md) — Phase 1 setup, test commands, accepted CI results, and limitations
 - [docs/PHASE_2_RECORDS.md](docs/PHASE_2_RECORDS.md) — Phase 2 record schema, persistence, API examples, verified CI results, and limitations
 - [backend/README.md](backend/README.md) — backend setup and endpoint reference
+- [docs/BACKEND_DEPLOYMENT.md](docs/BACKEND_DEPLOYMENT.md) — container runtime, deployment architecture, and production release gates
 - [docs/PHASE_3_LITERATURE.md](docs/PHASE_3_LITERATURE.md) — scholarly search API, provenance, rate limits, and acceptance criteria
 - [docs/PHASE_4_KNOWLEDGE_GRAPH.md](docs/PHASE_4_KNOWLEDGE_GRAPH.md) — concept schemas, controlled relations, graph API, verified CI results, and acceptance criteria
 - [docs/PHASE_5_MATH_TOOLS.md](docs/PHASE_5_MATH_TOOLS.md) — mathematical API contracts, supported operations, safety bounds, numerical reference cases, CI evidence, and acceptance criteria\n- [docs/PHASE_6_CONTROLLED_LAB.md](docs/PHASE_6_CONTROLLED_LAB.md) — declarative lab API, integrity hashes, security limitations, and phase exit gates\n- [docs/PHASE_7_HYPOTHESIS_DISCOVERY.md](docs/PHASE_7_HYPOTHESIS_DISCOVERY.md) — question decomposition, hypothesis assessment, OpenAlex/Crossref prior-work screening, rubric, persistence, examples, limitations, and acceptance criteria

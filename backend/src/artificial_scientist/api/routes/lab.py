@@ -97,6 +97,9 @@ def require_lab_access(
                 issuer=oidc_values[0],
                 audience=oidc_values[1],
                 jwks_url=oidc_values[2],
+                audience_claim=getattr(settings, "oidc_audience_claim", "aud"),
+                expected_token_use=getattr(settings, "oidc_token_use", None),
+                expected_scope=getattr(settings, "oidc_required_scope", None),
             )
         except IdentityConfigurationError as error:
             raise HTTPException(

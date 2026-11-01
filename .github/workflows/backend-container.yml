@@ -1,0 +1,67 @@
+name: Backend container smoke test
+
+on:
+  pull_request:
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-container.yml"
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-container.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  container-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Build backend image
+        run: docker build --pull --tag asds-backend:ci ./backend
+
+      - name: Start API with restricted local container settings
+        run: |
+          docker run --detach --rm \
+            --name asds-backend-smoke \
+            --publish 127.0.0.1:8000:8000 \
+            --env ARTIFICIAL_SCIENTIST_ENV=development \
+            --env ARTIFICIAL_SCIENTIST_DB_PATH=/app/data/ci.sqlite3 \
+            --tmpfs /tmp:rw,noexec,nosuid,size=64m \
+            --cap-drop=ALL \
+            --security-opt no-new-privileges:true \
+            asds-backend:ci
+
+      - name: Verify API health and readiness
+        run: |
+          for attempt in $(seq 1 30); do
+            if python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=3)" 2>/dev/null; then
+              break
+            fi
+            if [ "$attempt" -eq 30 ]; then
+              docker logs asds-backend-smoke
+              exit 1
+            fi
+            sleep 2
+          done
+          python - <<'PY'
+          import json
+          import urllib.request
+
+          for endpoint, expected in (
+              ("/api/v1/health", "ok"),
+              ("/api/v1/ready", "ready"),
+          ):
+              with urllib.request.urlopen(f"http://127.0.0.1:8000{endpoint}", timeout=5) as response:
+                  payload = json.load(response)
+              assert payload["status"] == expected, (endpoint, payload)
+          PY
+
+      - name: Stop smoke-test container
+        if: always()
+        run: docker stop asds-backend-smoke || true
