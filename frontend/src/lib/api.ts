@@ -1,3 +1,5 @@
+import { getCognitoAccessToken } from './cognito';
+
 export type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
 
 const configuredBase = (import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.DEV ? 'http://127.0.0.1:8000' : '')).trim().replace(/\/+$/, '');
@@ -5,11 +7,6 @@ export const API_BASE_URL = configuredBase;
 export const API_PREFIX = '/api/v1';
 
 // Keep short-lived OIDC access tokens in memory only; the auth integration supplies them.
-let apiAccessToken: string | null = null;
-export function setApiAccessToken(token: string | null): void {
-  apiAccessToken = token?.trim() || null;
-}
-
 export class ApiError extends Error {
   status: number;
   detail: unknown;
@@ -22,7 +19,8 @@ export async function apiRequest<T = Json>(path: string, init: RequestInit = {})
   const headers = new Headers(init.headers);
   headers.set('Accept', 'application/json');
   if (init.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
-  if (apiAccessToken) headers.set('Authorization', `Bearer ${apiAccessToken}`);
+  const accessToken = await getCognitoAccessToken();
+  if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
   const tenantId = (import.meta.env.VITE_ASDS_TENANT_ID ?? '').trim();
   if (tenantId) headers.set('X-Tenant-ID', tenantId);
   const response = await fetch(`${API_BASE_URL}${path}`, {
