@@ -38,6 +38,7 @@ def validate_oidc_bearer_token(
     jwks_url: str,
     audience_claim: str = "aud",
     expected_token_use: str | None = None,
+    expected_scope: str | None = None,
 ) -> AuthenticatedPrincipal:
     """Validate a signed OIDC access token using only RS256 and configured trust values."""
     if (
@@ -110,6 +111,10 @@ def validate_oidc_bearer_token(
         raise InvalidIdentityError("Bearer token audience is invalid.")
     if expected_token_use is not None and claims.get("token_use") != expected_token_use:
         raise InvalidIdentityError("Bearer token type is invalid.")
+    if expected_scope is not None:
+        scopes = claims.get("scope", "")
+        if not isinstance(scopes, str) or expected_scope not in scopes.split():
+            raise InvalidIdentityError("Bearer token does not grant the required API scope.")
 
     return AuthenticatedPrincipal(
         subject=subject,
