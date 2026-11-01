@@ -33,7 +33,11 @@ def invoke_asgi(app, path: str, headers: list[tuple[bytes, bytes]] | None = None
 
 
 def response_status(messages):
-    return next(message["status"] for message in messages if message["type"] == "http.response.start")
+    return next(
+        message["status"]
+        for message in messages
+        if message["type"] == "http.response.start"
+    )
 
 
 def test_oidc_middleware_protects_literature_and_discovery_routes(monkeypatch):
@@ -58,7 +62,12 @@ def test_oidc_middleware_protects_literature_and_discovery_routes(monkeypatch):
         await send({"type": "http.response.body", "body": b"ok"})
 
     middleware = main.OIDCAuthenticationMiddleware(downstream)
-    for path in ("/api/v1/literature/search", "/api/v1/discovery/decompose", "/api/v1/autonomy/workflows"):
+    protected_paths = (
+        "/api/v1/literature/search",
+        "/api/v1/discovery/decompose",
+        "/api/v1/autonomy/workflows",
+    )
+    for path in protected_paths:
         messages = invoke_asgi(middleware, path)
         assert response_status(messages) == 401
     assert called == []
