@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
 import AdvancedWorkspaces from './AdvancedWorkspaces';
+import AdvancedWorkspaces from './AdvancedWorkspaces';
 import { API_BASE_URL, apiRequest, getHealth, getOpenApi, getReadiness, getVocabulary, searchConcepts, searchLiterature, createConcept, setAccessTokenProvider } from './lib/api';
 
 type Tab = 'overview'|'literature'|'knowledge'|'discovery'|'mathematics'|'laboratory'|'experiments'|'memory'|'collaboration'|'writing'|'governance'|'api';
