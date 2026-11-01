@@ -3,7 +3,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { apiClient, apiConfiguration } from '../lib/api'
 import type { ServiceStatus } from '../lib/status'
 
-type WorkspaceView = 'overview' | 'missions' | 'literature' | 'knowledge' | 'hypotheses' | 'lab' | 'analysis' | 'math' | 'records'
+type WorkspaceView = 'overview' | 'missions' | 'literature' | 'knowledge' | 'hypotheses' | 'lab' | 'analysis' | 'journal' | 'math' | 'records'
 type BusyAction = 'create-task' | 'decompose' | 'literature' | 'save-sources' | 'knowledge-search' | 'knowledge-create' | 'knowledge-relation' | 'knowledge-graph' | 'generate' | 'prior-work' | 'assess' | 'statistics' | 'plot' | 'lab-run' | 'lab-history' | 'lab-verify' | 'math' | null
 
 interface ResearchWorkspaceProps {
@@ -202,6 +202,17 @@ interface LabRunListResponse {
   offset: number
 }
 
+interface LabArtifactMetadata {
+  artifact_id: string
+  run_id: string
+  artifact_type: string
+  content_type: string
+  sha256: string
+  size_bytes: number
+  created_at: string
+  provenance: Record<string, unknown>
+}
+
 interface LabVerificationResponse {
   run_id: string
   reproducible: boolean
@@ -220,6 +231,7 @@ const navigation: { id: WorkspaceView; label: string; symbol: string; detail: st
   { id: 'knowledge', label: 'Knowledge graph', symbol: '⌘', detail: 'Create concepts, controlled vocabulary and evidence-linked relationships' },
   { id: 'hypotheses', label: 'Hypothesis lab', symbol: '◇', detail: 'Compare, screen and assess candidate hypotheses' },
   { id: 'lab', label: 'Computational lab', symbol: '⌬', detail: 'Run bounded, allowlisted computational experiments' },
+  { id: 'journal', label: 'Experiment journal', symbol: '▧', detail: 'Inspect run history, artifacts and reproducibility evidence' },
   { id: 'analysis', label: 'Data analysis', symbol: '∿', detail: 'Descriptive statistics and mathematical plots' },
   { id: 'math', label: 'Mathematics workbench', symbol: '∑', detail: 'Bounded symbolic calculations' },
   { id: 'records', label: 'Research records', symbol: '▤', detail: 'Browse immutable, provenance-aware records' },
@@ -235,7 +247,7 @@ const workspaceRoadmap = [
   { name: 'Mathematics & Formal Reasoning Workbench', status: 'AVAILABLE', note: 'Bounded symbolic calculation and review notes.' },
   { name: 'Computational Laboratory & Simulation Center', status: 'DEV UI / NOT PRODUCTION CERTIFIED', note: 'Bounded allowlisted operations only; production execution remains blocked pending reviewed OS sandbox and identity controls.' },
   { name: 'Data Analysis & Results Observatory', status: 'AVAILABLE', note: 'Descriptive statistics and bounded function plots.' },
-  { name: 'Experiment Journal & Reproducibility', status: 'NEXT', note: 'Run history, manifests, verification and exports.' },
+  { name: 'Experiment Journal & Reproducibility', status: 'AVAILABLE / DEV ONLY', note: 'Browse run history, hashes and artifacts; replay and export remain disabled in production pending identity and sandbox review.' },
   { name: 'Scientific Memory & Learning', status: 'BACKEND READY / UI NEXT', note: 'Versioned memory and contradiction review.' },
   { name: 'Scientific Manuscript & Publication Studio', status: 'BACKEND READY / UI NEXT', note: 'Evidence-linked writing; external submission stays gated.' },
   { name: 'Independent Review, Evaluation & Governance', status: 'NEXT', note: 'Review queues, benchmark evidence and approvals.' },
@@ -344,6 +356,7 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
   const [labError, setLabError] = useState<string | null>(null)
   const [labHistoryRefresh, setLabHistoryRefresh] = useState(0)
   const [labVerification, setLabVerification] = useState<LabVerificationResponse | null>(null)
+  const [journalArtifacts, setJournalArtifacts] = useState<LabArtifactMetadata[]>([])
 
   const [mathOperation, setMathOperation] = useState<'simplify' | 'differentiate' | 'integrate' | 'solve' | 'evaluate'>('simplify')
   const [mathExpression, setMathExpression] = useState('x**2 + 2*x + 1')
@@ -373,7 +386,7 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
   }, [activeView, recordsRefresh, protectedActionsAvailable])
 
   useEffect(() => {
-    if (activeView !== 'lab' || !labExecutionAvailable) return
+    if (!['lab', 'journal'].includes(activeView) || !labExecutionAvailable) return
 
     const controller = new AbortController()
     setLabError(null)
@@ -812,6 +825,47 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
     }
   }
 
+  async function openJournalRun(runId: string) {
+    beginAction('lab-history')
+    setLabError(null)
+    setJournalArtifacts([])
+    try {
+      const [run, artifacts] = await Promise.all([
+        apiClient.get<LabRunResponse>(`/api/v1/lab/runs/${encodeURIComponent(runId)}`),
+        apiClient.get<LabArtifactMetadata[]>(`/api/v1/lab/runs/${encodeURIComponent(runId)}/artifacts`),
+      ])
+      setLabRunResponse(run)
+      setJournalArtifacts(artifacts)
+      setLabVerification(null)
+    } catch (error) {
+      setLabError(errorText(error))
+    } finally {
+      finishAction()
+    }
+  }
+
+  async function downloadLabExport(runId: string) {
+    beginAction('lab-history')
+    setLabError(null)
+    try {
+      const archive = await apiClient.getBlob(`/api/v1/lab/runs/${encodeURIComponent(runId)}/export`, 'application/zip')
+      const url = URL.createObjectURL(archive)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `asds-lab-run-${runId}.zip`
+      link.rel = 'noopener'
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+      setNotice('Integrity-manifest export requested for the selected run.')
+    } catch (error) {
+      setLabError(errorText(error))
+    } finally {
+      finishAction()
+    }
+  }
+
   async function loadLabRun(runId: string) {
     beginAction('lab-history')
     setLabError(null)
@@ -852,6 +906,7 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
     setNotice(null)
     setPageError(null)
     if (view === 'records') setRecordsRefresh((value) => value + 1)
+    if (view === 'lab' || view === 'journal') setLabHistoryRefresh((value) => value + 1)
   }
 
   const savedForCurrentSearch = literatureResponse?.results.filter((item) => savedSourceUrls.includes(item.source_url)).length ?? 0
@@ -941,8 +996,8 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
               </article>
               <article className="workspace-stat">
                 <span className="card-label">WORKSPACES IMPLEMENTED</span>
-                <strong>8 <small>/ 12</small></strong>
-                <p>Eight screens implemented. Protected workspaces and lab execution remain gated until reviewed identity and sandbox controls are available.</p>
+                <strong>9 <small>/ 12</small></strong>
+                <p>Nine workspace screens implemented. Protected record workflows and computational execution remain restricted until production identity and sandbox evidence is complete.</p>
               </article>
               <article className="workspace-stat">
                 <span className="card-label">AI INFERENCE</span>
@@ -1362,6 +1417,40 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
               {labExecutionAvailable && labHistory.length === 0 ? <div className="empty-state"><strong>No prior runs returned</strong><p>Completed and failed runs are retained by the backend store and appear here when available.</p></div> : null}
               {labHistory.length > 0 && <div className="lab-history-list">{labHistory.map((run) => <article className="lab-history-item" key={run.run_id}><div><strong>{run.title}</strong><span className="lab-run-id">{run.run_id}</span></div><span className={'result-chip ' + (run.status === 'completed' ? '' : 'result-chip-warning')}>{run.status}</span><div className="lab-history-actions"><button className="secondary-button" type="button" onClick={() => void loadLabRun(run.run_id)} disabled={busy !== null}>Open run</button><button className="secondary-button" type="button" onClick={() => void verifyLabRun(run.run_id)} disabled={busy !== null || !labExecutionAvailable}>Replay</button></div></article>)}</div>}
             </section>
+          </section>
+        )}
+
+        {activeView === 'journal' && (
+          <section className="workspace-page">
+            <div className="page-heading">
+              <p className="card-label">EXPERIMENT JOURNAL & REPRODUCIBILITY</p>
+              <h1>Inspect the computational evidence trail</h1>
+              <p>Review stored run configurations, immutable identifiers, execution environments, step outputs and generated artifacts. Replaying a run checks computational consistency; it does not prove a scientific claim.</p>
+            </div>
+            {!labExecutionAvailable && <div className="workspace-alert workspace-alert-warning" role="note"><strong>Authenticated run history is unavailable here.</strong><span>Journal data is tenant-scoped. A reviewed OIDC session and tenant selector, together with an approved lab execution boundary, are required before this workspace can query or replay runs.</span></div>}
+            {labError && <div className="workspace-alert workspace-alert-error" role="alert">{labError}</div>}
+            <section className="workspace-card">
+              <div className="section-heading"><div><p className="card-label">PERSISTED EXECUTION HISTORY</p><h2>{labTotal} run record(s)</h2></div><button className="secondary-button" type="button" onClick={() => setLabHistoryRefresh((value) => value + 1)} disabled={!labExecutionAvailable || busy !== null}>Refresh journal</button></div>
+              {labExecutionAvailable && labHistory.length === 0 ? <div className="empty-state"><span>▧</span><strong>No execution history returned</strong><p>Run a controlled experiment in the Computational Lab. Persisted runs will appear here with their identifiers and hashes.</p><button className="secondary-button" type="button" onClick={() => selectView('lab')}>Open computational lab</button></div> : null}
+              {labHistory.length > 0 && <div className="lab-history-list">{labHistory.map((run) => <article className="lab-history-item" key={run.run_id}><div><strong>{run.title}</strong><span className="lab-run-id">{run.run_id}</span><small>{formatDate(run.completed_at)} · {run.steps.length} step(s)</small></div><span className={'result-chip ' + (run.status === 'completed' ? '' : 'result-chip-warning')}>{run.status}</span><div className="lab-history-actions"><button className="secondary-button" type="button" onClick={() => void openJournalRun(run.run_id)} disabled={busy !== null}>Inspect evidence</button><button className="secondary-button" type="button" onClick={() => void verifyLabRun(run.run_id)} disabled={busy !== null || !labExecutionAvailable}>Replay & compare</button><button className="secondary-button" type="button" onClick={() => void downloadLabExport(run.run_id)} disabled={busy !== null || !labExecutionAvailable}>Export ZIP</button></div></article>)}</div>}
+            </section>
+            {labRunResponse && (
+              <div className="workspace-two-column journal-detail-grid">
+                <section className="workspace-card">
+                  <div className="section-heading"><div><p className="card-label">RUN MANIFEST</p><h2>{labRunResponse.title}</h2></div><span className="result-chip">{labRunResponse.status}</span></div>
+                  <p className="lab-run-id">{labRunResponse.run_id}</p>
+                  <div className="lab-hash-grid"><div><span>Configuration SHA-256</span><code>{labRunResponse.configuration_sha256}</code></div><div><span>Result SHA-256</span><code>{labRunResponse.result_sha256}</code></div></div>
+                  <h3 className="journal-subheading">Runtime environment manifest</h3>
+                  <div className="manifest-list">{Object.entries(labRunResponse.environment_manifest).map(([key, value]) => <div key={key}><span>{key}</span><code>{value}</code></div>)}</div>
+                  <div className="form-actions"><button className="secondary-button" type="button" onClick={() => void downloadLabExport(labRunResponse.run_id)} disabled={busy !== null || !labExecutionAvailable}>Download integrity-manifest ZIP</button><button className="secondary-button" type="button" onClick={() => void verifyLabRun(labRunResponse.run_id)} disabled={busy !== null || !labExecutionAvailable}>Replay this run</button></div>
+                </section>
+                <section className="workspace-card">
+                  <div className="section-heading"><div><p className="card-label">IMMUTABLE RUN ARTIFACTS</p><h2>{journalArtifacts.length} artifact(s)</h2></div><span className="section-index">CHECKSUMS</span></div>
+                  {journalArtifacts.length > 0 ? <div className="artifact-list">{journalArtifacts.map((artifact) => <article className="artifact-item" key={artifact.artifact_id}><strong>{artifact.artifact_type.replaceAll('_', ' ')}</strong><span>{artifact.content_type} · {artifact.size_bytes.toLocaleString()} bytes</span><code>{artifact.sha256}</code><small>{artifact.artifact_id}</small></article>)}</div> : <div className="empty-state"><strong>No JSON artifacts reported</strong><p>Artifact metadata will be shown when the backend has stored a run result artifact.</p></div>}
+                </section>
+              </div>
+            )}
+            {labVerification && <section className="workspace-card lab-verification"><div className="section-heading"><div><p className="card-label">REPRODUCIBILITY RESULT</p><h2>{labVerification.reproducible ? 'Replay matched' : 'Replay differences detected'}</h2></div><span className="section-index">RUN REPLAY</span></div><div className="vocabulary-tags"><span>Configuration: {labVerification.configuration_matches ? 'MATCH' : 'DIFFERENT'}</span><span>Environment: {labVerification.environment_matches ? 'MATCH' : 'DIFFERENT'}</span><span>Outputs: {labVerification.outputs_match ? 'MATCH' : 'DIFFERENT'}</span></div><p className="workspace-caveat">A matching replay supports computational reproducibility under the recorded runtime. It does not certify scientific truth or source validity.</p></section>}
           </section>
         )}
 
