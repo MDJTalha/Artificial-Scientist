@@ -24,7 +24,7 @@ export interface ApiClient {
 }
 
 /**
- * Create a small JSON-only client for the ASDS API.
+ * Create a typed JSON and binary client for the ASDS API.
  *
  * Credentials are intentionally omitted. Production authentication must be supplied
  * by a reviewed OIDC session adapter; the browser must never embed a shared API key.
