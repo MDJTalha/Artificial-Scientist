@@ -5,3 +5,13 @@
 @media(max-width:1100px){.page-wrap{padding:0 25px}.topbar{padding:0 25px}.metrics-grid{grid-template-columns:repeat(2,1fr)}.workspace-grid{grid-template-columns:repeat(2,1fr)}.hero-orbit{transform:scale(.8);margin:0 -10px}.pipeline{grid-template-columns:repeat(3,1fr)}.pipeline article>i{display:none}}
 @media(max-width:760px){.sidebar{transform:translateX(-105%);transition:transform .2s ease;width:280px}.sidebar-open{transform:translateX(0)}.mobile-close,.menu-toggle{display:block}.scrim{display:block;position:fixed;inset:0;z-index:4;background:#0009;border:0}.main{margin-left:0}.topbar{height:58px;padding:0 15px;gap:12px}.crumb{flex:1;font-size:9px}.top-actions{font-size:7px}.page-wrap{padding:0 15px}.page-heading{padding:25px 0 20px;align-items:flex-start}.heading-meta{display:none}.hero-panel{padding:25px 21px;min-height:0}.hero-orbit{display:none}.hero-panel h2{font-size:28px}.metrics-grid{gap:8px}.metric{padding:13px}.metric strong{font-size:17px}.pipeline{grid-template-columns:repeat(2,1fr)}.workspace-grid{grid-template-columns:1fr 1fr}.workspace-tile{padding:13px;min-height:155px}.two-col{grid-template-columns:1fr}.diagnostic{grid-template-columns:1fr}.search-row{flex-direction:column}.search-row .primary-button{align-self:flex-start}.footer{flex-direction:column}.endpoint-list button{grid-template-columns:45px 1fr}.endpoint-list button span{grid-column:2}.section-head{align-items:flex-start;gap:10px}.section-head .muted{display:none}}
 @media(max-width:420px){.workspace-grid{grid-template-columns:1fr}.pipeline{grid-template-columns:1fr 1fr}.top-actions>span:nth-child(2){display:none}}
+
+
+/* Cognito sign-in surface */
+.auth-shell{min-height:100vh;display:grid;place-items:center;padding:24px;background:radial-gradient(ellipse at 50% 10%,rgba(37,173,157,.13),transparent 48%),#07131d}
+.auth-card{width:min(100%,460px);display:flex;flex-direction:column;align-items:flex-start;gap:18px;padding:38px;border:1px solid rgba(127,170,184,.2);border-radius:18px;background:rgba(13,29,41,.96);box-shadow:0 28px 90px rgba(0,0,0,.28)}
+.auth-card h1{margin:0;color:#f0f6f8;font-size:32px;letter-spacing:-1.2px}
+.auth-card p{margin:0;color:#a6bbc4;line-height:1.7}
+.auth-card small{color:#8098a4;line-height:1.6}
+.auth-card .primary-button{width:100%;justify-content:center}
+@media(max-width:520px){.auth-card{padding:26px}}
