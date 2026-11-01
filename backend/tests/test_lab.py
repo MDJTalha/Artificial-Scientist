@@ -185,7 +185,7 @@ def test_missing_environment_defaults_to_protected_lab_access(
     assert get_settings().environment == "production"
     response = TestClient(app).get("/api/v1/lab/runs")
     assert response.status_code == 503
-    assert response.json()["detail"] == "Lab API authentication is not configured."
+    assert response.json()["detail"] == "OIDC authentication is not fully configured."
 
 
 
