@@ -629,7 +629,7 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
     event.preventDefault()
     beginAction('statistics')
     try {
-      const values = sampleValues.split(/[\\s,;]+/).filter(Boolean).map(Number)
+      const values = sampleValues.split(/[\s,;]+/).filter(Boolean).map(Number)
       if (values.length < 2 || values.length > 100000 || values.some((value) => !Number.isFinite(value))) {
         throw new Error('Enter between 2 and 100,000 finite numeric values, separated by commas or whitespace.')
       }
