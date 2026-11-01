@@ -3,8 +3,8 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { apiClient, apiConfiguration } from '../lib/api'
 import type { ServiceStatus } from '../lib/status'
 
-type WorkspaceView = 'overview' | 'missions' | 'literature' | 'knowledge' | 'hypotheses' | 'lab' | 'analysis' | 'journal' | 'memory' | 'manuscript' | 'math' | 'records'
-type BusyAction = 'create-task' | 'decompose' | 'literature' | 'save-sources' | 'knowledge-search' | 'knowledge-create' | 'knowledge-relation' | 'knowledge-graph' | 'generate' | 'prior-work' | 'assess' | 'statistics' | 'plot' | 'lab-run' | 'lab-history' | 'lab-verify' | 'memory-load' | 'memory-save' | 'memory-history' | 'memory-contradict' | 'memory-rollback' | 'manuscript-load' | 'manuscript-create' | 'math' | null
+type WorkspaceView = 'overview' | 'missions' | 'literature' | 'knowledge' | 'hypotheses' | 'lab' | 'analysis' | 'journal' | 'memory' | 'manuscript' | 'governance' | 'math' | 'records'
+type BusyAction = 'create-task' | 'decompose' | 'literature' | 'save-sources' | 'knowledge-search' | 'knowledge-create' | 'knowledge-relation' | 'knowledge-graph' | 'generate' | 'prior-work' | 'assess' | 'statistics' | 'plot' | 'lab-run' | 'lab-history' | 'lab-verify' | 'memory-load' | 'memory-save' | 'memory-history' | 'memory-contradict' | 'memory-rollback' | 'manuscript-load' | 'manuscript-create' | 'governance-load' | 'math' | null
 
 interface ResearchWorkspaceProps {
   apiStatus: ServiceStatus
@@ -281,6 +281,23 @@ interface ManuscriptClaimDraft {
   sourceIds: string[]
 }
 
+interface AuditEvent {
+  event_id: string
+  occurred_at: string
+  action: string
+  actor: string
+  record_id: string
+  record_type: string
+  content_sha256: string
+}
+
+interface AuditEventListResponse {
+  items: AuditEvent[]
+  total: number
+  limit: number
+  offset: number
+}
+
 const navigation: { id: WorkspaceView; label: string; symbol: string; detail: string }[] = [
   { id: 'overview', label: 'Command center', symbol: '◫', detail: 'System overview and workspace maturity' },
   { id: 'missions', label: 'Research agenda', symbol: '⌖', detail: 'Create and structure research questions' },
@@ -291,6 +308,7 @@ const navigation: { id: WorkspaceView; label: string; symbol: string; detail: st
   { id: 'journal', label: 'Experiment journal', symbol: '▧', detail: 'Inspect run history, artifacts and reproducibility evidence' },
   { id: 'memory', label: 'Scientific memory', symbol: '◈', detail: 'Maintain evidence-linked, versioned scientific knowledge' },
   { id: 'manuscript', label: 'Manuscript studio', symbol: '✎', detail: 'Prepare and export evidence-linked manuscript drafts' },
+  { id: 'governance', label: 'Review & governance', symbol: '⚖', detail: 'Inspect review assertions, approval requests and record audit events' },
   { id: 'analysis', label: 'Data analysis', symbol: '∿', detail: 'Descriptive statistics and mathematical plots' },
   { id: 'math', label: 'Mathematics workbench', symbol: '∑', detail: 'Bounded symbolic calculations' },
   { id: 'records', label: 'Research records', symbol: '▤', detail: 'Browse immutable, provenance-aware records' },
@@ -309,7 +327,7 @@ const workspaceRoadmap = [
   { name: 'Experiment Journal & Reproducibility', status: 'AVAILABLE / DEV ONLY', note: 'Browse run history, hashes and artifacts; replay and export remain disabled in production pending identity and sandbox review.' },
   { name: 'Scientific Memory & Learning', status: 'AVAILABLE / TENANT GATED', note: 'Evidence-linked versioning, contradiction tracking and rollback; protected access requires identity integration.' },
   { name: 'Scientific Manuscript & Publication Studio', status: 'AVAILABLE / DRAFT ONLY', note: 'Claim-to-source citation mapping and persistent drafts; external submission is disabled.' },
-  { name: 'Independent Review, Evaluation & Governance', status: 'NEXT', note: 'Review queues, benchmark evidence and approvals.' },
+  { name: 'Independent Review, Evaluation & Governance', status: 'AVAILABLE / EVIDENCE VIEWER', note: 'Read stored review assertions, approval requests and audit events; no independent reviewer identity or production release approval is inferred.' },
 ]
 
 function errorText(error: unknown): string {
@@ -443,6 +461,13 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
   const [manuscriptError, setManuscriptError] = useState<string | null>(null)
   const [manuscriptRefresh, setManuscriptRefresh] = useState(0)
 
+  const [governanceReviews, setGovernanceReviews] = useState<RecordEnvelope[]>([])
+  const [governanceApprovals, setGovernanceApprovals] = useState<RecordEnvelope[]>([])
+  const [governanceAuditEvents, setGovernanceAuditEvents] = useState<AuditEvent[]>([])
+  const [governanceTotals, setGovernanceTotals] = useState({ reviews: 0, approvals: 0, auditEvents: 0 })
+  const [governanceErrors, setGovernanceErrors] = useState({ reviews: null as string | null, approvals: null as string | null, audit: null as string | null })
+  const [governanceRefresh, setGovernanceRefresh] = useState(0)
+
   const [mathOperation, setMathOperation] = useState<'simplify' | 'differentiate' | 'integrate' | 'solve' | 'evaluate'>('simplify')
   const [mathExpression, setMathExpression] = useState('x**2 + 2*x + 1')
   const [mathVariable, setMathVariable] = useState('x')
@@ -469,6 +494,40 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
 
     return () => controller.abort()
   }, [activeView, recordsRefresh, protectedActionsAvailable])
+
+  useEffect(() => {
+    if (activeView !== 'governance' || !protectedActionsAvailable) return
+
+    const controller = new AbortController()
+    setGovernanceErrors({ reviews: null, approvals: null, audit: null })
+    Promise.allSettled([
+      apiClient.get<RecordListResponse>('/api/v1/records?record_type=review&limit=50&offset=0', { signal: controller.signal }),
+      apiClient.get<RecordListResponse>('/api/v1/records?record_type=approval_request&limit=50&offset=0', { signal: controller.signal }),
+      apiClient.get<AuditEventListResponse>('/api/v1/records/audit-events?limit=50&offset=0', { signal: controller.signal }),
+    ]).then(([reviews, approvals, audit]) => {
+      if (controller.signal.aborted) return
+      if (reviews.status === 'fulfilled') {
+        setGovernanceReviews(reviews.value.items)
+        setGovernanceTotals((current) => ({ ...current, reviews: reviews.value.total }))
+      } else {
+        setGovernanceErrors((current) => ({ ...current, reviews: errorText(reviews.reason) }))
+      }
+      if (approvals.status === 'fulfilled') {
+        setGovernanceApprovals(approvals.value.items)
+        setGovernanceTotals((current) => ({ ...current, approvals: approvals.value.total }))
+      } else {
+        setGovernanceErrors((current) => ({ ...current, approvals: errorText(approvals.reason) }))
+      }
+      if (audit.status === 'fulfilled') {
+        setGovernanceAuditEvents(audit.value.items)
+        setGovernanceTotals((current) => ({ ...current, auditEvents: audit.value.total }))
+      } else {
+        setGovernanceErrors((current) => ({ ...current, audit: errorText(audit.reason) }))
+      }
+    })
+
+    return () => controller.abort()
+  }, [activeView, governanceRefresh, protectedActionsAvailable])
 
   useEffect(() => {
     if (activeView !== 'manuscript' || !protectedActionsAvailable) return
@@ -1189,6 +1248,7 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
     if (view === 'lab' || view === 'journal') setLabHistoryRefresh((value) => value + 1)
     if (view === 'memory') setMemoryRefresh((value) => value + 1)
     if (view === 'manuscript') setManuscriptRefresh((value) => value + 1)
+    if (view === 'governance') setGovernanceRefresh((value) => value + 1)
   }
 
   const savedForCurrentSearch = literatureResponse?.results.filter((item) => savedSourceUrls.includes(item.source_url)).length ?? 0
@@ -1278,8 +1338,8 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
               </article>
               <article className="workspace-stat">
                 <span className="card-label">WORKSPACES IMPLEMENTED</span>
-                <strong>11 <small>/ 12</small></strong>
-                <p>Eleven capability screens implemented. Protected research records, memory and manuscript persistence remain disabled in production until reviewed OIDC identity and tenant access are integrated.</p>
+                <strong>12 <small>/ 12</small></strong>
+                <p>All twelve planned workspace screens have an initial implementation. Protected research records, memory, manuscript and governance data remain disabled in production until reviewed OIDC identity and tenant access are integrated.</p>
               </article>
               <article className="workspace-stat">
                 <span className="card-label">AI INFERENCE</span>
@@ -1733,6 +1793,65 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
               </div>
             )}
             {labVerification && <section className="workspace-card lab-verification"><div className="section-heading"><div><p className="card-label">REPRODUCIBILITY RESULT</p><h2>{labVerification.reproducible ? 'Replay matched' : 'Replay differences detected'}</h2></div><span className="section-index">RUN REPLAY</span></div><div className="vocabulary-tags"><span>Configuration: {labVerification.configuration_matches ? 'MATCH' : 'DIFFERENT'}</span><span>Environment: {labVerification.environment_matches ? 'MATCH' : 'DIFFERENT'}</span><span>Outputs: {labVerification.outputs_match ? 'MATCH' : 'DIFFERENT'}</span></div><p className="workspace-caveat">A matching replay supports computational reproducibility under the recorded runtime. It does not certify scientific truth or source validity.</p></section>}
+          </section>
+        )}
+
+        {activeView === 'governance' && (
+          <section className="workspace-page">
+            <div className="page-heading">
+              <p className="card-label">INDEPENDENT REVIEW, EVALUATION & GOVERNANCE</p>
+              <h1>Inspect governance evidence</h1>
+              <p>Review stored review assertions, approval-request records and record-creation audit events. This workspace is an evidence viewer; it does not grant reviewer credentials, validate reviewer independence or approve consequential actions.</p>
+            </div>
+            {!protectedActionsAvailable && <div className="workspace-alert workspace-alert-warning" role="note"><strong>Governance data is protected in this production build.</strong><span>Authenticated tenant access is required. OIDC sign-in and tenant selection are not connected to this frontend.</span></div>}
+            <div className="workspace-alert workspace-alert-warning"><strong>Review-integrity boundary</strong><span>Review records store reviewer labels and outcomes supplied in the record payload. Existing generic record creation does not authenticate the named reviewer or establish independence. Treat these entries as recorded assertions, not independent sign-off. Approval-request records are requests only; they are not approvals.</span></div>
+            <section className="workspace-card">
+              <div className="section-heading"><div><p className="card-label">GOVERNANCE REGISTER</p><h2>Stored evidence by category</h2></div><button className="secondary-button" type="button" onClick={() => setGovernanceRefresh((value) => value + 1)} disabled={!protectedActionsAvailable || busy !== null}>Refresh governance</button></div>
+              <div className="workspace-stats governance-stats">
+                <article className="workspace-stat"><span className="card-label">REVIEW RECORDS</span><strong>{governanceTotals.reviews}</strong><p>Stored reviewer assertions. Identity and independence are not authenticated.</p></article>
+                <article className="workspace-stat"><span className="card-label">APPROVAL REQUESTS</span><strong>{governanceTotals.approvals}</strong><p>Requests only; no request is interpreted as an approval.</p></article>
+                <article className="workspace-stat"><span className="card-label">RECORD AUDIT EVENTS</span><strong>{governanceTotals.auditEvents}</strong><p>Server-created record events with content digests.</p></article>
+              </div>
+            </section>
+            <div className="workspace-two-column governance-lists">
+              <section className="workspace-card">
+                <div className="section-heading"><div><p className="card-label">REVIEW ASSERTIONS</p><h2>{governanceReviews.length} record(s) loaded</h2></div><span className="section-index">NOT INDEPENDENTLY ATTESTED</span></div>
+                {governanceErrors.reviews && <div className="workspace-alert workspace-alert-error" role="alert">{governanceErrors.reviews}</div>}
+                {governanceReviews.length === 0 && !governanceErrors.reviews ? <div className="empty-state"><strong>No review records returned</strong><p>Reviewer assertions will appear when review records exist in this tenant.</p></div> : null}
+                <div className="governance-entry-list">{governanceReviews.map((record) => (
+                  <article className="governance-entry" key={record.id}>
+                    <div className="literature-result-top"><span className="result-chip">{String(record.payload.outcome ?? 'unknown').replaceAll('_', ' ')}</span><span className="result-chip result-chip-warning">STORED ASSERTION</span></div>
+                    <h3>{String(record.payload.reviewer_label ?? 'Reviewer label unavailable')}</h3>
+                    <p>{String(record.payload.method ?? 'No review method supplied.')}</p>
+                    <dl className="governance-definition-list"><div><dt>Reviewer kind</dt><dd>{String(record.payload.reviewer_kind ?? 'unknown')}</dd></div><div><dt>Target record</dt><dd>{String(record.payload.target_record_id ?? 'not supplied')}</dd></div><div><dt>Created</dt><dd>{formatDate(record.created_at)}</dd></div></dl>
+                    {Array.isArray(record.payload.findings) && record.payload.findings.length > 0 && <ul className="workspace-list">{record.payload.findings.map((finding, index) => <li key={index}>{String(finding)}</li>)}</ul>}
+                    <small>Record ID: {record.id} · SHA-256: {record.content_sha256}</small>
+                  </article>
+                ))}</div>
+              </section>
+              <section className="workspace-card">
+                <div className="section-heading"><div><p className="card-label">CONSEQUENTIAL ACTION REQUESTS</p><h2>{governanceApprovals.length} request(s) loaded</h2></div><span className="section-index">REQUEST ≠ APPROVAL</span></div>
+                {governanceErrors.approvals && <div className="workspace-alert workspace-alert-error" role="alert">{governanceErrors.approvals}</div>}
+                {governanceApprovals.length === 0 && !governanceErrors.approvals ? <div className="empty-state"><strong>No approval requests returned</strong><p>Requests remain stored separately from any later approval decision.</p></div> : null}
+                <div className="governance-entry-list">{governanceApprovals.map((record) => (
+                  <article className="governance-entry" key={record.id}>
+                    <div className="literature-result-top"><span className="result-chip">{String(record.payload.status ?? 'requested')}</span><span className="result-chip result-chip-warning">NOT AN APPROVAL</span></div>
+                    <h3>{String(record.payload.requested_action ?? 'Unspecified action').replaceAll('_', ' ')}</h3>
+                    <p>{String(record.payload.rationale ?? 'No rationale supplied.')}</p>
+                    <dl className="governance-definition-list"><div><dt>Requester label</dt><dd>{String(record.payload.requested_by ?? 'not supplied')} · not authenticated by this record</dd></div><div><dt>Target record</dt><dd>{String(record.payload.target_record_id ?? 'not supplied')}</dd></div><div><dt>Created</dt><dd>{formatDate(record.created_at)}</dd></div></dl>
+                    <small>Record ID: {record.id} · SHA-256: {record.content_sha256}</small>
+                  </article>
+                ))}</div>
+              </section>
+            </div>
+            <section className="workspace-card governance-audit">
+              <div className="section-heading"><div><p className="card-label">SERVER-GENERATED AUDIT LEDGER</p><h2>{governanceAuditEvents.length} event(s) loaded</h2></div><span className="section-index">RECORD CREATION EVENTS</span></div>
+              {governanceErrors.audit && <div className="workspace-alert workspace-alert-warning" role="note">Audit events are not available to this role or API session: {governanceErrors.audit}</div>}
+              {governanceAuditEvents.length === 0 && !governanceErrors.audit ? <div className="empty-state"><strong>No audit events returned</strong><p>Server-generated record creation events will appear when the tenant has auditable records.</p></div> : null}
+              {governanceAuditEvents.length > 0 && <div className="records-table-wrap"><table className="records-table"><thead><tr><th scope="col">Timestamp</th><th scope="col">Event</th><th scope="col">Actor field</th><th scope="col">Record type</th><th scope="col">Record digest</th></tr></thead><tbody>{governanceAuditEvents.map((event) => <tr key={event.event_id}><td>{formatDate(event.occurred_at)}</td><td>{event.action}</td><td>{event.actor}</td><td>{event.record_type.replaceAll('_', ' ')}</td><td><code>{event.content_sha256}</code></td></tr>)}</tbody></table></div>}
+              <p className="form-help">The current audit schema records the actor as the generic <code>local-api-client</code>. These events attest that a record was created in the store; they do not identify a specific human principal or authenticate review independence.</p>
+            </section>
+            <div className="workspace-caveat">Release-gate certification is maintained separately in the repository evidence matrix. This in-app ledger does not mark OIDC, production sandbox, backup/restore, monitoring, independent security review or scientific replication gates complete.</div>
           </section>
         )}
 
