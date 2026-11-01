@@ -179,15 +179,16 @@ def _render_markdown(
             "",
             "## Scientific-integrity notice",
             "",
-            "This document is a researcher-authored draft assembled from structured inputs. "
-            "A citation resolves to a tenant-owned, integrity-checked bibliographic "
-            "metadata record with an external identifier. This check does not establish "
-            "that the source supports the associated claim, validate the source's "
-            "scientific conclusions, prove novelty, or constitute independent peer "
-            "review. Inspect each original source.",
+            "This document is a researcher-authored draft assembled from structured "
+            "inputs. A citation resolves to a tenant-owned, integrity-checked "
+            "bibliographic metadata record with an external identifier. This check does "
+            "not establish that the source supports the associated claim, validate the "
+            "source's scientific conclusions, prove novelty, or constitute independent "
+            "peer review. Inspect each original source.",
             "",
             "External submission and publication are disabled. A separate authorized "
-            "human approval process is required before any consequential external action.",
+            "human approval process is required before any consequential external "
+            "action.",
             "",
         ]
     )
