@@ -31,6 +31,7 @@ _ROLE_ACTIONS = {
         "discovery:assess",
         "memory:list", "memory:read", "memory:write", "memory:contradict", "memory:rollback",
         "manuscript:list", "manuscript:read", "manuscript:create",
+        "ai:inference",
     }),
     "researcher": frozenset({
         "record:create", "record:read", "record:list", "record:search",
