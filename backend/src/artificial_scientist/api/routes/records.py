@@ -69,7 +69,7 @@ def require_record_access(
         )
         principal_id = stable_principal_id(principal.issuer, principal.subject)
         TenantDirectory(
-            settings.database_url or settings.database_path
+            getattr(settings, "database_url", None) or settings.database_path
         ).authorize(principal_id, x_tenant_id, action)
     except IdentityConfigurationError as error:
         raise HTTPException(
