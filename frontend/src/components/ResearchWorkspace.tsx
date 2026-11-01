@@ -1277,7 +1277,9 @@ export default function ResearchWorkspace({
   const savedForCurrentSearch = literatureResponse?.results.filter((item) => savedSourceUrls.includes(item.source_url)).length ?? 0
   const protectedNotice = import.meta.env.PROD
     ? !authSession
-      ? 'Sign in using the configured OIDC provider before accessing protected research data.'
+      ? authStatus === 'not-configured'
+        ? 'Production OIDC is not configured. Set the public SPA issuer, client ID and exact redirect URI, then configure the matching API issuer, audience and JWKS URL.'
+        : 'Sign in using the configured OIDC provider before accessing protected research data.'
       : authSession.memberships.length === 0
         ? 'Your identity is authenticated, but no active tenant membership has been provisioned. Ask a tenant administrator to provision your account.'
         : !hasSelectedMembership
@@ -1405,7 +1407,7 @@ export default function ResearchWorkspace({
               <article className="workspace-stat">
                 <span className="card-label">RELEASE POSTURE</span>
                 <strong>Evidence-gated</strong>
-                <p>Identity, sandbox deployment, operations and external scientific review remain open.</p>
+                <p>Production identity, sandbox deployment, operations and independent scientific review still require live evidence.</p>
               </article>
             </section>
 
