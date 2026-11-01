@@ -360,18 +360,6 @@ async function processOidcCallback(
   const state = parameters.get("state")
   const providerError = parameters.get("error")
   if (!code && !providerError) return null
-  if (providerError) {
-    const safeDescription = parameters.get("error_description")?.slice(0, 300)
-    sessionStorage.removeItem(PENDING_KEY)
-    throw new Error(
-      "OIDC sign-in was not completed: " + providerError +
-      (safeDescription ? " — " + safeDescription : ""),
-    )
-  }
-  if (!code || code.length > 4096 || !state || state.length > 512) {
-    sessionStorage.removeItem(PENDING_KEY)
-    throw new Error("OIDC callback is missing a valid authorization code or state.")
-  }
 
   let pending: PendingAuthorization | null = null
   try {
@@ -383,6 +371,8 @@ async function processOidcCallback(
   sessionStorage.removeItem(PENDING_KEY)
   if (
     !pending ||
+    !state ||
+    state.length > 512 ||
     pending.state !== state ||
     pending.issuer !== config.issuer ||
     pending.clientId !== config.clientId ||
@@ -391,6 +381,16 @@ async function processOidcCallback(
     Date.now() < pending.createdAt
   ) {
     throw new Error("OIDC callback state is missing, expired or does not match this sign-in.")
+  }
+  if (providerError) {
+    const safeDescription = parameters.get("error_description")?.slice(0, 300)
+    throw new Error(
+      "OIDC sign-in was not completed: " + providerError +
+      (safeDescription ? " — " + safeDescription : ""),
+    )
+  }
+  if (!code || code.length > 4096) {
+    throw new Error("OIDC callback is missing a valid authorization code.")
   }
 
   const discovery = await loadDiscovery(config)
