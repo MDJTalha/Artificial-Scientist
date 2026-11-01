@@ -160,7 +160,6 @@ def downgrade() -> None:
     op.drop_table("asds_memberships")
     op.drop_table("asds_tenants")
     op.drop_table("asds_principals")
-    op.drop_index("idx_audit_events_tenant_time", table_name="asds_security_audit") if False else None
     op.drop_table("source_identity")
     op.drop_index("idx_audit_events_tenant_occurred", table_name="audit_events")
     op.drop_index("idx_audit_events_occurred", table_name="audit_events")
