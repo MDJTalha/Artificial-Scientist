@@ -1,84 +1,102 @@
 # ASDS Artificial Scientist — Current Engineering Status
 
-**Snapshot:** 2026-10-31  
+**Snapshot:** 2026-11-01 18:15 PKT  
 **Repository:** `MDJTalha/Artificial-Scientist`  
-**Verified baseline:** `main` commit `b28b6bdaffa4851a2dec390460706e100302d138` is the merged Phase 0/6/7/14 hardening baseline; post-merge CI run 1114 succeeded.
+**Default branch:** `main`  
+**Status:** Active release-candidate development; not production-certified.
 
-This document is the current repository evidence snapshot. Older phase documents may contain historical branch names or earlier implementation descriptions; this snapshot takes precedence for the present integration state.
+This document separates the merged baseline from the current unmerged development stack. Pull-request changes are not part of `main` until reviewed and merged by the repository owner.
 
-## Verified integration state
+## Verified repository state
 
-### Main branch
+### Merged baseline
 
-The current `main` head contains:
-- the reconciled Phases 8–14 bounded-autonomy implementation;
-- tenant-scoped Phase 7 research-record and knowledge-graph controls;
-- Phase 6 controlled-lab authorization, quotas, recovery, artifacts, retention, audit and execution controls;
-- the fail-closed Phase 6 execution-adapter boundary.
+The last independently recorded merged baseline in the repository status history is main commit `b28b6bdaffa4851a2dec390460706e100302d138`, with successful CI run 1114. The current development work is being prepared in open pull requests stacked on that baseline.
 
-### Latest main CI
+Do not describe unmerged pull-request functionality as already integrated into `main`.
 
-GitHub Actions run **41212896349** (run number **1114**) for commit `b28b6bdaffa4851a2dec390460706e100302d138` completed with **success**. It verifies Python 3.12, Python 3.13, frontend type-check/tests/build on the merged Phase 0/6/7/14 hardening baseline.
+### Active pull-request stack
 
-The repository CI workflow covers:
-- Python 3.12 backend checks/tests;
-- Python 3.13 backend checks/tests;
-- frontend type-check, unit tests and production build.
+| PR | Branch | Scope | State |
+|---|---|---|---|
+| [#40](https://github.com/MDJTalha/Artificial-Scientist/pull/40) | `feat/complete-functional-workspaces` | Functional scientific workspace panels | Open, draft |
+| [#41](https://github.com/MDJTalha/Artificial-Scientist/pull/41) | `fix/auth0-deployment-and-readiness-audit` | Auth0/OIDC alignment, API authorization and fail-closed release gates | Open, ready for review |
+| This status update | `docs/current-status-2026-11-01` | Synchronize engineering status evidence | Proposed stacked documentation change |
 
-A successful CI result is repository evidence only. It is not evidence of production deployment, live identity-provider validation, OS sandbox certification, scientific validity, or independent security review.
+PR #41 targets PR #40's branch, and PR #40 targets `main`. Preserve this dependency order during review. Neither PR has been merged. No production settings or production branch have been changed as part of this work.
+
+## Exact-commit CI evidence
+
+The GitHub Actions checks were queried against the exact current head SHAs:
+
+| Pull request | Head SHA | Backend Python 3.12 | Backend Python 3.13 | Frontend checks | Container smoke |
+|---|---|---|---|---|---|
+| #40 | `f95bb8107e78586e8d5a0ac98f3165a0022b9f7c` | Passed | Passed | Passed | Passed |
+| #41 | `766e45eacc2d93ce3ec4409d536e3e5c3164b2ef` | Passed | Passed | Passed | Passed |
+
+Frontend checks include type-checking, unit tests and production asset build. These results establish repository CI for those exact commits only; they do not establish production readiness.
+
+A Codex code-review summary on PR #41 reported no findings for reviewed commit `d4c2bbda8dbfaaacb554d0f7fdbab308d604df15`. That review is not an independent security audit and should not be represented as one.
+
+## Preview deployment evidence
+
+- A Vercel notification reported a Ready Preview for PR #41: [open preview](https://artificial-scienti-git-a1de43-muhammad-talhas-projects-381912c6.vercel.app).
+- Earlier deployment attempts were rejected by the Vercel free-plan daily deployment limit (`api-deployments-free-per-day`).
+- The Ready Preview is a preview deployment only. Its existence does not verify the production environment, live backend connectivity, Auth0 token flow, durable persistence or release acceptance.
+- Record the exact deployment ID and deployed commit whenever a release candidate is assessed.
 
 ## Phase status
 
-| Phase | Repository status | Release interpretation |
+| Phase | Engineering status | Release interpretation |
 |---|---|---|
-| 0 | Repository baseline complete | External review/evaluation evidence remains environment-dependent |
-| 1 | Integrated | Repository implementation complete; operational setup remains environment-dependent |
-| 2 | Integrated | Provenance implementation exists; long-term backup/data-governance evidence remains operational |
-| 3 | Integrated | Retrieval implementation exists; provider availability/licensing remain deployment concerns |
-| 4 | Integrated | Knowledge graph implementation exists; scientific-definition conflicts require evidence review |
-| 5 | Integrated | Bounded scientific tools are implemented; tool correctness remains benchmark/evaluation dependent |
-| 6 | Hardened, **not release-complete** | Real OS-level sandbox, live IdP verification, migration rehearsal, operations validation and independent review remain open |
-| 7 | Implemented, **acceptance-gated** | Tenant isolation, legacy ownership migration and discovery structure are integrated; scientific novelty/truth/expert validation remain evidence-gated |
-| 8 | Implemented | Bounded workflow, approval, persistence and recovery are integrated |
-| 9 | Implemented | Independent verification primitives are integrated; broader benchmark evidence remains required |
-| 10 | Implemented | Versioned tenant-scoped memory and contradiction/rollback semantics are integrated |
-| 11 | Implemented | Bounded roles, budgets and conflict resolution are integrated |
-| 12 | Implemented | Evidence-linked writing and explicit submission authorization are integrated |
-| 13 | Implemented | Governance and benchmark decision primitives are integrated; external review remains required |
-| 14 | Hardened implementation with hard physical-action boundary | Domain expansion remains evidence- and expert-gated; registry controls and adversarial definition tests are integrated |
+| 0 | Repository baseline complete | External evaluation and review remain evidence-dependent |
+| 1–5 | Implemented in the merged baseline | Operational setup, provider availability, licensing and scientific benchmark evidence remain environment-dependent |
+| 6 | Hardened implementation; release-gated | Reviewed OS sandbox, live identity-provider validation, migration/recovery rehearsal, operational validation and independent security review remain open |
+| 7 | Implemented with acceptance gates | Tenant-isolation and discovery controls require exact-deployment validation; truth, novelty and domain-expert validation remain open |
+| 8–14 | Bounded implementation and governance controls in the merged baseline | Broader benchmark, external review and domain-specific evidence remain required |
+| Frontend workspace expansion | Implemented in open PR #40, not merged | Requires owner review and ordered integration |
+| Auth0 deployment/auth hardening | Implemented in open PR #41, not merged | Requires owner review, live provider configuration and end-to-end token validation |
 
-## Phase 6 security boundary
+## Current change summaries
 
-Production-like lab execution now resolves through an explicit adapter. The trusted local subprocess runner is available only when the application environment is explicitly set to development with local-process mode.
+### PR #40 — functional scientific workspaces
 
-For production-like environments:
-- no implicit subprocess fallback exists;
-- an undeployed `sandbox:<name>` adapter remains unavailable by design;
-- missing reviewed sandbox configuration fails closed;
-- the API reports HTTP 503 rather than executing inside the service host.
+- Replaces four placeholder panels with research workflows for experiment journaling, scientific-memory drafts, collaboration and manuscript drafting.
+- Memory and manuscript drafts remain browser-session only; they are not represented as durable server-side records.
+- Protected research operations remain fail-closed pending tenant-scoped authorization review.
+- Computational execution remains gated pending reviewed sandbox deployment and authenticated OIDC integration.
 
-This is a security hardening measure, not a claim that the repository contains a production OS sandbox.
+### PR #41 — Auth0 and API authorization hardening
 
-## Remaining external release gates
+- Aligns deployment documentation and environment examples with Auth0 SPA/API configuration.
+- Requires the actual Auth0 API Identifier to be confirmed by the tenant owner; no audience or scope is invented.
+- Applies OIDC protection to the relevant literature, knowledge, discovery and autonomy routes while preserving the explicit public vocabulary endpoint.
+- Registers the Phase 7 record/discovery fail-closed isolation gate in the middleware stack.
+- Removes the legacy shared lab API key as an alternative to per-user OIDC identity.
+- Adds regression tests for missing/valid bearer tokens and fail-closed behavior.
 
-These cannot honestly be completed by repository edits alone:
+## External release blockers
 
-1. **Reviewed OS sandbox deployment:** select a target runtime and prove filesystem, network, syscall/capability, identity, resource, artifact and cleanup controls with adversarial tests.
-2. **Real OIDC/JWKS verification:** validate against the actual provider, including rotation/unknown-key refresh and provider-specific claims.
-3. **Production migration/recovery rehearsal:** use a sanitized representative snapshot and verify backup, restore, WAL/recovery, migration, rollback and ownership reconciliation.
-4. **Independent security review:** review authentication, tenant isolation, audit integrity/retention, quotas, secrets, dependencies and deployment configuration.
-5. **Operational deployment validation:** TLS, secret management, least privilege, monitoring, alerting, rate limiting, incident response and backup/restore.
-6. **Scientific evaluation:** benchmark validity, replication, domain-expert review, misleading-source/prompt-injection resistance and scientific-integrity assessment.
+These cannot be certified complete by repository edits, mocks, or CI alone:
+
+1. **Auth0 production integration:** confirm the Auth0 API Identifier and any required scopes; configure exact frontend/backend settings; validate real access tokens against the deployed backend, including issuer, audience, signature, expiry, JWKS rotation and tenant membership.
+2. **Tenant-scoped records:** retain fail-closed behavior until record ownership, server-side authorization, migration and cross-tenant adversarial tests are independently reviewed.
+3. **Durable persistence:** implement and rehearse an approved durable database strategy, including sanitized migration, backup, restore, WAL/recovery, rollback and ownership reconciliation. A `DATABASE_URL` alone does not convert SQLite-specific stores to PostgreSQL.
+4. **Reviewed execution sandbox:** deploy and independently test filesystem, network, syscall/capability, identity, CPU, memory, PID, artifact and cleanup boundaries. The current bounded subprocess worker and POSIX resource limits are not an OS-level sandbox.
+5. **Operations and security:** verify TLS, secrets management, least privilege, audit retention, monitoring, alerting, rate limiting, incident response and independent security review.
+6. **Scientific assurance:** perform reproducibility/replication benchmarks, domain-expert review, source-quality and prompt-injection assessments, and explicit uncertainty/limitation reporting.
+
+## Required review and release sequence
+
+1. Review PR #40 and its exact-head checks; do not merge it without owner approval.
+2. Review PR #41 after #40's scope and target are understood; retain the fail-closed controls.
+3. Review the documentation synchronization change independently.
+4. Configure Auth0 with owner-confirmed identifiers and run live browser-to-backend integration tests.
+5. Complete the persistence, sandbox, operational, independent-security and scientific-evaluation evidence gates.
+6. Only then prepare a production release candidate with exact commit SHAs, CI links, deployment IDs, test outcomes, limitations and explicit owner approval.
 
 ## Engineering rule
 
-No external gate is marked complete merely because a unit test, mock provider, documentation page, or CI run exists. The release package must contain concrete evidence, scope, commit/version, commands, outcomes, limitations, risks and sign-off for every gate.
+No phase, security control, deployment, scientific conclusion or certification is marked complete solely because documentation exists or automated tests pass. Every external gate remains **OPEN** until concrete evidence, scope, version, outcomes, limitations, reviewer and sign-off are recorded.
 
-## Next repository-side priorities
-
-While external evidence is being gathered, repository work should continue on:
-- endpoint-by-endpoint authorization and cross-tenant negative-test coverage;
-- concurrency/race regressions for quotas and ownership;
-- migration/rehearsal fixture quality and rollback assertions;
-- frontend accessibility/E2E and conference-grade research-workspace verification;
-- CI/release-gate automation that prevents stale documentation from being interpreted as production certification.
+Never include credentials, access tokens, private connection strings or private research data in this status record.
