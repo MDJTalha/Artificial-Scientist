@@ -174,7 +174,7 @@ def require_tenant_access(request: Request, action: str) -> str | None:
         )
 
     tenant_id = str(parsed_tenant_id)
-    directory = TenantDirectory(settings.database_path)
+    directory = TenantDirectory(settings.database_url or settings.database_path)
     path_params = request.path_params
     target_id = next(
         (
