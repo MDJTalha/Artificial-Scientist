@@ -35,7 +35,9 @@ def test_memory_api_versions_contradictions_and_rollback(monkeypatch, tmp_path):
             created = client.post(
                 "/api/v1/memory/reaction-rate",
                 json={
-                    "value": {"statement": "The measured rate increases under condition A."},
+                    "value": {
+                        "statement": "The measured rate increases under condition A."
+                    },
                     "evidence_record_ids": [str(source.id)],
                 },
             )
@@ -54,7 +56,9 @@ def test_memory_api_versions_contradictions_and_rollback(monkeypatch, tmp_path):
             contradiction = client.post(
                 "/api/v1/memory/reaction-rate/contradict",
                 json={
-                    "reason": "A documented repeat measurement conflicts with the current memory.",
+                    "reason": (
+                        "A documented repeat measurement conflicts with the current memory."
+                    ),
                     "evidence_record_ids": [str(source.id)],
                 },
             )
