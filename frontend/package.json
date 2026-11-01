@@ -10,8 +10,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "react": "19.2.0",
-    "react-dom": "19.2.0",
+    "react": "19.2.1",
+    "react-dom": "19.2.1",
     "@auth0/auth0-react": "^2.3.0"
   },
   "devDependencies": {
