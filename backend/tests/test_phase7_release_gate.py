@@ -25,7 +25,10 @@ def test_production_research_routes_require_configured_oidc(monkeypatch) -> None
                 path, json={"research_question": "Does temperature affect reaction rate?"}
             )
             assert response.status_code == 503
-            assert "OIDC authentication is not fully configured." in response.json()["detail"]
+            assert (
+                "tenant-scoped record authorization is implemented and reviewed"
+                in response.json()["detail"]
+            )
 
 def test_production_health_remains_available_without_record_access(monkeypatch) -> None:
     configured = main.get_settings()
