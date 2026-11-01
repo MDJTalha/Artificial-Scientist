@@ -1,284 +1,96 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { API_BASE_URL, ApiError, apiRequest, getHealth, getOpenApi, getReadiness, getVocabulary, searchConcepts, searchLiterature, createConcept } from './lib/api';
 
-import { getStatusPresentation, isHealthyResponse, type ServiceStatus } from './lib/status'
-
-interface HealthResponse {
-  status: string
-  service: string
-  version: string
+type Tab = 'overview'|'literature'|'knowledge'|'discovery'|'mathematics'|'laboratory'|'experiments'|'memory'|'collaboration'|'writing'|'governance'|'api';
+type Result = unknown;
+const navigation: {id:Tab; label:string; group:string; mark:string}[] = [
+ {id:'overview',label:'Command center',group:'WORKSPACE',mark:'⌂'},
+ {id:'literature',label:'Literature explorer',group:'RESEARCH',mark:'⌕'},
+ {id:'knowledge',label:'Knowledge graph',group:'RESEARCH',mark:'◎'},
+ {id:'discovery',label:'Hypothesis lab',group:'RESEARCH',mark:'✳'},
+ {id:'mathematics',label:'Mathematics',group:'LABORATORY',mark:'∑'},
+ {id:'laboratory',label:'Computational lab',group:'LABORATORY',mark:'⌘'},
+ {id:'experiments',label:'Experiment journal',group:'LABORATORY',mark:'◷'},
+ {id:'memory',label:'Scientific memory',group:'INTELLIGENCE',mark:'◈'},
+ {id:'collaboration',label:'Collaboration',group:'INTELLIGENCE',mark:'⧉'},
+ {id:'writing',label:'Manuscript studio',group:'OUTPUT',mark:'▤'},
+ {id:'governance',label:'Review & governance',group:'GOVERNANCE',mark:'◇'},
+ {id:'api',label:'API explorer',group:'SYSTEM',mark:'⌘'},
+];
+const descriptions:Record<Tab,string> = {
+ overview:'A governed environment for evidence-led scientific inquiry.',
+ literature:'Discover scholarly metadata and preserve bibliographic provenance.',
+ knowledge:'Explore controlled scientific concepts and their evidence-linked relationships.',
+ discovery:'Decompose research questions and compare falsifiable hypothesis candidates.',
+ mathematics:'Run bounded mathematical operations through the scientific tools API.',
+ laboratory:'Submit and inspect controlled computational runs. Production execution remains gated.',
+ experiments:'Keep experiment records, methods, parameters and reproducibility evidence together.',
+ memory:'Review versioned scientific knowledge, contradictions and provenance.',
+ collaboration:'Coordinate bounded specialist workflows with explicit authorization.',
+ writing:'Prepare evidence-linked scientific reports and manuscripts.',
+ governance:'Inspect system readiness, scientific integrity controls and release gates.',
+ api:'Inspect the live OpenAPI contract and invoke supported backend endpoints.',
+};
+function pretty(value:unknown){return JSON.stringify(value,null,2) ?? String(value)}
+function ErrorPanel({error}:{error:string}){return <div className="notice notice-error"><b>Request could not be completed</b><span>{error}</span></div>}
+function Metric({label,value,detail}:{label:string;value:string;detail:string}){return <article className="metric"><span>{label}</span><strong>{value}</strong><small>{detail}</small></article>}
+function App(){
+ const [tab,setTab]=useState<Tab>('overview');
+ const [health,setHealth]=useState<any>(null),[ready,setReady]=useState<any>(null),[apiError,setApiError]=useState('');
+ const [loading,setLoading]=useState(false),[lastUpdated,setLastUpdated]=useState('');
+ const [openApi,setOpenApi]=useState<Record<string,any>|null>(null);
+ const [literatureQuery,setLiteratureQuery]=useState(''); const [literatureResult,setLiteratureResult]=useState<Result>(null);
+ const [conceptQuery,setConceptQuery]=useState(''); const [conceptResult,setConceptResult]=useState<Result>(null);
+ const [vocabulary,setVocabulary]=useState<Result>(null);
+ const [conceptLabel,setConceptLabel]=useState(''); const [conceptDefinition,setConceptDefinition]=useState('');
+ const [discoveryQuestion,setDiscoveryQuestion]=useState(''); const [discoveryResult,setDiscoveryResult]=useState<Result>(null);
+ const [mathPath,setMathPath]=useState('/statistics'); const [mathBody,setMathBody]=useState('{"values":[1,2,3,4,5]}'); const [mathResult,setMathResult]=useState<Result>(null);
+ const [apiPath,setApiPath]=useState('/api/v1/ready'); const [apiMethod,setApiMethod]=useState('GET'); const [apiBody,setApiBody]=useState('{}'); const [apiResult,setApiResult]=useState<Result>(null);
+ const [mobileNav,setMobileNav]=useState(false);
+ const refresh=useCallback(async()=>{setLoading(true);setApiError('');try{const [h,r]=await Promise.all([getHealth(),getReadiness()]);setHealth(h);setReady(r);setLastUpdated(new Date().toLocaleTimeString());}catch(e){setHealth(null);setReady(null);setApiError(e instanceof Error?e.message:'API connection failed');}finally{setLoading(false);}},[]);
+ useEffect(()=>{void refresh();void getVocabulary().then(setVocabulary).catch(()=>{});},[refresh]);
+ const paths=useMemo(()=>Object.entries(openApi?.paths??{}).flatMap(([path,methods]:[string,any])=>Object.entries(methods??{}).filter(([method])=>['get','post','put','patch','delete'].includes(method)).map(([method,op]:[string,any])=>({path,method:method.toUpperCase(),summary:op.summary??op.operationId??''}))),[openApi]);
+ const loadSpec=async()=>{try{setOpenApi(await getOpenApi());}catch(e){setApiError(e instanceof Error?e.message:'Unable to load API contract');}};
+ const run=async(fn:()=>Promise<any>,setter:(v:any)=>void)=>{setLoading(true);setApiError('');try{setter(await fn());}catch(e){setApiError(e instanceof Error?e.message:'Request failed');}finally{setLoading(false);}};
+ const runDiscovery=async()=>run(()=>apiRequest('/api/v1/discovery/decompose',{method:'POST',body:JSON.stringify({question:discoveryQuestion})}),setDiscoveryResult);
+ const runMath=async()=>{let body:any;try{body=JSON.parse(mathBody);}catch{setApiError('Enter valid JSON for the mathematical operation.');return;}await run(()=>apiRequest('/api/v1/math'+mathPath,{method:'POST',body:JSON.stringify(body)}),setMathResult);};
+ const runApi=async()=>{let body:any;try{body=JSON.parse(apiBody);}catch{setApiError('Request body must be valid JSON.');return;}await run(()=>apiRequest(apiPath,{method:apiMethod,body:apiMethod==='GET'||apiMethod==='DELETE'?undefined:JSON.stringify(body)}),setApiResult);};
+ const active=navigation.find(n=>n.id===tab)!;
+ return <div className="shell">
+  <aside className={mobileNav?'sidebar sidebar-open':'sidebar'}>
+   <div className="brand"><div className="brand-symbol"><i/><i/><i/></div><div><b>ARTIFICIAL</b><b className="brand-accent">SCIENTIST</b><small>ASDS RESEARCH SYSTEM</small></div><button className="mobile-close" onClick={()=>setMobileNav(false)}>×</button></div>
+   <div className="nav-scroll">{['WORKSPACE','RESEARCH','LABORATORY','INTELLIGENCE','OUTPUT','GOVERNANCE','SYSTEM'].map(group=><div className="nav-group" key={group}><label>{group}</label>{navigation.filter(n=>n.group===group).map(n=><button key={n.id} className={tab===n.id?'nav-link active':'nav-link'} onClick={()=>{setTab(n.id);setMobileNav(false);setApiError('')}}><span className="nav-mark">{n.mark}</span>{n.label}{n.id==='laboratory'&&<em>GATED</em>}</button>)}</div>)}</div>
+   <div className="sidebar-foot"><span className={health?'pulse good':'pulse'}></span><span>{health?'API REACHABLE':'API NOT VERIFIED'}</span><small>Evidence before claims.</small></div>
+  </aside>
+  {mobileNav&&<button className="scrim" aria-label="Close navigation" onClick={()=>setMobileNav(false)}/>}
+  <main className="main">
+   <header className="topbar"><button className="menu-toggle" onClick={()=>setMobileNav(true)}>☰</button><div className="crumb">ASDS <span>/</span> <b>{active.label}</b></div><div className="top-actions"><span className={health?'api-indicator online':'api-indicator'}></span><span>{health?'API CONNECTED':'API DISCONNECTED'}</span><button className="icon-button" onClick={()=>void refresh()} title="Refresh service status">↻</button></div></header>
+   <div className="page-wrap"><div className="page-heading"><div><div className="eyebrow">ARTIFICIAL SCIENTIST / {active.group}</div><h1>{active.label}</h1><p>{descriptions[tab]}</p></div><div className="heading-meta"><span className="live-dot"></span> GOVERNED RESEARCH <small>{lastUpdated?'UPDATED '+lastUpdated:'STATUS PENDING'}</small></div></div>
+   {apiError&&<ErrorPanel error={apiError}/>}
+   {tab==='overview'&&<section className="view">
+    <div className="hero-panel"><div><div className="hero-kicker">RESEARCH INTELLIGENCE ENVIRONMENT · 01</div><h2>Make discovery<br/><span>traceable, testable, reproducible.</span></h2><p>One governed workspace for literature, hypotheses, scientific computation and independent verification. Every consequential action remains bounded by evidence and authorization.</p><button className="primary-button" onClick={()=>setTab('literature')}>Start a research inquiry <span>↗</span></button></div><div className="hero-orbit"><div className="orbit o1"></div><div className="orbit o2"></div><div className="orbit o3"></div><span>AS</span></div></div>
+    <div className="metrics-grid"><Metric label="API SERVICE" value={health?.status==='ok'?'ONLINE':'UNVERIFIED'} detail={health?.service??'Connect a deployed backend'}/><Metric label="APPLICATION READINESS" value={ready?.status?.toUpperCase()??'UNKNOWN'} detail={ready?.scope??'Readiness not confirmed'}/><Metric label="RESEARCH WORKSPACES" value="12" detail="Integrated navigation surface"/><Metric label="RELEASE POSTURE" value="GATED" detail="External assurance still required"/></div>
+    <div className="section-head"><div><span className="eyebrow">RESEARCH PIPELINE</span><h2>From question to defensible result</h2></div><span className="muted">Connected to available API capabilities</span></div>
+    <div className="pipeline">{[['01','Question','Define scope and variables'],['02','Evidence','Retrieve scholarly metadata'],['03','Hypotheses','Compare competing explanations'],['04','Computation','Run bounded calculations'],['05','Verification','Review provenance and limitations']].map((x,i)=><article key={x[0]}><small>{x[0]}</small><b>{x[1]}</b><span>{x[2]}</span>{i<4&&<i>→</i>}</article>)}</div>
+    <div className="section-head"><div><span className="eyebrow">WORKSPACES</span><h2>Scientific capabilities</h2></div></div><div className="workspace-grid">{navigation.filter(n=>n.id!=='overview'&&n.id!=='api').map((n,i)=><button className="workspace-tile" key={n.id} onClick={()=>setTab(n.id)}><span>{n.mark}</span><small>0{i+1}</small><b>{n.label}</b><p>{descriptions[n.id]}</p><em>Open workspace ↗</em></button>)}</div>
+    <div className="section-head"><div><span className="eyebrow">SERVICE DIAGNOSTICS</span><h2>Backend connection</h2></div><button className="text-button" onClick={()=>void refresh()}>{loading?'Checking…':'Refresh status ↻'}</button></div><div className="diagnostic"><div><span>Health endpoint</span><b>{health?'Responding':'Not verified'}</b></div><div><span>Readiness endpoint</span><b>{ready?.scope??'Not verified'}</b></div><div><span>API base URL</span><b>{API_BASE_URL||'Same-origin (configure VITE_API_BASE_URL for remote API)'}</b></div></div>
+   </section>}
+   {tab==='literature'&&<section className="view"><div className="work-card"><div className="card-title"><div><span className="eyebrow">OPENALEX / CROSSREF</span><h2>Scholarly literature search</h2></div><span className="chip">LIVE API</span></div><form onSubmit={e=>{e.preventDefault();void run(()=>searchLiterature(literatureQuery,15),setLiteratureResult)}}><label>Research topic or search query</label><div className="search-row"><input value={literatureQuery} onChange={e=>setLiteratureQuery(e.target.value)} placeholder="e.g. reproducible machine learning in biology" required minLength={2}/><button className="primary-button" disabled={loading}>Search literature ↗</button></div><small className="hint">Searches bibliographic metadata; it does not retrieve or assess full-text papers.</small></form></div>{literatureResult!==null&&<ResultCard title="Literature search response" data={literatureResult}/>}</section>}
+   {tab==='knowledge'&&<section className="view"><div className="two-col"><div className="work-card"><span className="eyebrow">KNOWLEDGE GRAPH</span><h2>Find concepts</h2><form onSubmit={e=>{e.preventDefault();void run(()=>searchConcepts(conceptQuery),setConceptResult)}}><label>Concept or domain</label><div className="search-row"><input value={conceptQuery} onChange={e=>setConceptQuery(e.target.value)} placeholder="Search concepts…" required/><button className="primary-button" disabled={loading}>Search</button></div></form></div><div className="work-card"><span className="eyebrow">CONTROLLED VOCABULARY</span><h2>Create a concept record</h2><form onSubmit={e=>{e.preventDefault();void run(()=>createConcept({label:conceptLabel,definition:conceptDefinition,concept_type:'concept',scientific_domain:'general',status:'proposed'}),setConceptResult)}}><label>Concept label</label><input value={conceptLabel} onChange={e=>setConceptLabel(e.target.value)} required/><label>Definition</label><textarea value={conceptDefinition} onChange={e=>setConceptDefinition(e.target.value)} required/><button className="secondary-button" disabled={loading}>Create concept record</button></form></div></div>{vocabulary&&<ResultCard title="Supported vocabulary" data={vocabulary}/ >}{conceptResult!==null&&<ResultCard title="Knowledge graph response" data={conceptResult}/>}</section>}
+   {tab==='discovery'&&<section className="view"><div className="work-card"><span className="eyebrow">PHASE 7 · BOUNDED DISCOVERY</span><h2>Research question decomposition</h2><p className="muted">Create a structured draft from a question. Suggestions require human review and are not claims of truth, causality or novelty.</p><form onSubmit={e=>{e.preventDefault();void runDiscovery()}}><label>Research question</label><textarea rows={4} value={discoveryQuestion} onChange={e=>setDiscoveryQuestion(e.target.value)} placeholder="What is the relationship between…?" required minLength={8}/><button className="primary-button" disabled={loading}>Decompose question ↗</button></form></div>{discoveryResult!==null&&<ResultCard title="Decomposition result" data={discoveryResult}/>}<div className="notice"><b>Scientific integrity boundary</b><span>Prior-work search coverage is incomplete. No search result or missing result establishes novelty.</span></div></section>}
+   {tab==='mathematics'&&<section className="view"><div className="work-card"><span className="eyebrow">PHASE 5 · SCIENTIFIC TOOLS</span><h2>Mathematical operation console</h2><label>Operation endpoint</label><select value={mathPath} onChange={e=>setMathPath(e.target.value)}>{['/statistics','/symbolic','/unit-conversion','/dimension-check','/integrate','/root','/plot'].map(p=><option key={p} value={p}>{p}</option>)}</select><label>JSON request payload</label><textarea className="code-input" rows={8} value={mathBody} onChange={e=>setMathBody(e.target.value)} spellCheck={false}/><button className="primary-button" disabled={loading} onClick={()=>void runMath()}>Execute bounded calculation ↗</button><small className="hint">The selected endpoint must exist in the deployed API schema. Input is sent as JSON.</small></div>{mathResult!==null&&<ResultCard title="Calculation response" data={mathResult}/>}</section>}
+   {tab==='laboratory'&&<section className="view"><div className="gate-panel"><span className="gate-icon">◇</span><span className="eyebrow">PHASE 6 · EXECUTION SAFETY</span><h2>Computational execution is gated</h2><p>The lab API requires deployment-level identity, tenant membership and an independently reviewed OS-level sandbox. This interface does not bypass those controls.</p><div className="gate-list"><span>✓ API contract available</span><span>! Production sandbox not independently verified</span><span>! Live OIDC/JWKS validation remains an external gate</span></div><button className="secondary-button" onClick={()=>setTab('api')}>Inspect lab API contract</button></div></section>}
+   {tab==='experiments'&&<ComingSoon title="Experiment journal" text="The current backend exposes controlled lab runs and artifacts. This workspace will render run history after the API contract and production authorization are validated." onInspect={()=>setTab('api')}/>}
+   {tab==='memory'&&<ComingSoon title="Scientific memory" text="Memory and workflow APIs are being mapped to a durable evidence timeline. No placeholder records are presented as real scientific findings." onInspect={()=>setTab('api')}/>}
+   {tab==='collaboration'&&<ComingSoon title="Bounded collaboration" text="Workflow orchestration endpoints support state transitions and approvals. A role-aware collaboration console requires verified identity and tenant context." onInspect={()=>setTab('api')}/>}
+   {tab==='writing'&&<ComingSoon title="Scientific manuscript studio" text="The interface will bind report sections to source records, calculations, limitations and reproducibility artifacts. No unsupported claims are auto-generated." onInspect={()=>setTab('api')}/>}
+   {tab==='governance'&&<section className="view"><div className="gate-panel"><span className="eyebrow">RELEASE ASSURANCE</span><h2>Evidence-gated release posture</h2><p>Passing a frontend build or health endpoint does not certify scientific accuracy, operational resilience or production security.</p><div className="gate-list">{['Reviewed OS-level execution sandbox','Real OIDC/JWKS issuer, audience and key rotation tests','Database migration, backup, restore and rollback rehearsal','Independent security review and operational acceptance','Scientific benchmark replication and domain-expert review'].map(x=><span key={x}>○ {x}</span>)}</div></div></section>}
+   {tab==='api'&&<section className="view"><div className="work-card"><div className="card-title"><div><span className="eyebrow">BACKEND CONTRACT</span><h2>OpenAPI endpoint explorer</h2></div><button className="secondary-button" onClick={()=>void loadSpec()}>Load API schema</button></div><p className="muted">Inspect the actual deployed backend routes. Operations are sent to the configured API base URL.</p><div className="endpoint-list">{paths.map((p,i)=><button key={p.method+p.path+i} onClick={()=>{setApiMethod(p.method);setApiPath(p.path)}}><b className={'method method-'+p.method.toLowerCase()}>{p.method}</b><code>{p.path}</code><span>{p.summary}</span></button>)}</div></div><div className="work-card"><span className="eyebrow">REQUEST CONSOLE</span><h2>Invoke endpoint</h2><label>Method</label><select value={apiMethod} onChange={e=>setApiMethod(e.target.value)}>{['GET','POST','PUT','PATCH','DELETE'].map(x=><option key={x}>{x}</option>)}</select><label>Path</label><input value={apiPath} onChange={e=>setApiPath(e.target.value)}/><label>JSON body</label><textarea className="code-input" rows={6} value={apiBody} onChange={e=>setApiBody(e.target.value)}/><button className="primary-button" disabled={loading} onClick={()=>void runApi()}>Send request ↗</button></div>{apiResult!==null&&<ResultCard title="API response" data={apiResult}/>}</section>}
+   <footer className="footer"><span>ASDS · ARTIFICIAL SCIENTIST</span><span>Evidence · Falsification · Provenance · Authorization</span></footer>
+   </div>
+  </main>
+ </div>
 }
-
-type PhaseState = 'INTEGRATED' | 'ADVANCED' | 'GATED' | 'OPEN'
-
-interface Phase {
-  id: number
-  title: string
-  state: PhaseState
-  detail: string
-}
-
-const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8000')
-  .replace(/\/+$/, '')
-
-const phases: Phase[] = [
-  { id: 0, title: 'Charter', state: 'ADVANCED', detail: 'Mission, boundaries, risk and evaluation baseline.' },
-  { id: 1, title: 'Foundation', state: 'INTEGRATED', detail: 'Application shell, CI, configuration and health.' },
-  { id: 2, title: 'Research records', state: 'INTEGRATED', detail: 'Typed records, provenance and audit structures.' },
-  { id: 3, title: 'Literature', state: 'INTEGRATED', detail: 'Bounded scholarly retrieval and source provenance.' },
-  { id: 4, title: 'Knowledge graph', state: 'INTEGRATED', detail: 'Controlled concepts and tenant-scoped relations.' },
-  { id: 5, title: 'Scientific tools', state: 'INTEGRATED', detail: 'Bounded mathematics, units, statistics and plotting.' },
-  { id: 6, title: 'Controlled lab', state: 'GATED', detail: 'Execution, artifacts, identity and quotas; sandbox gate remains open.' },
-  { id: 7, title: 'Discovery', state: 'GATED', detail: 'Question decomposition, competing hypotheses and prior-work screening.' },
-  { id: 8, title: 'Orchestration', state: 'INTEGRATED', detail: 'Finite-state workflows, approvals and recovery.' },
-  { id: 9, title: 'Verification', state: 'INTEGRATED', detail: 'Independent bounded numerical verification.' },
-  { id: 10, title: 'Scientific memory', state: 'INTEGRATED', detail: 'Versioned evidence, contradiction and rollback.' },
-  { id: 11, title: 'Collaboration', state: 'INTEGRATED', detail: 'Bounded roles, budgets and conflict handling.' },
-  { id: 12, title: 'Scientific writing', state: 'INTEGRATED', detail: 'Evidence-linked reports and explicit submission authorization.' },
-  { id: 13, title: 'Governance', state: 'INTEGRATED', detail: 'Benchmarks, adversarial categories and release decisions.' },
-  { id: 14, title: 'Multidisciplinary', state: 'GATED', detail: 'Evidence-gated domains with a hard physical-action boundary.' },
-]
-
-const releaseGates = [
-  'Reviewed OS-level execution sandbox',
-  'Real OIDC/JWKS provider validation and rotation evidence',
-  'Sanitized migration, backup, restore and rollback rehearsal',
-  'Independent security review and operational deployment validation',
-  'Scientific benchmark, replication and domain-expert evidence',
-]
-
-const researchPrinciples = [
-  ['EVIDENCE', 'Claims stay linked to sources, calculations or explicit hypotheses.'],
-  ['FALSIFICATION', 'Competing explanations and discriminating tests are first-class records.'],
-  ['PROVENANCE', 'Inputs, outputs, versions and decisions remain traceable.'],
-  ['AUTHORIZATION', 'Consequential actions require explicit approval and bounded state transitions.'],
-]
-
-export default function App() {
-  const [status, setStatus] = useState<ServiceStatus>('checking')
-  const [health, setHealth] = useState<HealthResponse | null>(null)
-  const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  const [retryKey, setRetryKey] = useState(0)
-
-  useEffect(() => {
-    const controller = new AbortController()
-
-    async function checkApi() {
-      setStatus('checking')
-      setErrorMessage(null)
-
-      try {
-        const response = await fetch(apiBaseUrl + '/api/v1/health', {
-          method: 'GET',
-          headers: { Accept: 'application/json' },
-          signal: controller.signal,
-        })
-
-        if (!response.ok) throw new Error('The API returned HTTP ' + response.status + '.')
-
-        const payload: unknown = await response.json()
-        if (!isHealthyResponse(payload)) throw new Error('The API did not report a healthy status.')
-
-        setHealth({ status: payload.status, service: payload.service, version: payload.version })
-        setStatus('connected')
-      } catch (error) {
-        if (controller.signal.aborted) return
-        setHealth(null)
-        setStatus('unavailable')
-        setErrorMessage(
-          error instanceof Error ? error.message : 'An unknown connection error occurred.',
-        )
-      }
-    }
-
-    void checkApi()
-    return () => controller.abort()
-  }, [retryKey])
-
-  const presentation = getStatusPresentation(status)
-  const integratedCount = phases.filter((phase) => phase.state === 'INTEGRATED').length
-  const gatedCount = phases.filter((phase) => phase.state === 'GATED').length
-
-  return (
-    <div className="app-shell">
-      <aside className="sidebar">
-        <div className="brand">
-          <div className="brand-mark" aria-hidden="true"><span /><span /><span /></div>
-          <div>
-            <p className="brand-name">ARTIFICIAL</p>
-            <p className="brand-name brand-name-secondary">SCIENTIST</p>
-          </div>
-        </div>
-
-        <div className="sidebar-section-label">RESEARCH SYSTEM</div>
-        <nav aria-label="Research workspace">
-          <a className="nav-item nav-item-active" href="#overview" aria-current="page">
-            <span className="nav-symbol">◫</span> Overview <span className="nav-indicator" />
-          </a>
-          <a className="nav-item" href="#architecture"><span className="nav-symbol">⌘</span> Architecture</a>
-          <a className="nav-item" href="#phases"><span className="nav-symbol">◌</span> Phase map</a>
-          <a className="nav-item" href="#release-gates"><span className="nav-symbol">◇</span> Release gates</a>
-        </nav>
-
-        <div className="sidebar-bottom">
-          <div className="sidebar-orbit" aria-hidden="true"><span /><span /><span /></div>
-          <p className="sidebar-note">Research before autonomy.</p>
-          <p className="sidebar-subnote">Evidence, falsification, provenance and authorization are system invariants.</p>
-          <div className="sidebar-version">INTEGRATED MAIN · 14 PHASES</div>
-        </div>
-      </aside>
-
-      <main className="main-content" id="overview">
-        <header className="topbar">
-          <div className="breadcrumb">
-            <span>ASDS</span><span className="breadcrumb-divider">/</span><strong>Governed research workspace</strong>
-          </div>
-          <div className="topbar-status">
-            <span className={status === 'connected' ? 'status-dot status-dot-ok' : 'status-dot'} />
-            <span>{status === 'connected' ? 'API CONNECTED' : 'DEVELOPMENT / GATED'}</span>
-          </div>
-        </header>
-
-        <section className="welcome-section">
-          <div className="eyebrow"><span /> ARTIFICIAL SCIENTIST · SYSTEM OVERVIEW</div>
-          <h1>Scientific discovery<br /><span>with evidence as the control plane.</span></h1>
-          <p className="welcome-copy">
-            ASDS is a research-first platform for traceable questions, evidence, hypotheses,
-            controlled computation, independent verification and bounded scientific autonomy.
-            Capability expansion is gated by implementation evidence and explicit security review.
-          </p>
-          <div className="welcome-meta">
-            <span className="meta-line" /><span>EVIDENCE BEFORE CLAIMS</span>
-            <span className="meta-divider">·</span><span>FALSIFICATION BEFORE CONFIDENCE</span>
-            <span className="meta-divider">·</span><span>AUTHORIZATION BEFORE CONSEQUENCE</span>
-          </div>
-        </section>
-
-        <section className="summary-grid" aria-label="System status">
-          <article className="summary-card summary-card-primary">
-            <div className="card-topline"><span className="card-label">RUNTIME CONNECTION</span><span className="card-icon">◉</span></div>
-            <div className="connection-status">
-              <span className={status === 'connected' ? 'status-dot status-dot-ok' : status === 'unavailable' ? 'status-dot status-dot-error' : 'status-dot'} />
-              <h2>{presentation.label}</h2>
-            </div>
-            <p className="card-description">{presentation.detail}</p>
-            <p className="connection-detail">
-              {health ? health.service + ' · v' + health.version : 'Expected API: ' + apiBaseUrl}
-            </p>
-            {errorMessage && <p className="error-message" role="status">{errorMessage}</p>}
-            <button className="secondary-button" type="button" onClick={() => setRetryKey((key) => key + 1)}>
-              Retry connection <span aria-hidden="true">↗</span>
-            </button>
-          </article>
-
-          <article className="summary-card">
-            <div className="card-topline"><span className="card-label">CAPABILITY MAP</span><span className="card-icon">⌁</span></div>
-            <p className="metric-value">{integratedCount}<span> / {phases.length}</span></p>
-            <h2>Capability layers integrated</h2>
-            <p className="card-description">{gatedCount} phases remain explicitly gated by acceptance evidence rather than being represented as production-complete.</p>
-            <div className="milestone-track" aria-label={integratedCount + ' of ' + phases.length + ' phases integrated'}>
-              <span style={{ width: ((integratedCount / phases.length) * 100).toFixed(1) + '%' }} />
-            </div>
-            <p className="metric-footnote">Capability-led roadmap · no fixed delivery dates</p>
-          </article>
-
-          <article className="summary-card">
-            <div className="card-topline"><span className="card-label">RELEASE POSTURE</span><span className="card-icon">◇</span></div>
-            <div className="principle-icon" aria-hidden="true">!</div>
-            <h2>Evidence-gated, not production-certified</h2>
-            <p className="card-description">
-              Repository CI is green, but OS sandbox deployment, live identity verification,
-              operational rehearsal, independent security review and scientific validation remain open.
-            </p>
-            <div className="principle-footnote"><span /> RELEASE GATES ACTIVE</div>
-          </article>
-        </section>
-
-        <section className="content-grid" id="architecture">
-          <article className="workspace-card">
-            <div className="section-heading">
-              <div><p className="card-label">SCIENTIFIC CONTROL LOOP</p><h2>From question to governed result</h2></div>
-              <span className="section-index">CONTROL / 01</span>
-            </div>
-            <div className="research-steps">
-              {[
-                ['01', 'Question', 'Define variables, scope and unresolved assumptions.'],
-                ['02', 'Evidence', 'Retrieve and preserve source identity and provenance.'],
-                ['03', 'Hypotheses', 'Compare alternatives and define falsification criteria.'],
-                ['04', 'Experiment', 'Run only bounded, authorized computational work.'],
-                ['05', 'Verification', 'Independently check outputs, uncertainty and alternatives.'],
-                ['06', 'Memory', 'Retain evidence-linked findings without erasing history.'],
-              ].map(([number, title, detail], index, items) => (
-                <div className="research-step" key={number}>
-                  <div className="step-number">{number}</div>
-                  <div className="step-content"><h3>{title}</h3><p>{detail}</p></div>
-                  <span className="step-state">BOUNDED</span>
-                  {index < items.length - 1 && <span className="step-connector" aria-hidden="true" />}
-                </div>
-              ))}
-            </div>
-          </article>
-
-          <article className="workspace-card">
-            <div className="section-heading">
-              <div><p className="card-label">SYSTEM INVARIANTS</p><h2>Scientific integrity by construction</h2></div>
-              <span className="section-index">CORE / 04</span>
-            </div>
-            <ul className="capability-list">
-              {researchPrinciples.map(([label, detail], index) => (
-                <li key={label}>
-                  <span className="capability-number">0{index + 1}</span>
-                  <span><strong className="principle-label">{label}</strong><br /><span className="principle-detail">{detail}</span></span>
-                  <span className="planned-tag">REQUIRED</span>
-                </li>
-              ))}
-            </ul>
-          </article>
-        </section>
-
-        <section className="workspace-card phase-map" id="phases">
-          <div className="section-heading">
-            <div><p className="card-label">DEVELOPMENT ROADMAP</p><h2>Capability maturity across Phase 0 → 14</h2></div>
-            <span className="section-index">STATUS / LIVE REPOSITORY</span>
-          </div>
-          <div className="phase-grid">
-            {phases.map((phase) => (
-              <article className={'phase-card phase-' + phase.state.toLowerCase()} key={phase.id}>
-                <div className="phase-card-top">
-                  <span className="phase-number">{String(phase.id).padStart(2, '0')}</span>
-                  <span className="phase-state">{phase.state}</span>
-                </div>
-                <h3>{phase.title}</h3>
-                <p>{phase.detail}</p>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <section className="workspace-card release-panel" id="release-gates">
-          <div className="section-heading">
-            <div><p className="card-label">RELEASE EVIDENCE REGISTER</p><h2>Open gates that CI cannot self-certify</h2></div>
-            <span className="section-index">SECURITY / SCIENCE</span>
-          </div>
-          <div className="gate-list">
-            {releaseGates.map((gate, index) => (
-              <div className="gate-row" key={gate}>
-                <span className="gate-number">{String(index + 1).padStart(2, '0')}</span>
-                <span className="gate-copy">{gate}</span>
-                <span className="gate-state">OPEN</span>
-              </div>
-            ))}
-          </div>
-          <p className="workflow-note">
-            “Open” means evidence is still required. The platform intentionally fails closed where
-            a missing security or authorization boundary could otherwise become an implicit capability.
-          </p>
-        </section>
-
-        <footer className="page-footer">
-          <div><span className="footer-mark" /> ARTIFICIAL SCIENTIST <span className="footer-version">ASDS</span></div>
-          <p>Research-first · evidence-led · bounded autonomy · no unsupported claims of autonomous discovery</p>
-        </footer>
-      </main>
-    </div>
-  )
-}
+function ResultCard({title,data}:{title:string;data:unknown}){return <div className="result-card"><div className="card-title"><h2>{title}</h2><button className="text-button" onClick={()=>navigator.clipboard?.writeText(pretty(data))}>Copy JSON</button></div><pre>{pretty(data)}</pre></div>}
+function ComingSoon({title,text,onInspect}:{title:string;text:string;onInspect:()=>void}){return <section className="view"><div className="gate-panel"><span className="eyebrow">WORKSPACE INTEGRATION IN PROGRESS</span><h2>{title}</h2><p>{text}</p><button className="secondary-button" onClick={onInspect}>Inspect available backend endpoints ↗</button></div></section>}
+export default App;
