@@ -133,7 +133,7 @@ export function resolveOidcConfiguration(
     throw new Error("OIDC scopes must include openid and contain no more than 20 entries.")
   }
   return {
-    issuer: issuer.toString().replace(/\/$/, ""),
+    issuer: issuer.toString(),
     clientId,
     redirectUri: redirectUri.toString(),
     scopes: [...new Set(scopes)],
