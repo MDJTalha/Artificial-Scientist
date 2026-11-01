@@ -42,10 +42,14 @@ class OIDCAuthenticationMiddleware:
         # Lab and records routers validate OIDC and tenant membership in their own
         # dependencies. All other versioned API routes must pass this middleware.
         route_guarded_prefixes = ("/api/v1/lab", "/api/v1/records")
+        is_route_guarded = any(
+            path == prefix or path.startswith(f"{prefix}/")
+            for prefix in route_guarded_prefixes
+        )
         if (
             not path.startswith("/api/v1/")
             or path in public_paths
-            or path.startswith(route_guarded_prefixes)
+            or is_route_guarded
         ):
             await self.app(scope, receive, send)
             return
