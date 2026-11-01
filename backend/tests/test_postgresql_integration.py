@@ -23,7 +23,7 @@ def test_postgresql_driver_executes_read_only_health_query(database_url: str) ->
     check_database_connection(database_url)
 
 
-def test_readiness_reports_postgresql_connected(
+def test_readiness_stays_blocked_until_postgresql_adapters_exist(
     database_url: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("ARTIFICIAL_SCIENTIST_ENV", "production")
