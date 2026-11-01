@@ -44,9 +44,12 @@ def readiness_check() -> dict[str, str]:
             detail="Required database dependency is unavailable.",
         ) from error
 
-    return {
-        "status": "ready",
-        "service": settings.app_name,
-        "scope": "postgresql",
-        "database": "connected",
-    }
+    # A reachable PostgreSQL server is not equivalent to application readiness.
+    # Records, autonomy, lab and tenant-directory stores still have SQLite adapters.
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail=(
+            "PostgreSQL is reachable, but application persistence adapters have not "
+            "been migrated. Production readiness remains blocked."
+        ),
+    )
