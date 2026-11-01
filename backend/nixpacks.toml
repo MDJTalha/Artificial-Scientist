@@ -10,4 +10,7 @@ cmds = [
 ]
 
 [start]
-cmd = "uvicorn artificial_scientist.main:app --host 0.0.0.0 --port $PORT"
+# Nixpacks installs Python dependencies into /opt/venv. Its PATH profile is not
+# guaranteed to be loaded by the platform's non-login runtime shell, so invoke
+# the virtualenv interpreter explicitly.
+cmd = "/opt/venv/bin/python -m uvicorn artificial_scientist.main:app --host 0.0.0.0 --port $PORT"
