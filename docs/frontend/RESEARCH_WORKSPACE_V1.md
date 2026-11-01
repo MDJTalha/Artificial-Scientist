@@ -9,7 +9,7 @@ This document records what this branch introduces. It does not supersede the ext
 
 ## Delivered user-facing surfaces
 
-The previous overview-only page is replaced by a navigable React research workspace. The first six planned capability areas now have working screens backed by existing API endpoints:
+The previous overview-only page is replaced by a navigable React research workspace. The first seven planned capability areas now have working screens backed by existing API endpoints:
 
 | Surface | Frontend behavior | API integration |
 |---|---|---|
@@ -18,10 +18,11 @@ The previous overview-only page is replaced by a navigable React research worksp
 | Literature & Evidence Explorer | Search OpenAlex/Crossref metadata; inspect provider status; save bibliographic sources as unassessed records | \`POST /api/v1/literature/search\`, \`POST /api/v1/records\` |
 | Scientific Knowledge Graph & Vocabulary | Create and search concepts; read the supported controlled vocabulary; add proposed relationship assertions; inspect bounded graph neighborhoods | `GET /api/v1/knowledge/vocabulary`, `GET /api/v1/knowledge/concepts`, `POST /api/v1/knowledge/concepts`, `POST /api/v1/knowledge/relationships`, `GET /api/v1/knowledge/graph/neighborhood` |
 | Hypothesis & Discovery Lab | Create deterministic directional candidate templates; perform bounded prior-work metadata screen; assess and persist candidates | \`POST /api/v1/discovery/generate\`, \`POST /api/v1/discovery/prior-work-screen\`, \`POST /api/v1/discovery/assess\` |
+| Data Analysis & Results Observatory | Calculate descriptive statistics and bounded function plots from supplied numeric inputs | `POST /api/v1/math/statistics`, `POST /api/v1/math/plot` |
 | Mathematics & Formal Reasoning Workbench | Submit bounded symbolic simplification, differentiation, integration, solving and evaluation | \`POST /api/v1/math/symbolic\` |
 | Research Records (supporting surface) | Browse paginated immutable record envelopes and their content identifiers | \`GET /api/v1/records\` |
 
-The record browser is a supporting surface rather than a claim that all 12 planned panels are complete. The knowledge-graph UI preserves the backend's distinction between proposed, reviewed, disputed and rejected relationships; creating an edge does not establish that it is true.
+The record browser is a supporting surface rather than a claim that all 12 planned panels are complete. The initial release now contains seven implemented capability screens; several data-mutating screens remain gated in production until OIDC is connected. The knowledge-graph UI preserves the backend's distinction between proposed, reviewed, disputed and rejected relationships; creating an edge does not establish that it is true.
 
 ## API client controls
 
@@ -44,13 +45,14 @@ The production API origin continues to use the existing fail-closed \`resolveApi
 - Literature search retrieves bibliographic metadata only. It does not download full text, extract claims or prove novelty.
 - Knowledge graph concepts and relationships are immutable records. Newly created concepts are proposed; newly created relationships are proposed assertions without independent source verification. Neighborhood traversal is bounded and excludes rejected edges.
 - Retrieved source records are saved as \`unassessed\`; users must inspect original material.
-- The browser client does not yet have a reviewed OIDC sign-in/session or tenant-selection adapter. In production, protected write and record/discovery endpoints remain unavailable until that adapter and a real identity provider are configured.
+- The browser client does not yet have a reviewed OIDC sign-in/session or tenant-selection adapter. In production, protected write, record, discovery and knowledge-graph operations are disabled in the UI until that adapter and a real identity provider are configured. Development-only bypasses do not imply production identity readiness.
+- The Data Analysis workspace uses the existing descriptive-statistics and plot endpoints. Statistics describe only supplied values; plots are bounded mathematical visualizations, not scientific conclusions.
 - No execution UI is exposed as production-ready. The lab still requires reviewed OS-level sandbox deployment and external security acceptance.
 
 ## Verification introduced
 
 - API-client unit tests cover missing configuration, unsafe paths, JSON GET/POST behavior, response errors and refusal of non-JSON success responses.
-- Playwright covers keyboard operation across the new workspaces, visible capability boundaries, knowledge-graph navigation and the research-record surface.
+- Playwright covers keyboard operation across the new workspaces, visible capability boundaries, knowledge-graph and data-analysis navigation, and the research-record surface.
 - Automated axe accessibility checks remain part of the frontend workflow.
 - Type-check, unit tests, production build, E2E, Python suites and release-gate jobs are required CI evidence for the exact branch head.
 
@@ -58,11 +60,11 @@ A passing frontend test suite verifies the interface and API-client contract. It
 
 ## Remaining frontend sequence
 
-1. Add Data Analysis and Results views for statistics, plots and comparison of retained outputs.
-2. Add Lab, Experiment Journal and Reproducibility interfaces only with explicit blocked states until reviewed execution controls are actually deployed.
-3. Add Scientific Memory and Learning, Manuscript Studio, and Review/Governance interfaces through the existing backend services and documented approval semantics.
-4. Add OIDC login/session and tenant selection only after selecting and configuring a real provider; never replace identity with a client-side role selector.
-5. Complete real browser acceptance for each role and protected API operation; add end-to-end tests with isolated test identities and tenant fixtures.
+1. Add Lab, Experiment Journal and Reproducibility interfaces only with explicit blocked states until reviewed execution controls are actually deployed.
+2. Add Scientific Memory and Learning, Manuscript Studio, and Review/Governance interfaces through the existing backend services and documented approval semantics.
+3. Add OIDC login/session and tenant selection only after selecting and configuring a real provider; never replace identity with a client-side role selector.
+4. Complete real browser acceptance for each role and protected API operation; add end-to-end tests with isolated test identities and tenant fixtures.
+5. Add a provider-independent AI model gateway only after provider choice, data-governance and operating-cost approval.
 
 ## Integration and release rule
 
