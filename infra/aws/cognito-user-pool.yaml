@@ -47,10 +47,6 @@ Resources:
       EnabledMfas: [SOFTWARE_TOKEN_MFA]
       UserPoolAddOns:
         AdvancedSecurityMode: ENFORCED
-      Schema:
-        - Name: email
-          Required: true
-          Mutable: true
 
   AsdsApiResourceServer:
     Type: AWS::Cognito::UserPoolResourceServer
