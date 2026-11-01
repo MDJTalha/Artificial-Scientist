@@ -70,7 +70,7 @@ The entry point does not create a background thread or automatically schedule it
 - [x] API and adversarial-input tests added.
 - [ ] CI passes on the final Phase 6 head (must be checked from a fresh GitHub Actions run).
 - [x] Durable execution-attempt records are created before API execution; startup recovery marks stale attempts interrupted or reconciles them to a persisted run; status API and regression tests are included.
-- [x] Durable SQLite run storage, bounded listing/retrieval, and full-record integrity checks.
+- [x] Durable SQLite run storage, bounded listing/retrieval, and full-record integrity checks for local/single-instance use only. This is not an approved durable multi-tenant production database; PostgreSQL migration, backup/restore rehearsal, and concurrency validation remain release blockers.
 - [x] Durable JSON result artifacts with byte-digest verification and run/plan/step provenance metadata.
 - [x] ZIP export package containing the run record, verified result artifacts, and a SHA-256 manifest, with regression coverage. The manifest is not digitally signed.
 - [x] General binary artifact upload/download and digest/provenance checks, with a 10 MiB limit and regression coverage. Per-run quotas are enforced (100 attachments / 50 MiB). Optional ClamAV TCP INSTREAM scanning is integrated; non-development uploads fail closed unless a scanner is configured and reports clean. The scanner outcome and timestamp are persisted in attachment provenance and included in metadata/exports; legacy attachments without a scan record remain readable. Production still requires an operated ClamAV service and deployment verification. Cross-system plan/record linkage, object-store support, and per-user/tenant quotas remain outstanding. Retention redacts stored execution request payloads while preserving digest-backed attempt metadata.
@@ -80,8 +80,10 @@ The entry point does not create a background thread or automatically schedule it
 - [x] POSIX worker CPU/address-space/file-size/open-descriptor limits are applied and their configuration is regression-tested. These limits are not filesystem/network isolation.
 - [ ] Complete OS-level sandbox with filesystem/network isolation and independent security review.
 - [x] Runtime environment manifest and stored-configuration rerun/verification endpoint with output comparison tests.
-- [x] Shared API-key gate for lab endpoints outside development, with unauthorized and missing-secret tests; this is not per-user authorization.
+- [x] Per-user OIDC bearer-token validation for lab endpoints outside development, with missing/invalid-token, missing-configuration, and legacy-shared-key rejection tests. Active tenant membership and role authorization are checked separately; durable production tenant-directory storage remains outstanding.
 - [ ] Security review of the execution boundary before enabling generated code or untrusted users.
+
+- [ ] Production-grade PostgreSQL persistence for lab runs, execution attempts, artifacts, tenant directory, and security audit events, including transactional migrations, tenant constraints, concurrency tests, backup/restore rehearsal, and operational monitoring.
 
 Phase 6 remains in progress until all required security, durability, reproducibility, and CI gates are evidenced. No arbitrary generated code should be enabled before a separately reviewed isolation boundary exists.
 
