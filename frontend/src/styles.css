@@ -769,3 +769,26 @@ h1 span { color: #82a5aa; font-weight: 430; }
   .auth-controls select { flex: 1; max-width: none; }
   .auth-session-label { font-size: 7px; }
 }
+
+
+/* Optional, explicitly invoked AI research assistance */
+.ai-assistance-panel { margin-bottom: 13px; }
+.ai-provider-summary { display: flex; flex-wrap: wrap; gap: 7px; margin: 12px 0; }
+.ai-suggestion-result { display: grid; gap: 9px; margin-top: 14px; padding-top: 13px; border-top: 1px solid var(--line-soft); }
+.ai-suggestion-result pre {
+  max-height: 560px;
+  overflow: auto;
+  margin: 0;
+  padding: 13px;
+  color: #c7dadd;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: #07141d;
+  font-size: 10px;
+  line-height: 1.75;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 760px) {
+  .ai-suggestion-result pre { max-height: 420px; font-size: 9px; }
+}
