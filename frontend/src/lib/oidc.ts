@@ -212,7 +212,9 @@ async function loadDiscovery(config: OidcClientConfiguration): Promise<Discovery
     redirect: "error",
   })
   if (!response.ok) throw new Error("OIDC discovery failed with HTTP " + response.status + ".")
-  const document = (await response.json()) as Partial<DiscoveryDocument>
+  const body = await response.text()
+  if (body.length > 64 * 1024) throw new Error("OIDC discovery response exceeds the accepted size.")
+  const document = JSON.parse(body) as Partial<DiscoveryDocument>
   if (document.issuer !== config.issuer) {
     throw new Error("OIDC discovery issuer does not match the configured issuer.")
   }
@@ -280,6 +282,7 @@ async function validateIdToken(
     claims.iss !== config.issuer ||
     typeof claims.sub !== "string" ||
     !claims.sub.trim() ||
+    claims.sub.length > 255 ||
     claims.nonce !== expectedNonce ||
     typeof claims.exp !== "number" ||
     claims.exp <= Math.floor(Date.now() / 1000) ||
@@ -292,8 +295,17 @@ async function validateIdToken(
   if (!audiences.includes(config.clientId)) {
     throw new Error("ID token audience does not include this OIDC client.")
   }
-  if (audiences.length > 1 && claims.azp !== config.clientId) {
+  if (
+    (audiences.length > 1 && claims.azp !== config.clientId) ||
+    (claims.azp !== undefined && claims.azp !== config.clientId)
+  ) {
     throw new Error("ID token authorized party is invalid.")
+  }
+  if (
+    claims.nbf !== undefined &&
+    (typeof claims.nbf !== "number" || claims.nbf > Math.floor(Date.now() / 1000))
+  ) {
+    throw new Error("ID token is not yet valid.")
   }
 
   const jwksResponse = await fetch(jwksUri, {
@@ -306,7 +318,9 @@ async function validateIdToken(
   if (!jwksResponse.ok) {
     throw new Error("OIDC signing-key retrieval failed with HTTP " + jwksResponse.status + ".")
   }
-  const jwksPayload = (await jwksResponse.json()) as { keys?: unknown }
+  const jwksText = await jwksResponse.text()
+  if (jwksText.length > 128 * 1024) throw new Error("OIDC JWKS response exceeds the accepted size.")
+  const jwksPayload = JSON.parse(jwksText) as { keys?: unknown }
   if (!Array.isArray(jwksPayload.keys) || jwksPayload.keys.length > 100) {
     throw new Error("OIDC JWKS response is invalid.")
   }
@@ -317,7 +331,10 @@ async function validateIdToken(
       key.kid === header.kid &&
       key.kty === "RSA" &&
       (key.use === undefined || key.use === "sig") &&
-      (key.alg === undefined || key.alg === "RS256")
+      (key.alg === undefined || key.alg === "RS256") &&
+      (key.key_ops === undefined || (
+        Array.isArray(key.key_ops) && key.key_ops.includes("verify")
+      ))
     )
   }) as JsonWebKey | undefined
   if (!jwk) throw new Error("No matching OIDC signing key was found.")
