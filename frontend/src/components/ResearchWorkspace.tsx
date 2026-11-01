@@ -5,7 +5,7 @@ import type { ServiceStatus } from '../lib/status'
 import type { AuthenticatedSession, AuthenticationStatus } from '../lib/oidc'
 
 type WorkspaceView = 'overview' | 'missions' | 'literature' | 'knowledge' | 'hypotheses' | 'lab' | 'analysis' | 'journal' | 'memory' | 'manuscript' | 'governance' | 'math' | 'records'
-type BusyAction = 'create-task' | 'decompose' | 'literature' | 'save-sources' | 'knowledge-search' | 'knowledge-create' | 'knowledge-relation' | 'knowledge-graph' | 'generate' | 'prior-work' | 'assess' | 'statistics' | 'plot' | 'lab-run' | 'lab-history' | 'lab-verify' | 'memory-load' | 'memory-save' | 'memory-history' | 'memory-contradict' | 'memory-rollback' | 'manuscript-load' | 'manuscript-create' | 'governance-load' | 'math' | null
+type BusyAction = 'create-task' | 'decompose' | 'literature' | 'save-sources' | 'knowledge-search' | 'knowledge-create' | 'knowledge-relation' | 'knowledge-graph' | 'generate' | 'prior-work' | 'assess' | 'statistics' | 'plot' | 'lab-run' | 'lab-history' | 'lab-verify' | 'memory-load' | 'memory-save' | 'memory-history' | 'memory-contradict' | 'memory-rollback' | 'manuscript-load' | 'manuscript-create' | 'governance-load' | 'ai-generate' | 'math' | null
 
 interface ResearchWorkspaceProps {
   apiStatus: ServiceStatus
@@ -283,6 +283,34 @@ interface ManuscriptListResponse {
   offset: number
 }
 
+
+interface AiCapabilityResponse {
+  configured: boolean
+  provider: string | null
+  model: string | null
+  max_output_tokens: number
+  daily_request_limit: number
+  daily_token_budget: number
+  requires_human_review: boolean
+  note: string
+}
+
+interface AiGenerationResponse {
+  invocation_record_id: string
+  provider: string
+  model: string
+  content: string
+  prompt_sha256: string
+  response_sha256: string
+  prompt_bytes: number
+  response_bytes: number
+  input_tokens: number | null
+  output_tokens: number | null
+  finish_reason: string | null
+  requires_human_review: boolean
+  limitations: string[]
+}
+
 interface ManuscriptClaimDraft {
   id: number
   text: string
@@ -406,6 +434,10 @@ export default function ResearchWorkspace({
   const [hypothesisResponse, setHypothesisResponse] = useState<HypothesisGenerationResponse | null>(null)
   const [priorWorkResponse, setPriorWorkResponse] = useState<PriorWorkResponse | null>(null)
   const [assessmentResponse, setAssessmentResponse] = useState<AssessmentResponse | null>(null)
+  const [aiCapabilities, setAiCapabilities] = useState<AiCapabilityResponse | null>(null)
+  const [aiCapabilityError, setAiCapabilityError] = useState<string | null>(null)
+  const [aiSuggestion, setAiSuggestion] = useState<AiGenerationResponse | null>(null)
+  const [aiSuggestionError, setAiSuggestionError] = useState<string | null>(null)
 
   const [records, setRecords] = useState<RecordEnvelope[]>([])
   const [recordTotal, setRecordTotal] = useState(0)
@@ -499,6 +531,21 @@ export default function ResearchWorkspace({
   )
   const protectedActionsAvailable = apiConfigured && (!import.meta.env.PROD || hasSelectedMembership)
   const labExecutionAvailable = apiConfigured && !import.meta.env.PROD
+
+  useEffect(() => {
+    if (activeView !== 'hypotheses' || !protectedActionsAvailable) return
+
+    const controller = new AbortController()
+    setAiCapabilityError(null)
+    apiClient
+      .get<AiCapabilityResponse>('/api/v1/ai/capabilities', { signal: controller.signal })
+      .then((result) => setAiCapabilities(result))
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted) setAiCapabilityError(errorText(error))
+      })
+
+    return () => controller.abort()
+  }, [activeView, protectedActionsAvailable])
 
   useEffect(() => {
     if (activeView !== 'records' || !protectedActionsAvailable) return
@@ -891,6 +938,44 @@ export default function ResearchWorkspace({
       setNotice('Bounded candidate templates generated. These are not AI inference, evidence, novelty or truth claims.')
     } catch (error) {
       setPageError(errorText(error))
+    } finally {
+      finishAction()
+    }
+  }
+
+  async function generateAiResearchCritique() {
+    if (!aiCapabilities?.configured || !protectedActionsAvailable) return
+    beginAction('ai-generate')
+    setAiSuggestionError(null)
+    setAiSuggestion(null)
+    const candidates = hypothesisResponse?.candidates.map((item) => ({
+      title: item.candidate.title,
+      statement: item.candidate.statement,
+    })) ?? []
+    const prompt = [
+      "Research question:",
+      researchQuestion.trim(),
+      "",
+      "Researcher-confirmed variables:",
+      "Independent variable: " + independentVariable.trim(),
+      "Dependent variable: " + dependentVariable.trim(),
+      "System or population: " + systemOrPopulation.trim(),
+      "Context: " + (domainContext.trim() || "Not supplied"),
+      "",
+      "Current candidate templates (if any):",
+      JSON.stringify(candidates, null, 2),
+      "",
+      "Task: provide a critical research-design critique. Identify unclear definitions, hidden assumptions, alternative explanations, potential confounders, falsifiable predictions, and a discriminating test. Clearly label speculation. Do not invent sources, data, measurements, probabilities or experimental results. Do not claim novelty or scientific verification. State what evidence would be required to support each important suggestion.",
+    ].join("\n")
+    try {
+      const result = await apiClient.post<AiGenerationResponse>('/api/v1/ai/generate', {
+        prompt,
+        max_output_tokens: Math.min(800, aiCapabilities.max_output_tokens),
+      })
+      setAiSuggestion(result)
+      setNotice('Model assistance returned and its hash-only invocation record was saved. Review the output critically before using any suggestion.')
+    } catch (error) {
+      setAiSuggestionError(errorText(error))
     } finally {
       finishAction()
     }
@@ -1401,8 +1486,8 @@ export default function ResearchWorkspace({
               </article>
               <article className="workspace-stat">
                 <span className="card-label">AI INFERENCE</span>
-                <strong>Not connected</strong>
-                <p>Hypothesis suggestions use deterministic templates; no provider model is invoked.</p>
+                <strong>Optional / gated</strong>
+                <p>Only manually invoked when an operator configures a supported provider and tenant authorization permits inference.</p>
               </article>
               <article className="workspace-stat">
                 <span className="card-label">RELEASE POSTURE</span>
@@ -1691,6 +1776,63 @@ export default function ResearchWorkspace({
               <h1>Develop competing explanations</h1>
               <p>Use researcher-confirmed variables to create bounded candidate templates, screen prior-work metadata and save structured assessments.</p>
             </div>
+            <section className="workspace-card ai-assistance-panel">
+              <div className="section-heading">
+                <div><p className="card-label">OPTIONAL MODEL-ASSISTED CRITIQUE</p><h2>Ask a configured research assistant</h2></div>
+                <span className="section-index">HUMAN-INVOKED</span>
+              </div>
+              {aiCapabilityError && <div className="workspace-alert workspace-alert-warning" role="status">{aiCapabilityError}</div>}
+              {aiCapabilities?.configured ? (
+                <>
+                  <div className="ai-provider-summary">
+                    <span className="result-chip">{aiCapabilities.provider}</span>
+                    <span className="result-chip">{aiCapabilities.model}</span>
+                    <span className="result-chip">Max {aiCapabilities.max_output_tokens} output tokens</span>
+                    <span className="result-chip">{aiCapabilities.daily_request_limit} requests/day</span>
+                    <span className="result-chip">{aiCapabilities.daily_token_budget.toLocaleString()} reserved tokens/day</span>
+                  </div>
+                  <p className="form-help">{aiCapabilities.note}</p>
+                  <button
+                    className="secondary-button"
+                    type="button"
+                    onClick={() => void generateAiResearchCritique()}
+                    disabled={
+                      busy !== null ||
+                      !researchQuestion.trim() ||
+                      researchQuestion.trim().length < 10 ||
+                      !independentVariable.trim() ||
+                      !dependentVariable.trim() ||
+                      !systemOrPopulation.trim()
+                    }
+                  >
+                    {busy === 'ai-generate' ? 'Requesting model critique…' : 'Generate research-design critique'}
+                  </button>
+                </>
+              ) : (
+                <div className="empty-state">
+                  <span>◇</span>
+                  <strong>{aiCapabilityError ? 'AI capability is unavailable to this identity' : 'AI inference is not configured'}</strong>
+                  <p>{aiCapabilities?.note ?? 'No provider is contacted by default. An operator must configure a supported model endpoint and a tenant role with inference permission.'}</p>
+                </div>
+              )}
+              {aiSuggestionError && <div className="workspace-alert workspace-alert-error" role="alert">{aiSuggestionError}</div>}
+              {aiSuggestion && (
+                <div className="ai-suggestion-result">
+                  <div className="literature-result-top">
+                    <span className="result-chip">MODEL SUGGESTION · UNVERIFIED</span>
+                    <span className="result-chip">{aiSuggestion.provider} · {aiSuggestion.model}</span>
+                  </div>
+                  <pre>{aiSuggestion.content}</pre>
+                  <p className="form-help">
+                    Invocation record: {aiSuggestion.invocation_record_id}. Prompt SHA-256: {aiSuggestion.prompt_sha256}. Response SHA-256: {aiSuggestion.response_sha256}.
+                    {aiSuggestion.input_tokens !== null ? ' Input tokens: ' + aiSuggestion.input_tokens + '.' : ''}
+                    {aiSuggestion.output_tokens !== null ? ' Output tokens: ' + aiSuggestion.output_tokens + '.' : ''}
+                  </p>
+                  <ul className="workspace-list">{aiSuggestion.limitations.map((item) => <li key={item}>{item}</li>)}</ul>
+                </div>
+              )}
+            </section>
+
             <section className="workspace-card">
               <div className="section-heading"><div><p className="card-label">INPUT REVIEW</p><h2>Question and variable definitions</h2></div><span className="section-index">HUMAN-LED</span></div>
               <div className="workspace-form variable-grid">
