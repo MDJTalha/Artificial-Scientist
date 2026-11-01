@@ -28,12 +28,14 @@ _ROLE_ACTIONS = {
         "discovery:prior-work-screen",
         "discovery:assess",
         "memory:list", "memory:read", "memory:write", "memory:contradict", "memory:rollback",
+        "manuscript:list", "manuscript:read", "manuscript:create",
     }),
     "researcher": frozenset({
         "record:create", "record:read", "record:list", "record:search",
         "discovery:decompose", "discovery:generate", "discovery:prior-work-screen",
         "discovery:assess",
         "memory:list", "memory:read", "memory:write", "memory:contradict", "memory:rollback",
+        "manuscript:list", "manuscript:read", "manuscript:create",
     }),
     "viewer": frozenset({
         "record:read", "record:list", "record:search",
