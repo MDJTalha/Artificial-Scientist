@@ -28,6 +28,10 @@ test.describe('research workspace', () => {
     await expect(page.getByRole('heading', { name: 'Run a controlled computational experiment' })).toBeVisible()
     await expect(page.getByText(/does not execute arbitrary code/i)).toBeVisible()
 
+    await navigation.getByRole('button', { name: 'Experiment journal' }).click()
+    await expect(page.getByRole('heading', { name: 'Inspect the computational evidence trail' })).toBeVisible()
+    await expect(page.getByText(/computational reproducibility/i)).toBeVisible()
+
     await navigation.getByRole('button', { name: 'Data analysis' }).click()
     await expect(page.getByRole('heading', { name: 'Explore numerical evidence' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Analyze a numeric sample' })).toBeVisible()
@@ -38,7 +42,7 @@ test.describe('research workspace', () => {
 
   test('states which capabilities and external boundaries are actually available', async ({ page }) => {
     await page.goto('/')
-    await expect(page.locator('.workspace-stat').nth(1).locator('strong')).toContainText('8')
+    await expect(page.locator('.workspace-stat').nth(1).locator('strong')).toContainText('9')
     await expect(page.getByText('Not connected', { exact: true })).toBeVisible()
     await expect(page.getByText(/hypothesis suggestions use deterministic templates/i)).toBeVisible()
     await expect(page.getByText(/identity, sandbox deployment, operations and external scientific review remain open/i)).toBeVisible()
