@@ -10,7 +10,6 @@ cmds = [
 ]
 
 [start]
-# Nixpacks installs Python dependencies into /opt/venv. Its PATH profile is not
-# guaranteed to be loaded by the platform's non-login runtime shell, so invoke
-# the virtualenv interpreter explicitly.
-cmd = "/opt/venv/bin/python -m uvicorn artificial_scientist.main:app --host 0.0.0.0 --port $PORT"
+# Dependencies are installed by the Nix-provided Python/pip toolchain.
+# Use the Nix profile interpreter directly; /opt/venv is not created in this build.
+cmd = "/root/.nix-profile/bin/python3.12 -m uvicorn artificial_scientist.main:app --host 0.0.0.0 --port $PORT"
