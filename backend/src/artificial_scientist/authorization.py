@@ -228,6 +228,15 @@ class TenantDirectory:
                     SET role=excluded.role, active=1""",
                     (principal_id, tenant_id, role, now),
                 )
+        self.audit(
+            principal_id=principal_id,
+            tenant_id=tenant_id,
+            action="membership:grant",
+            target_type="principal",
+            target_id=principal_id,
+            outcome="allowed",
+            metadata={"role": role},
+        )
 
     def revoke_membership(self, principal_id: str, tenant_id: str) -> None:
         with closing(self._connect()) as connection:
@@ -236,6 +245,36 @@ class TenantDirectory:
                     "UPDATE asds_memberships SET active=0 WHERE principal_id=? AND tenant_id=?",
                     (principal_id, tenant_id),
                 )
+        self.audit(
+            principal_id=principal_id,
+            tenant_id=tenant_id,
+            action="membership:revoke",
+            target_type="principal",
+            target_id=principal_id,
+            outcome="allowed",
+        )
+
+    def list_memberships(self, principal_id: str) -> list[dict[str, str]]:
+        """Return only active tenant memberships for a validated principal."""
+        with closing(self._connect()) as connection:
+            rows = connection.execute(
+                """
+                SELECT t.tenant_id, t.name, m.role
+                FROM asds_memberships AS m
+                JOIN asds_tenants AS t ON t.tenant_id = m.tenant_id
+                WHERE m.principal_id = ? AND m.active = 1
+                ORDER BY t.name COLLATE NOCASE, t.tenant_id
+                """,
+                (principal_id,),
+            ).fetchall()
+        return [
+            {
+                "tenant_id": str(row["tenant_id"]),
+                "tenant_name": str(row["name"]),
+                "role": str(row["role"]),
+            }
+            for row in rows
+        ]
 
     def authorize(self, principal_id: str, tenant_id: str, action: str) -> TenantMembership:
         with closing(self._connect()) as connection:
