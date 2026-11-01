@@ -18,6 +18,9 @@ test.describe('research workspace', () => {
     await navigation.getByRole('button', { name: 'Literature explorer' }).click()
     await expect(page.getByRole('heading', { name: 'Find scholarly metadata' })).toBeVisible()
 
+    await navigation.getByRole('button', { name: 'Knowledge graph' }).click()
+    await expect(page.getByRole('heading', { name: 'Build a traceable concept graph' })).toBeVisible()
+
     await navigation.getByRole('button', { name: 'Hypothesis lab' }).click()
     await expect(page.getByRole('heading', { name: 'Develop competing explanations' })).toBeVisible()
 
@@ -27,10 +30,14 @@ test.describe('research workspace', () => {
 
   test('states which capabilities and external boundaries are actually available', async ({ page }) => {
     await page.goto('/')
-    await expect(page.locator('.workspace-stat').nth(1).locator('strong')).toContainText('5')
+    await expect(page.locator('.workspace-stat').nth(1).locator('strong')).toContainText('6')
     await expect(page.getByText('Not connected', { exact: true })).toBeVisible()
     await expect(page.getByText(/hypothesis suggestions use deterministic templates/i)).toBeVisible()
     await expect(page.getByText(/identity, sandbox deployment, operations and external scientific review remain open/i)).toBeVisible()
+
+    await page.getByRole('button', { name: 'Knowledge graph' }).click()
+    await expect(page.getByRole('heading', { name: 'Build a traceable concept graph' })).toBeVisible()
+    await expect(page.getByText(/proposed links are not scientific facts/i)).toBeVisible()
 
     await page.getByRole('button', { name: 'Research records' }).click()
     await expect(page.getByRole('heading', { name: 'Research records' })).toBeVisible()
