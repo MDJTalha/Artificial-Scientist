@@ -1,95 +1,122 @@
 # ASDS Deployment and Release Runbook
 
-**Status:** Live backend deployment verified by operator-provided endpoint responses on 2026-11-01. This runbook separates verified facts from configuration and release gates that still require testing.
+**Status:** Development/release-candidate runbook. The operator reported a healthy backend deployment on 2026-11-01; those endpoint responses establish application-process health only, not end-to-end readiness or production certification.
 
-## Deployed services
+## Repository and deployment boundaries
 
-- Backend API: https://artificial-scientist.ethiodeploy.app
-- Backend API documentation: https://artificial-scientist.ethiodeploy.app/docs
+- Repository: https://github.com/MDJTalha/Artificial-Scientist
+- Current frontend implementation review: PR #40, branch `feat/complete-functional-workspaces` (open, draft, unmerged at the time this runbook was updated).
+- Earlier backend endpoint: https://artificial-scientist.ethiodeploy.app
+- API docs: https://artificial-scientist.ethiodeploy.app/docs
 - Health: https://artificial-scientist.ethiodeploy.app/api/v1/health
 - Application readiness: https://artificial-scientist.ethiodeploy.app/api/v1/ready
-- Frontend preview (not a production release): https://artificial-scientist-kq91e4vws.vercel.app
-- Working branch: `feat/complete-scientific-frontend`
-- Review boundary: PR #39 remains open, draft, and unmerged until the repository checks and human review are complete.
+- Earlier Vercel preview: https://artificial-scientist-kq91e4vws.vercel.app (verify current deployment state before relying on it).
 
-## Verified deployment evidence
+Do not infer that a deployment is current merely because its URL responds. Record the deployed commit SHA and deployment ID for every release candidate.
 
-The operator reported these responses from the deployed service:
+## Verified versus unverified evidence
 
+The operator previously reported:
 - `GET /`: service `Artificial Scientist`, version `0.1.0`, status `running`.
 - `GET /api/v1/health`: status `ok`.
 - `GET /api/v1/ready`: status `ready`, scope `application_only`.
 
-The readiness endpoint intentionally does not claim that a database, identity provider, research provider, or other external dependency is available. A successful process/health check is not a production-readiness certification.
+The readiness scope is explicitly application-only. It does not prove database durability, identity-provider integration, research-provider connectivity, tenant isolation, audit persistence, scientific correctness, or operational resilience.
 
-## Required backend environment configuration
+## Auth0 identity configuration
 
-Configure these values in the backend hosting provider's environment-variable settings. Do not commit credentials or secret values.
+The frontend is an Auth0 Single Page Application (SPA). Use Authorization Code Flow with PKCE through the official Auth0 React SDK. Never place an Auth0 client secret in Vite variables or browser code.
 
-| Variable | Required configuration |
+Auth0 tenant domain currently configured in the frontend:
+- Domain: `asds-artificial-scientist.us.auth0.com`
+- Issuer: `https://asds-artificial-scientist.us.auth0.com/`
+- JWKS: `https://asds-artificial-scientist.us.auth0.com/.well-known/jwks.json`
+
+Before enabling API calls that require authentication, create/confirm an Auth0 API in the tenant. Its Identifier must be selected by the tenant owner and copied exactly; do not assume or invent it. Configure the same Identifier as the SPA's `VITE_AUTH0_AUDIENCE` and backend's `ARTIFICIAL_SCIENTIST_OIDC_AUDIENCE`.
+
+Backend configuration for Auth0 JWT access tokens:
+
+| Variable | Required value |
 | --- | --- |
-| `ARTIFICIAL_SCIENTIST_ENV` | `production` |
-| `ARTIFICIAL_SCIENTIST_ALLOWED_ORIGINS` | Exact HTTPS origins of the intended Vercel frontend deployment(s), comma-separated. Do not use `*`. |
-| `ARTIFICIAL_SCIENTIST_DB_PATH` | Current SQLite file path only for the existing deployment; SQLite on ephemeral hosting storage is not an approved production persistence strategy. |
-| `ARTIFICIAL_SCIENTIST_OIDC_ISSUER` | Cognito user-pool issuer URL after the pool is provisioned and verified. |
-| `ARTIFICIAL_SCIENTIST_OIDC_AUDIENCE` | Cognito app-client identifier expected by the backend validator. |
-| `ARTIFICIAL_SCIENTIST_OIDC_JWKS_URL` | HTTPS JWKS URL belonging to the configured issuer. |
-| `ARTIFICIAL_SCIENTIST_OIDC_AUDIENCE_CLAIM` | `client_id` for Cognito access tokens, matching the actual token contract. |
-| `ARTIFICIAL_SCIENTIST_OIDC_TOKEN_USE` | `access` |
-| `ARTIFICIAL_SCIENTIST_OIDC_REQUIRED_SCOPE` | `asds-api/access`, if that scope is provisioned on the Cognito resource server. |
+| `ARTIFICIAL_SCIENTIST_OIDC_ISSUER` | `https://asds-artificial-scientist.us.auth0.com/` |
+| `ARTIFICIAL_SCIENTIST_OIDC_AUDIENCE` | Exact Identifier configured on the Auth0 API; not the SPA Client ID |
+| `ARTIFICIAL_SCIENTIST_OIDC_JWKS_URL` | `https://asds-artificial-scientist.us.auth0.com/.well-known/jwks.json` |
+| `ARTIFICIAL_SCIENTIST_OIDC_AUDIENCE_CLAIM` | `aud` |
+| `ARTIFICIAL_SCIENTIST_OIDC_TOKEN_USE` | Leave unset for Auth0; Cognito's `token_use` claim is not an Auth0 contract |
+| `ARTIFICIAL_SCIENTIST_OIDC_REQUIRED_SCOPE` | Optional; set only to a scope actually defined on the Auth0 API and requested by the SPA |
 
-The current backend CORS default is localhost-only. The frontend preview origin must be explicitly added to `ARTIFICIAL_SCIENTIST_ALLOWED_ORIGINS` before browser integration can be considered verified. Add the final production frontend origin separately when one exists. Keep the allowlist narrow and exact.
+The backend validator accepts RS256 JWTs and checks signature/JWKS, issuer, audience, expiry, issued-at, and subject. If a required scope is configured, it must be present in the token's space-delimited `scope` claim. The API must issue JWT access tokens for the configured Identifier. Do not send an ID token as an API bearer token.
 
-Do not enable Cognito configuration with placeholder values. Provision the user pool, app client, resource-server scope, callback URLs, and logout URLs first; then validate a real access token end-to-end. Do not use an ID token as an API access token.
+The backend currently has generic OIDC settings that can validate Auth0 JWTs; this does not by itself prove that the deployed environment is configured or that a real token has passed end-to-end tests. Keep protected routes fail-closed until that test succeeds.
 
-## Required Vercel environment configuration
+## Auth0 SPA settings
 
-For the preview environment, set:
+For local development:
+- Allowed Callback URLs: `http://localhost:5173/`
+- Allowed Logout URLs: `http://localhost:5173/`
+- Allowed Web Origins: `http://localhost:5173`
 
-- `VITE_API_BASE_URL=https://artificial-scientist.ethiodeploy.app`
+Add each Vercel Preview and Production origin explicitly to the relevant Auth0 allowlists. Origins have no path or trailing slash. Callback and logout URLs include the exact path used by the application.
 
-Set the `VITE_COGNITO_*` values only after the matching Cognito app client and HTTPS callback/logout URLs are provisioned. The Vercel frontend uses OAuth authorization-code flow with PKCE and a public client; do not add a client secret to frontend variables.
+Vercel Preview environment variables:
+- `VITE_AUTH0_DOMAIN=asds-artificial-scientist.us.auth0.com`
+- `VITE_AUTH0_CLIENT_ID`: the public SPA Client ID already configured locally
+- `VITE_AUTH0_AUDIENCE`: exact Auth0 API Identifier (only after API creation/confirmation)
+- `VITE_API_BASE_URL=https://artificial-scientist.ethiodeploy.app` (only if this remains the verified backend URL)
+- `VITE_ASDS_TENANT_ID`: only after the principal has been explicitly provisioned as a member of that tenant
 
-Set `VITE_ASDS_TENANT_ID` only after a tenant and membership have been explicitly provisioned for the authenticated principal. A client-supplied tenant ID is not authorization.
+Vite variables are embedded at build time. Redeploy the corresponding Vercel environment after changing them. Never configure a SPA client secret.
 
-Vite variables are embedded at build time. Redeploy the relevant Vercel environment after changing them.
+## Backend CORS
 
-## Safe verification sequence
+Set `ARTIFICIAL_SCIENTIST_ALLOWED_ORIGINS` to a comma-separated allowlist of exact origins actually used by the intended frontend deployment. Include local development only in a development environment. Do not use wildcard origins. Verify preflight and actual browser requests from the exact preview origin, and verify an unlisted origin is rejected.
 
-1. Confirm the deployed backend commit and provider environment before changing deployment settings.
-2. Configure the exact Vercel preview origin in backend CORS. Redeploy the backend only after reviewing the environment change.
-3. Configure `VITE_API_BASE_URL` in Vercel Preview and redeploy the frontend.
-4. From the actual Vercel preview browser origin, verify preflight and GET requests to `/api/v1/health`, `/api/v1/ready`, and `/openapi.json`. Verify an unlisted origin is not granted CORS access.
-5. Exercise representative mathematics and literature routes with valid, invalid, and oversized requests. Confirm documented response codes and bounded behavior.
-6. Verify all protected routes fail closed when OIDC is absent or invalid. Then test a real Cognito access token, issuer, audience, expiry, token-use, scope, and tenant membership.
-7. Verify lab authorization and audit persistence, including cross-tenant read/write denial and audit-store failure behavior.
-8. Verify persistent database storage, backup, restore, migrations, rollback, concurrency, and tenant isolation against a real PostgreSQL test database before migrating any data.
-9. Run the full backend Python 3.12/3.13 and frontend typecheck/test/build CI on the exact PR head.
-10. Complete independent security and scientific-domain review before production release.
+## Persistence and authorization boundaries
 
-## Known release blockers and safety gates
+- Current persistence modules use SQLite-specific SQL. A `DATABASE_URL` alone does not convert them to PostgreSQL.
+- Do not store real tenant/research data on an unverified ephemeral SQLite filesystem.
+- The general research-record/discovery production gate must remain enabled until tenant ownership, tenant-scoped persistence, authorization, migration and isolation tests are implemented and independently reviewed.
+- Lab tenant authorization depends on a validated principal and an explicit server-side membership. A client-provided `X-Tenant-ID` is only a selector, never proof of membership.
+- Audit persistence must remain fail-closed for protected lab operations.
+- The computational runner is not an OS-level sandbox. Do not expose arbitrary generated code execution.
+- Scientific hypotheses and automated assessments are drafts requiring independent evidence and human/domain-expert review; they are not proof of truth, causality, or novelty.
 
-- **PostgreSQL:** current stores use SQLite-specific SQL and persistence behavior. Setting a `DATABASE_URL` alone does not migrate them. Implement and test a persistence abstraction and migration plan before using PostgreSQL.
-- **Persistence durability:** do not store real tenant/research data on an unverified ephemeral SQLite volume.
-- **Identity:** Cognito deployment and real provider-token verification remain external gates until proven with live configuration.
-- **Tenant-scoped research records:** the production fail-closed gate for general records/discovery must remain enabled until record ownership and authorization are implemented and reviewed.
-- **Computational isolation:** the bounded runner is not an OS-level sandbox. Do not expose arbitrary generated code execution.
-- **Audit integrity:** preserve fail-closed behavior when audit persistence is unavailable.
-- **Scientific validity:** generated hypotheses and automated assessments require human review and independent evidence; they are not proof of truth, causality, or novelty.
-- **Release governance:** do not merge PR #39, switch the production branch, or represent the system as certified/production-ready without explicit approval and evidence for all required gates.
+## Verification and release sequence
+
+1. Record repository branch, commit SHA, PR, workflow run URL, and exact deployment IDs.
+2. Confirm the current deployed backend and frontend commit SHAs before changing configuration.
+3. Configure the Auth0 API Identifier and scopes, then request a real JWT access token for that audience.
+4. Configure backend Auth0 issuer, audience, JWKS, and exact CORS origins. Keep the audience and scope values consistent with the Auth0 API configuration.
+5. Test from the actual Vercel browser origin: CORS preflight, health, readiness, OpenAPI, and representative API calls.
+6. Test protected routes with no token, malformed token, wrong issuer, wrong audience, expired token, wrong signature, missing scope, and a valid Auth0 access token. Expect fail-closed behavior for every invalid case.
+7. Test tenant membership, cross-tenant read/write denial, role boundaries, membership revocation, and audit-store failure behavior.
+8. Implement and verify durable PostgreSQL persistence, migrations, concurrency, transaction rollback, backup/restore, and tenant isolation before moving real data.
+9. Verify all frontend workspaces at desktop/tablet/mobile widths, including loading, empty, success, error, offline, and unauthorized states.
+10. Run backend Python 3.12/3.13 lint and tests plus frontend typecheck, unit tests, and production build on the exact PR head.
+11. Complete independent security review, scientific benchmark/domain review, monitoring and operational acceptance before production release.
+
+## Current known release blockers
+
+- Auth0 API Identifier and required scopes have not yet been confirmed by the tenant owner.
+- Real Auth0 access-token validation against the deployed backend has not yet been demonstrated.
+- Production Vercel environment variables and CORS origin alignment have not yet been independently verified.
+- PostgreSQL persistence and migration strategy are not implemented/verified.
+- General research-record/discovery routes remain fail-closed outside development.
+- OS-level computational sandboxing and independent scientific validation remain outstanding.
+- No production certification or production-readiness claim is supported by the current evidence.
 
 ## Release evidence record
 
-For every release candidate, record:
+For each release candidate record:
+- Git commit SHA, branch, PR and reviewer/approval state.
+- CI workflow URL and all job outcomes.
+- Backend deployment ID, deployed SHA, health/readiness output.
+- Frontend deployment ID, deployed SHA, URL and environment.
+- CORS browser preflight and API integration results.
+- Auth0 issuer/audience/scope validation result (never record tokens).
+- PostgreSQL migration, backup/restore, tenant-isolation, concurrency and audit results.
+- Security review owner, scope, findings and remediation.
+- Scientific benchmark/domain review and known limitations.
+- Explicit release approval.
 
-- Git commit SHA and branch.
-- CI workflow run URL and Python/frontend job results.
-- Backend deployment ID, deployed commit, health/readiness output.
-- Frontend deployment URL, deployment ID, and environment.
-- CORS browser preflight result and API integration test results.
-- OIDC issuer/audience/scope verification (never record tokens).
-- PostgreSQL migration, backup/restore, tenant-isolation, and audit test results.
-- Security review owner, scope, findings, and remediation status.
-- Known limitations and explicit release approval.
-
-Never include secrets, access tokens, private connection strings, or personal research data in this record.
+Never include secrets, access tokens, private connection strings, or private research data in this record.
