@@ -6,13 +6,17 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from artificial_scientist.api.routes.ai import router as ai_router
+from artificial_scientist.api.routes.auth import router as auth_router
 from artificial_scientist.api.routes.autonomy import router as autonomy_router
 from artificial_scientist.api.routes.discovery import router as discovery_router
 from artificial_scientist.api.routes.health import router as health_router
 from artificial_scientist.api.routes.knowledge import router as knowledge_router
 from artificial_scientist.api.routes.lab import router as lab_router
 from artificial_scientist.api.routes.literature import router as literature_router
+from artificial_scientist.api.routes.manuscripts import router as manuscripts_router
 from artificial_scientist.api.routes.math_tools import router as math_tools_router
+from artificial_scientist.api.routes.memory import router as memory_router
 from artificial_scientist.api.routes.records import router as records_router
 from artificial_scientist.authorization import TenantDirectory
 from artificial_scientist.config import get_settings
@@ -20,59 +24,6 @@ from artificial_scientist.config import get_settings
 settings = get_settings()
 LAB_RUN_BODY_LIMIT_BYTES = 64 * 1024
 DISCOVERY_BODY_LIMIT_BYTES = 1024 * 1024
-
-
-class Phase7RecordIsolationGateMiddleware:
-    """Fail closed on shared research records until tenant-scoped access is implemented.
-
-    Phase 6 tenant isolation currently protects lab runs and artifacts, not the general
-    append-only research-record store. Production-like deployments must not expose those
-    shared records or discovery endpoints until that store has tenant-scoped persistence
-    and authorization. Local development remains available for implementation and testing.
-    """
-
-    def __init__(self, app: ASGIApp) -> None:
-        self.app = app
-
-    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        path = scope.get("path", "")
-        guarded_path = (
-            path == "/api/v1/records"
-            or path.startswith("/api/v1/records/")
-            or path == "/api/v1/discovery"
-            or path.startswith("/api/v1/discovery/")
-        )
-        if (
-            scope.get("type") != "http"
-            or not guarded_path
-            or get_settings().environment.lower() == "development"
-        ):
-            await self.app(scope, receive, send)
-            return
-
-        import json
-
-        body = json.dumps(
-            {
-                "detail": (
-                    "Research records and discovery are disabled outside development "
-                    "until tenant-scoped record authorization is implemented and reviewed."
-                )
-            },
-            separators=(",", ":"),
-        ).encode("utf-8")
-        await send(
-            {
-                "type": "http.response.start",
-                "status": 503,
-                "headers": [
-                    (b"content-type", b"application/json"),
-                    (b"content-length", str(len(body)).encode("ascii")),
-                    (b"cache-control", b"no-store"),
-                ],
-            }
-        )
-        await send({"type": "http.response.body", "body": body})
 
 
 class LabSecurityAuditMiddleware:
@@ -289,10 +240,14 @@ app.add_middleware(
 )
 
 app.include_router(health_router)
+app.include_router(ai_router)
+app.include_router(auth_router)
 app.include_router(autonomy_router)
 app.include_router(discovery_router)
 app.include_router(literature_router)
 app.include_router(math_tools_router)
+app.include_router(memory_router)
+app.include_router(manuscripts_router)
 app.include_router(lab_router)
 app.include_router(knowledge_router)
 app.include_router(records_router)

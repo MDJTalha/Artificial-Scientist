@@ -64,7 +64,15 @@ def test_revoked_membership_denies_access_and_audits_both_outcomes(tmp_path):
         directory.authorize(principal, tenant, "run:read")
 
     events = directory.list_audit_events(tenant)
-    assert [event["outcome"] for event in events] == ["denied", "allowed"]
+    run_events = [event for event in events if event["action"] == "run:read"]
+    membership_events = [
+        event for event in events if event["action"] in {"membership:grant", "membership:revoke"}
+    ]
+    assert [event["outcome"] for event in run_events] == ["denied", "allowed"]
+    assert {event["action"] for event in membership_events} == {
+        "membership:grant",
+        "membership:revoke",
+    }
     assert all(event["principal_id"] == principal for event in events)
     assert all("metadata_json" in event for event in events)
 
@@ -159,6 +167,9 @@ def test_audit_accepts_bounded_operational_metadata(tmp_path):
                 "discovery:prior-work-screen",
                 "discovery:assess", "autonomy:workflow:create",
                 "autonomy:workflow:read", "autonomy:workflow:write", "autonomy:workflow:approve",
+                "memory:list", "memory:read", "memory:write",
+                "memory:contradict", "memory:rollback",
+                "manuscript:list", "manuscript:read", "manuscript:create",
             },
         ),
         (
@@ -171,6 +182,9 @@ def test_audit_accepts_bounded_operational_metadata(tmp_path):
                 "discovery:assess",
                 "autonomy:workflow:create", "autonomy:workflow:read",
                 "autonomy:workflow:write", "autonomy:workflow:approve",
+                "memory:list", "memory:read", "memory:write",
+                "memory:contradict", "memory:rollback",
+                "manuscript:list", "manuscript:read", "manuscript:create",
             },
         ),
         (
@@ -179,6 +193,7 @@ def test_audit_accepts_bounded_operational_metadata(tmp_path):
                 "run:list", "run:read", "run:export", "artifact:read",
                 "record:read", "record:list", "record:search",
                 "discovery:decompose", "discovery:prior-work-screen", "autonomy:workflow:read",
+                "memory:list", "memory:read", "manuscript:list", "manuscript:read",
             },
         ),
         (
@@ -186,6 +201,7 @@ def test_audit_accepts_bounded_operational_metadata(tmp_path):
             {
                 "run:list", "run:read", "run:export", "artifact:read",
                 "record:read", "record:list", "record:audit:read",
+                "memory:list", "memory:read", "manuscript:list", "manuscript:read",
             },
         ),
     ],
@@ -263,3 +279,28 @@ def test_autonomy_workflow_actions_follow_least_privilege():
     assert role_allows("viewer", "autonomy:workflow:read")
     assert not role_allows("viewer", "autonomy:workflow:approve")
     assert not role_allows("auditor", "autonomy:workflow:write")
+
+
+def test_memory_actions_follow_least_privilege():
+    from artificial_scientist.authorization import role_allows
+
+    assert role_allows("tenant_admin", "memory:write")
+    assert role_allows("researcher", "memory:write")
+    assert role_allows("researcher", "memory:contradict")
+    assert role_allows("researcher", "memory:rollback")
+    assert role_allows("viewer", "memory:list")
+    assert role_allows("viewer", "memory:read")
+    assert role_allows("auditor", "memory:read")
+    assert not role_allows("viewer", "memory:write")
+    assert not role_allows("auditor", "memory:write")
+    assert not role_allows("unknown", "memory:read")
+
+
+def test_optional_ai_inference_permission_is_limited_to_research_roles():
+    from artificial_scientist.authorization import role_allows
+
+    assert role_allows("tenant_admin", "ai:inference")
+    assert role_allows("researcher", "ai:inference")
+    assert not role_allows("viewer", "ai:inference")
+    assert not role_allows("auditor", "ai:inference")
+    assert not role_allows("unknown", "ai:inference")

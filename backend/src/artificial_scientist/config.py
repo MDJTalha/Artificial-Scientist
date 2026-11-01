@@ -19,6 +19,14 @@ class Settings:
     oidc_issuer: str | None
     oidc_audience: str | None
     oidc_jwks_url: str | None
+    model_provider: str | None = None
+    model_base_url: str | None = None
+    model_name: str | None = None
+    model_api_key: str | None = None
+    model_timeout_seconds: str = "30"
+    model_max_tokens: str = "1200"
+    model_daily_request_limit: str = "20"
+    model_daily_token_budget: str = "20000"
 
 
 def get_settings() -> Settings:
@@ -47,4 +55,12 @@ def get_settings() -> Settings:
         oidc_issuer=os.getenv("ARTIFICIAL_SCIENTIST_OIDC_ISSUER") or None,
         oidc_audience=os.getenv("ARTIFICIAL_SCIENTIST_OIDC_AUDIENCE") or None,
         oidc_jwks_url=os.getenv("ARTIFICIAL_SCIENTIST_OIDC_JWKS_URL") or None,
+        model_provider=os.getenv("ARTIFICIAL_SCIENTIST_MODEL_PROVIDER") or None,
+        model_base_url=os.getenv("ARTIFICIAL_SCIENTIST_MODEL_BASE_URL") or None,
+        model_name=os.getenv("ARTIFICIAL_SCIENTIST_MODEL_NAME") or None,
+        model_api_key=os.getenv("ARTIFICIAL_SCIENTIST_MODEL_API_KEY") or None,
+        model_timeout_seconds=os.getenv("ARTIFICIAL_SCIENTIST_MODEL_TIMEOUT_SECONDS", "30"),
+        model_max_tokens=os.getenv("ARTIFICIAL_SCIENTIST_MODEL_MAX_TOKENS", "1200"),
+        model_daily_request_limit=os.getenv("ARTIFICIAL_SCIENTIST_MODEL_DAILY_REQUEST_LIMIT", "20"),
+        model_daily_token_budget=os.getenv("ARTIFICIAL_SCIENTIST_MODEL_DAILY_TOKEN_BUDGET", "20000"),
     )

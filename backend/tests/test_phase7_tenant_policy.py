@@ -17,9 +17,16 @@ from artificial_scientist.records.tenant_policy import (
             {
                 "record:read", "record:list", "record:search",
                 "discovery:decompose", "discovery:prior-work-screen",
+                "memory:list", "memory:read", "manuscript:list", "manuscript:read",
             },
         ),
-        ("auditor", {"record:read", "record:list", "record:audit:read"}),
+        (
+            "auditor",
+            {
+                "record:read", "record:list", "record:audit:read",
+                "memory:list", "memory:read", "manuscript:list", "manuscript:read",
+            },
+        ),
     ],
 )
 def test_role_matrix_is_explicit(role, expected):

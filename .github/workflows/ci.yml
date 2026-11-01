@@ -102,6 +102,50 @@ jobs:
         run: |
           printf '%s\n' '{"operation":"statistics","inputs":{"values":[1,2,3],"variance_mode":"population"}}' |
             docker run --rm -i --network none --read-only --cap-drop ALL --security-opt no-new-privileges               --pids-limit 64 --memory 512m --cpus 1.0 --tmpfs /tmp:rw,noexec,nosuid,nodev,size=64m               --user 65532:65532 asds-lab-sandbox:ci
+      - name: Build production API container image
+        run: docker build --file deploy/api.Dockerfile --tag asds-api:ci .
+      - name: Smoke-test API container core readiness
+        run: |
+          set -eu
+          docker volume create asds-api-ci-data
+          docker run --detach --name asds-api-ci \
+            --publish 127.0.0.1:18000:8000 \
+            --mount source=asds-api-ci-data,target=/var/lib/asds \
+            --read-only --cap-drop ALL --security-opt no-new-privileges \
+            --pids-limit 256 --memory 1g --cpus 1.0 \
+            --tmpfs /tmp:rw,noexec,nosuid,nodev,size=128m \
+            --env ARTIFICIAL_SCIENTIST_ENV=production \
+            --env ARTIFICIAL_SCIENTIST_ALLOWED_ORIGINS=https://research.example.test \
+            --env ARTIFICIAL_SCIENTIST_OIDC_ISSUER=https://identity.example.test/ \
+            --env ARTIFICIAL_SCIENTIST_OIDC_AUDIENCE=asds-api \
+            --env ARTIFICIAL_SCIENTIST_OIDC_JWKS_URL=https://identity.example.test/.well-known/jwks.json \
+            --env ARTIFICIAL_SCIENTIST_DB_PATH=/var/lib/asds/artificial_scientist.sqlite3 \
+            asds-api:ci
+          python - <<'PY'
+          import json
+          import time
+          import urllib.error
+          import urllib.request
+
+          url = "http://127.0.0.1:18000/api/v1/ready"
+          last_error = None
+          for _ in range(30):
+              try:
+                  with urllib.request.urlopen(url, timeout=2) as response:
+                      payload = json.loads(response.read())
+                      assert response.status == 200, payload
+                      assert payload["status"] == "ready", payload
+                      assert all(payload["checks"].values()), payload
+                  print("API container core readiness: PASS")
+                  break
+              except (OSError, urllib.error.URLError, AssertionError) as error:
+                  last_error = error
+                  time.sleep(1)
+          else:
+              raise SystemExit(f"API container readiness failed: {last_error}")
+          PY
+          docker rm --force asds-api-ci
+          docker volume rm asds-api-ci-data
       - name: Install backend test tools
         working-directory: backend
         run: |

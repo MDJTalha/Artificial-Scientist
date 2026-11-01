@@ -103,3 +103,26 @@ def test_persistent_memory_isolation_allows_same_key_per_tenant(tmp_path):
     second.put("shared-key", {"tenant": "b"}, evidence=("source:b",))
     assert first.current("shared-key").value == {"tenant": "a"}
     assert second.current("shared-key").value == {"tenant": "b"}
+
+
+
+def test_memory_store_rejects_stale_concurrent_version_writer(tmp_path):
+    store = AutonomyStore(tmp_path / "memory-stale-writer.sqlite3")
+    assert store.memory_put(
+        "shared", {"value": 1}, "active", ("source:1",), "a" * 64, None,
+        tenant_id="tenant-a",
+    ) == 1
+    # This caller still believes it is writing the first version. It must not
+    # silently create version 3 with an incorrect supersedes pointer.
+    try:
+        store.memory_put(
+            "shared", {"value": 2}, "active", ("source:2",), "b" * 64, None,
+            tenant_id="tenant-a",
+        )
+    except ValueError as error:
+        assert "concurrently" in str(error)
+    else:
+        raise AssertionError("stale memory version was accepted")
+    history = store.memory_history("shared", tenant_id="tenant-a")
+    assert len(history) == 1
+    assert history[0]["version"] == 1
