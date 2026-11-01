@@ -257,6 +257,9 @@ def test_cognito_access_token_uses_client_id_token_use_and_required_scope(monkey
     assert principal.subject == "cognito-sub-123"
     assert captured["decode"]["audience"] is None
     assert captured["decode"]["options"]["verify_aud"] is False
+    assert set(captured["decode"]["options"]["require"]) == {
+        "exp", "iat", "iss", "client_id", "sub"
+    }
 
 
 def test_cognito_access_token_rejects_missing_required_scope(monkeypatch):
