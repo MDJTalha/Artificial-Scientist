@@ -1,0 +1,94 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Least-privilege GitHub Actions role for deploying the ASDS backend to an existing ECS service.
+
+Parameters:
+  GitHubOidcProviderArn:
+    Type: String
+    Description: ARN of the existing token.actions.githubusercontent.com IAM OIDC provider.
+  RepositoryOwner:
+    Type: String
+    Default: MDJTalha
+  RepositoryName:
+    Type: String
+    Default: Artificial-Scientist
+  DeploymentBranch:
+    Type: String
+    Default: main
+  EcrRepositoryName:
+    Type: String
+    Default: asds-backend
+  EcsServiceArn:
+    Type: String
+    Description: ARN of the pre-created ECS service to update.
+  TaskExecutionRoleArn:
+    Type: String
+    Description: Exact ECS task execution role ARN used by the task definition.
+  TaskRoleArn:
+    Type: String
+    Description: Exact ECS application task role ARN used by the task definition.
+
+Resources:
+  AsdsGitHubDeployRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: ASDS-GitHubActions-BackendDeploy
+      Description: GitHub OIDC deployment role scoped to the ASDS repository main branch.
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Ref GitHubOidcProviderArn
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+              StringLike:
+                token.actions.githubusercontent.com:sub: !Sub "repo:${RepositoryOwner}/${RepositoryName}:ref:refs/heads/${DeploymentBranch}"
+      Policies:
+        - PolicyName: ASDS-ECR-Push-And-ECS-Update
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: EcrAuthorization
+                Effect: Allow
+                Action: ecr:GetAuthorizationToken
+                Resource: "*"
+              - Sid: PushOnlyToAsdsRepository
+                Effect: Allow
+                Action:
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:CompleteLayerUpload
+                  - ecr:DescribeImages
+                  - ecr:InitiateLayerUpload
+                  - ecr:PutImage
+                  - ecr:UploadLayerPart
+                Resource: !Sub "arn:${AWS::Partition}:ecr:${AWS::Region}:${AWS::AccountId}:repository/${EcrRepositoryName}"
+              - Sid: ReadTaskDefinitionAndRegisterRevision
+                Effect: Allow
+                Action:
+                  - ecs:DescribeTaskDefinition
+                  - ecs:RegisterTaskDefinition
+                Resource: "*"
+              - Sid: UpdateOnlyTheConfiguredService
+                Effect: Allow
+                Action:
+                  - ecs:DescribeServices
+                  - ecs:UpdateService
+                Resource: !Ref EcsServiceArn
+              - Sid: PassOnlyTheConfiguredTaskRoles
+                Effect: Allow
+                Action: iam:PassRole
+                Resource:
+                  - !Ref TaskExecutionRoleArn
+                  - !Ref TaskRoleArn
+                Condition:
+                  StringEquals:
+                    iam:PassedToService: ecs-tasks.amazonaws.com
+
+Outputs:
+  DeploymentRoleArn:
+    Value: !GetAtt AsdsGitHubDeployRole.Arn
+  TrustSubject:
+    Value: !Sub "repo:${RepositoryOwner}/${RepositoryName}:ref:refs/heads/${DeploymentBranch}"
