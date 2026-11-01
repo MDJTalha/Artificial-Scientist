@@ -34,6 +34,7 @@ _RECORD_ACTIONS = frozenset({
     "memory:list", "memory:read", "memory:write",
     "memory:contradict", "memory:rollback",
     "manuscript:list", "manuscript:read", "manuscript:create",
+    "ai:inference",
 })
 _ALLOWED_ACTIONS = _LAB_ACTIONS | _RECORD_ACTIONS
 
@@ -85,6 +86,7 @@ def role_allows(role: str, action: str) -> bool:
                 "memory:list", "memory:read", "memory:write",
                 "memory:contradict", "memory:rollback",
                 "manuscript:list", "manuscript:read", "manuscript:create",
+                "ai:inference",
             }
         if role == "viewer":
             return action in {
