@@ -69,6 +69,7 @@ def test_alembic_schema_and_append_only_guards_are_installed(database_url: str) 
         "research_records_append_only",
         "audit_events_append_only",
         "source_identity_append_only",
+        "asds_security_audit_append_only",
     }.issubset(triggers)
 
 
@@ -123,10 +124,24 @@ def test_postgresql_append_only_triggers_reject_mutation(database_url: str) -> N
             {"identity_key": f"integration:{record_id}", "record_id": record_id},
         )
 
+    from artificial_scientist.authorization import TenantDirectory
+
+    security_event_id = TenantDirectory(database_url).audit(
+        principal_id=None,
+        tenant_id=None,
+        action="run:read",
+        target_type="run",
+        target_id="integration-run",
+        outcome="failed",
+    )
     mutations = [
         ("UPDATE research_records SET payload_json = '{}' WHERE id = :id", record_id),
         ("DELETE FROM audit_events WHERE event_id = :id", event_id),
         ("DELETE FROM source_identity WHERE record_id = :id", record_id),
+        (
+            "DELETE FROM asds_security_audit WHERE event_id = :id",
+            security_event_id,
+        ),
     ]
     for statement, identifier in mutations:
         with pytest.raises(DBAPIError):
