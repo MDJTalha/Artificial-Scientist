@@ -4,6 +4,12 @@ const configuredBase = (import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.DE
 export const API_BASE_URL = configuredBase;
 export const API_PREFIX = '/api/v1';
 
+// Keep short-lived OIDC access tokens in memory only; the auth integration supplies them.
+let apiAccessToken: string | null = null;
+export function setApiAccessToken(token: string | null): void {
+  apiAccessToken = token?.trim() || null;
+}
+
 export class ApiError extends Error {
   status: number;
   detail: unknown;
@@ -16,7 +22,13 @@ export async function apiRequest<T = Json>(path: string, init: RequestInit = {})
   const headers = new Headers(init.headers);
   headers.set('Accept', 'application/json');
   if (init.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
-  const response = await fetch(`${API_BASE_URL}${path}`, { ...init, headers, credentials: 'include' });
+  if (apiAccessToken) headers.set('Authorization', `Bearer ${apiAccessToken}`);
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...init,
+    headers,
+    // API authentication uses explicit bearer tokens, not ambient cross-origin cookies.
+    credentials: 'omit',
+  });
   const type = response.headers.get('content-type') ?? '';
   const payload: unknown = type.includes('application/json') ? await response.json() : await response.text();
   if (!response.ok) {
