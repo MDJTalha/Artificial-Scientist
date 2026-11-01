@@ -22,6 +22,7 @@ from artificial_scientist.records.models import (
     KnowledgeConceptRecord,
     KnowledgeRelationshipRecord,
     ManuscriptRecord,
+    ModelInvocationRecord,
     RecordBase,
     RecordEnvelope,
     RecordType,
@@ -44,6 +45,7 @@ MODEL_BY_TYPE: dict[str, type[RecordBase]] = {
     "knowledge_concept": KnowledgeConceptRecord,
     "knowledge_relationship": KnowledgeRelationshipRecord,
     "manuscript": ManuscriptRecord,
+    "model_invocation": ModelInvocationRecord,
 }
 
 
