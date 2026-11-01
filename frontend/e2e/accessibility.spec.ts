@@ -40,6 +40,11 @@ test.describe('research workspace', () => {
     await expect(page.getByRole('heading', { name: 'Prepare an evidence-linked research draft' })).toBeVisible()
     await expect(page.getByText(/This studio creates research drafts only/i)).toBeVisible()
 
+    await navigation.getByRole('button', { name: 'Review & governance' }).click()
+    await expect(page.getByRole('heading', { name: 'Inspect governance evidence' })).toBeVisible()
+    await expect(page.getByText(/Treat these entries as recorded assertions, not independent sign-off/i)).toBeVisible()
+    await expect(page.getByText(/Requests only; no request is interpreted as an approval/i)).toBeVisible()
+
     await navigation.getByRole('button', { name: 'Data analysis' }).click()
     await expect(page.getByRole('heading', { name: 'Explore numerical evidence' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Analyze a numeric sample' })).toBeVisible()
