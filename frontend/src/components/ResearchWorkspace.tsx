@@ -480,7 +480,7 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
     beginAction('knowledge-relation')
     setKnowledgeError(null)
     try {
-      const result = await apiClient.post<RecordEnvelope>('/api/v1/knowledge/relationships', {
+      await apiClient.post<RecordEnvelope>('/api/v1/knowledge/relationships', {
         record_type: 'knowledge_relationship',
         source_concept_id: relationshipSourceId,
         target_concept_id: relationshipTargetId,
@@ -625,6 +625,7 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
   }
 
   const apiConfigured = Boolean(apiConfiguration.baseUrl)
+  const savedForCurrentSearch = literatureResponse?.results.filter((item) => savedSourceUrls.includes(item.source_url)).length ?? 0
   const protectedNotice = import.meta.env.PROD
     ? 'Production OIDC sign-in and tenant selection are not yet connected to this frontend. Protected research-record and discovery actions will remain unavailable until a reviewed identity session is supplied.'
     : null
@@ -890,7 +891,7 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
                 {literatureResponse.results.length > 0 && (
                   <section className="workspace-card source-save-panel">
                     <div><p className="card-label">PROVENANCE CAPTURE</p><h2>Save retrieved sources to the record store</h2><p>Saving creates tenant-authorized source records with bibliographic provenance. It does not copy or license the full text.</p></div>
-                    <button className="primary-button" type="button" onClick={persistLiteratureSources} disabled={busy !== null || savedSourceUrls.length >= literatureResponse.results.length}>{busy === 'save-sources' ? 'Saving sources…' : 'Save source records (' + savedSourceUrls.length + '/' + literatureResponse.results.length + ')'}</button>
+                    <button className="primary-button" type="button" onClick={persistLiteratureSources} disabled={busy !== null || savedForCurrentSearch >= literatureResponse.results.length}>{busy === 'save-sources' ? 'Saving sources…' : 'Save source records (' + savedForCurrentSearch + '/' + literatureResponse.results.length + ')'}</button>
                   </section>
                 )}
               </>
