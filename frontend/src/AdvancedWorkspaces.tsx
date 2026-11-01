@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { FormEvent } from 'react';
 import { apiRequest } from './lib/api';
 
 type WorkspaceTab = 'experiments' | 'memory' | 'collaboration' | 'writing';
@@ -22,7 +23,7 @@ function Experiments() {
   const [title, setTitle] = useState(''), [question, setQuestion] = useState(''), [hypothesisId, setHypothesisId] = useState('');
   const [method, setMethod] = useState(''), [success, setSuccess] = useState(''), [failure, setFailure] = useState('');
   const load = async () => { const value = await request.execute(() => apiRequest('/api/v1/records?record_type=experiment_plan&limit=50')); if (value !== null) setItems(value); };
-  const create = async (event: React.FormEvent) => {
+  const create = async (event: FormEvent) => {
     event.preventDefault();
     const value = await request.execute(() => apiRequest('/api/v1/records', { method: 'POST', body: JSON.stringify({
       record_type: 'experiment_plan', title, research_question: question, hypothesis_record_id: hypothesisId, method,
@@ -71,9 +72,9 @@ function Memory() {
     {entries.length === 0 ? <div className="gate-panel"><h2>No memory drafts yet</h2><p>Add an evidence-linked item above. No sample or fabricated scientific findings are preloaded.</p></div> : <div className="workspace-grid">{entries.map((entry,index)=><article className="work-card" key={index}><span className="eyebrow">{entry.status.toUpperCase()} · SESSION ONLY</span><h2>{entry.key}</h2><p>{entry.value}</p><small className="muted">Evidence: {entry.evidence}</small><button className="text-button" onClick={()=>setEntries(current=>current.filter((_,i)=>i!==index))}>Remove draft</button></article>)}</div>}
   </section>;
 }
-function Collaboration() {
+function Collaboration({ authenticatedActor }: { authenticatedActor: string }) {
   const request = useRequest();
-  const [workflowId, setWorkflowId] = useState(''), [actor, setActor] = useState(''), [reason, setReason] = useState(''), [approvalToken, setApprovalToken] = useState('');
+  const [workflowId, setWorkflowId] = useState(''), [actor, setActor] = useState(authenticatedActor), [reason, setReason] = useState(''), [approvalToken, setApprovalToken] = useState('');
   const create = async (event: React.FormEvent) => { event.preventDefault(); await request.execute(()=>apiRequest('/api/v1/autonomy/workflows',{method:'POST',body:JSON.stringify({workflow_id:workflowId,consequential:true})})); };
   const inspect = async (event: React.FormEvent) => { event.preventDefault(); await request.execute(()=>apiRequest('/api/v1/autonomy/workflows/'+encodeURIComponent(workflowId))); };
   const transition = (action: 'plan'|'request-approval') => request.execute(()=>apiRequest('/api/v1/autonomy/workflows/'+encodeURIComponent(workflowId)+'/'+action,{method:'POST',body:JSON.stringify({actor,reason})}));
@@ -85,7 +86,7 @@ function Collaboration() {
       <div className="work-card"><span className="eyebrow">CREATE WORKFLOW</span><h2>Start a governed workflow</h2><form onSubmit={create}><label>Unique workflow ID</label><input value={workflowId} onChange={e=>setWorkflowId(e.target.value)} required maxLength={200} placeholder="project-review-2026-001"/><button className="primary-button" disabled={request.busy}>Create workflow ↗</button></form></div>
       <div className="work-card"><span className="eyebrow">INSPECT WORKFLOW</span><h2>Load current state</h2><form onSubmit={inspect}><label>Workflow ID</label><input value={workflowId} onChange={e=>setWorkflowId(e.target.value)} required/><button className="secondary-button" disabled={request.busy}>Retrieve state</button></form></div>
     </div>
-    <div className="work-card"><span className="eyebrow">STATE TRANSITIONS</span><h2>Plan or request review</h2><label>Actor identity / role label</label><input value={actor} onChange={e=>setActor(e.target.value)} required placeholder="Your authenticated operator label"/><label>Reason for transition</label><textarea value={reason} onChange={e=>setReason(e.target.value)} required rows={2}/><div className="search-row"><button className="secondary-button" disabled={request.busy||!workflowId||!actor||!reason} onClick={()=>void transition('plan')}>Move to planned</button><button className="primary-button" disabled={request.busy||!workflowId||!actor||!reason} onClick={()=>void transition('request-approval')}>Request approval</button></div>
+    <div className="work-card"><span className="eyebrow">STATE TRANSITIONS</span><h2>Plan or request review</h2><label>Authenticated account label (audit metadata)</label><input value={actor} onChange={e=>setActor(e.target.value)} required placeholder="Authenticated account label"/><label>Reason for transition</label><textarea value={reason} onChange={e=>setReason(e.target.value)} required rows={2}/><div className="search-row"><button className="secondary-button" disabled={request.busy||!workflowId||!actor||!reason} onClick={()=>void transition('plan')}>Move to planned</button><button className="primary-button" disabled={request.busy||!workflowId||!actor||!reason} onClick={()=>void transition('request-approval')}>Request approval</button></div>
       <label>Approval token (only if issued through the trusted approval process)</label><input type="password" value={approvalToken} onChange={e=>setApprovalToken(e.target.value)} autoComplete="off"/><button className="secondary-button" disabled={request.busy||!workflowId||!actor||!approvalToken} onClick={()=>void approve()}>Submit approval token</button>
     </div>
     {request.error && <div className="notice notice-error"><b>Workflow operation failed</b><span>{request.error}</span></div>}
@@ -104,9 +105,9 @@ function Writing() {
     <div className="result-card"><div className="card-title"><h2>Live manuscript preview</h2><span className="chip">LOCAL DRAFT</span></div><pre>{markdown}</pre></div>
   </section>;
 }
-export default function AdvancedWorkspaces({ tab }: { tab: WorkspaceTab }) {
+export default function AdvancedWorkspaces({ tab, authenticatedActor = '' }: { tab: WorkspaceTab; authenticatedActor?: string }) {
   if (tab === 'experiments') return <Experiments/>;
   if (tab === 'memory') return <Memory/>;
-  if (tab === 'collaboration') return <Collaboration/>;
+  if (tab === 'collaboration') return <Collaboration authenticatedActor={authenticatedActor}/>;
   return <Writing/>;
 }
