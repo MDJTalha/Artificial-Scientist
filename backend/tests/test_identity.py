@@ -213,3 +213,78 @@ def test_oidc_validator_rejects_blank_trust_values(issuer, audience):
             audience=audience,
             jwks_url="https://identity.example.test/jwks.json",
         )
+
+
+
+def test_cognito_access_token_uses_client_id_token_use_and_required_scope(monkeypatch):
+    captured = {}
+
+    class FakeJWKClient:
+        def __init__(self, url, **kwargs):
+            captured["jwks_url"] = url
+
+        def get_signing_key_from_jwt(self, token):
+            return SimpleNamespace(key="cognito-public-key")
+
+    def fake_decode(token, key, **kwargs):
+        captured["decode"] = kwargs
+        return {
+            "sub": "cognito-sub-123",
+            "iss": "https://cognito-idp.ap-southeast-1.amazonaws.com/ap-southeast-1_example",
+            "client_id": "asds-public-client",
+            "token_use": "access",
+            "scope": "openid email asds-api/access",
+            "exp": 2_000_000_000,
+            "iat": 1_900_000_000,
+        }
+
+    monkeypatch.setattr(identity, "PyJWKClient", FakeJWKClient)
+    monkeypatch.setattr(identity.jwt, "decode", fake_decode)
+    principal = identity.validate_oidc_bearer_token(
+        "signed-cognito-access-token",
+        issuer="https://cognito-idp.ap-southeast-1.amazonaws.com/ap-southeast-1_example",
+        audience="asds-public-client",
+        jwks_url="https://cognito-idp.ap-southeast-1.amazonaws.com/ap-southeast-1_example/.well-known/jwks.json",
+        audience_claim="client_id",
+        expected_token_use="access",
+        expected_scope="asds-api/access",
+    )
+
+    assert principal.subject == "cognito-sub-123"
+    assert captured["decode"]["audience"] is None
+    assert captured["decode"]["options"]["verify_aud"] is False
+
+
+def test_cognito_access_token_rejects_missing_required_scope(monkeypatch):
+    class FakeJWKClient:
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+        def get_signing_key_from_jwt(self, _token):
+            return SimpleNamespace(key="cognito-public-key")
+
+    monkeypatch.setattr(identity, "PyJWKClient", FakeJWKClient)
+    monkeypatch.setattr(
+        identity.jwt,
+        "decode",
+        lambda *_args, **_kwargs: {
+            "sub": "cognito-sub-123",
+            "iss": "https://cognito-idp.ap-southeast-1.amazonaws.com/ap-southeast-1_example",
+            "client_id": "asds-public-client",
+            "token_use": "access",
+            "scope": "openid email",
+            "exp": 2_000_000_000,
+            "iat": 1_900_000_000,
+        },
+    )
+
+    with pytest.raises(identity.InvalidIdentityError, match="required API scope"):
+        identity.validate_oidc_bearer_token(
+            "signed-cognito-access-token",
+            issuer="https://cognito-idp.ap-southeast-1.amazonaws.com/ap-southeast-1_example",
+            audience="asds-public-client",
+            jwks_url="https://cognito-idp.ap-southeast-1.amazonaws.com/ap-southeast-1_example/.well-known/jwks.json",
+            audience_claim="client_id",
+            expected_token_use="access",
+            expected_scope="asds-api/access",
+        )
