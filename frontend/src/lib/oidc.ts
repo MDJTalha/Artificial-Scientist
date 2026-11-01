@@ -21,6 +21,28 @@ export interface OidcClientConfiguration {
   production: boolean
 }
 
+
+export interface TenantMembership {
+  tenant_id: string
+  tenant_name: string
+  role: 'tenant_admin' | 'researcher' | 'viewer' | 'auditor'
+}
+
+export interface AuthenticatedSession {
+  principal_id: string
+  issuer: string
+  memberships: TenantMembership[]
+  accessToken: string
+  expiresAt: number
+}
+
+export type AuthenticationStatus =
+  | 'not-configured'
+  | 'signed-out'
+  | 'processing'
+  | 'authenticated'
+  | 'error'
+
 export interface OidcTokenResult {
   accessToken: string
   expiresAt: number
