@@ -88,6 +88,7 @@ interface JwtClaims {
   azp?: unknown
   exp?: unknown
   iat?: unknown
+  nbf?: unknown
   nonce?: unknown
   sub?: unknown
 }
@@ -346,10 +347,13 @@ async function validateIdToken(
     false,
     ["verify"],
   )
+  const signatureBytes = decodeBase64Url(segments[2])
+  const signatureBuffer = new ArrayBuffer(signatureBytes.byteLength)
+  new Uint8Array(signatureBuffer).set(signatureBytes)
   const validSignature = await crypto.subtle.verify(
     "RSASSA-PKCS1-v1_5",
     key,
-    decodeBase64Url(segments[2]),
+    signatureBuffer,
     new TextEncoder().encode(segments[0] + "." + segments[1]),
   )
   if (!validSignature) throw new Error("ID token signature validation failed.")
