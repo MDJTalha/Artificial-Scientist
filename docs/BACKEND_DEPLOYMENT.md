@@ -45,7 +45,7 @@ Never commit real secrets or put credentials in the image. Inject them from a ma
 
 ## Amazon Cognito identity provider
 
-The repository includes `infra/aws/cognito-user-pool.yaml`. It provisions an Amazon Cognito User Pool, a public OAuth authorization-code client (no client secret), PKCE-compatible hosted UI domain, and the `asds-api/access` resource-server scope. Self-registration defaults to disabled; create users through a controlled administrator workflow until tenant onboarding and abuse controls are accepted.
+The repository includes `infra/aws/cognito-user-pool.yaml`. It provisions an Amazon Cognito User Pool, a public OAuth authorization-code client (no client secret), PKCE-compatible hosted UI domain, and the `asds-api/access` resource-server scope. Self-registration defaults to disabled; create users through a controlled administrator workflow until tenant onboarding and abuse controls are accepted. After an administrator role and Cognito service access are available, deploy it with `aws cloudformation deploy --template-file infra/aws/cognito-user-pool.yaml --stack-name asds-identity --region <region> --parameter-overrides DomainPrefix=<unique-prefix> CallbackUrls=https://<frontend-domain>/auth/callback LogoutUrls=https://<frontend-domain>/ EnableSelfRegistration=false`. Inspect the change set and outputs before configuring either application.
 
 Configure the API with the CloudFormation outputs:
 
