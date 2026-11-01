@@ -54,7 +54,10 @@ def require_lab_access(
 ) -> None:
     """Require a validated, per-user OIDC identity for non-development lab access."""
     settings = get_settings()
-    database_path = getattr(settings, "database_url", None) or getattr(settings, "database_path", None)
+    database_path = (
+        getattr(settings, "database_url", None)
+        or getattr(settings, "database_path", None)
+    )
     if database_path:
         request.state.security_audit_database_path = database_path
     if settings.environment.lower() == "development":
@@ -160,7 +163,10 @@ def require_tenant_access(request: Request, action: str) -> str | None:
         request.state.authorization_audit = {
             "principal_id": principal_id,
             "tenant_id": None,
-            "database_path": getattr(settings, "database_url", None) or getattr(settings, "database_path", None),
+            "database_path": (
+        getattr(settings, "database_url", None)
+        or getattr(settings, "database_path", None)
+    ),
             "action": action,
             "target_type": "request",
             "target_id": None,
@@ -174,7 +180,10 @@ def require_tenant_access(request: Request, action: str) -> str | None:
         )
 
     tenant_id = str(parsed_tenant_id)
-    directory = TenantDirectory(getattr(settings, "database_url", None) or getattr(settings, "database_path", None))
+    directory = TenantDirectory((
+        getattr(settings, "database_url", None)
+        or getattr(settings, "database_path", None)
+    ))
     path_params = request.path_params
     target_id = next(
         (
@@ -196,7 +205,10 @@ def require_tenant_access(request: Request, action: str) -> str | None:
     request.state.authorization_audit = {
         "principal_id": principal_id,
         "tenant_id": tenant_id,
-        "database_path": getattr(settings, "database_url", None) or getattr(settings, "database_path", None),
+        "database_path": (
+        getattr(settings, "database_url", None)
+        or getattr(settings, "database_path", None)
+    ),
         "action": action,
         "target_type": target_type,
         "target_id": target_id,
