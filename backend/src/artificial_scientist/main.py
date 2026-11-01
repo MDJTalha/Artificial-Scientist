@@ -72,6 +72,7 @@ class CognitoAuthenticationMiddleware:
                 jwks_url=settings.oidc_jwks_url,
                 audience_claim=settings.oidc_audience_claim,
                 expected_token_use=settings.oidc_token_use,
+                expected_scope=settings.oidc_required_scope,
             )
         except IdentityConfigurationError:
             await self._reject(send, 503, "OIDC authentication configuration is invalid.")
