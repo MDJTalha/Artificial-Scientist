@@ -80,7 +80,8 @@ def role_allows(role: str, action: str) -> bool:
                 "discovery:assess",
                 "autonomy:workflow:create", "autonomy:workflow:read", "autonomy:workflow:write",
                 "autonomy:workflow:approve",
-                "memory:list", "memory:read", "memory:write", "memory:contradict", "memory:rollback",
+                "memory:list", "memory:read", "memory:write",
+                "memory:contradict", "memory:rollback",
             }
         if role == "viewer":
             return action in {
@@ -89,7 +90,9 @@ def role_allows(role: str, action: str) -> bool:
                 "memory:list", "memory:read",
             }
         if role == "auditor":
-            return action in {"record:read", "record:list", "record:audit:read", "memory:list", "memory:read"}
+            return action in {
+                "record:read", "record:list", "record:audit:read", "memory:list", "memory:read"
+            }
         return False
     if role == "researcher":
         return action in {
