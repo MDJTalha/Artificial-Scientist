@@ -57,7 +57,7 @@ test.describe('research workspace', () => {
   test('states which capabilities and external boundaries are actually available', async ({ page }) => {
     await page.goto('/')
     await expect(page.locator('.workspace-stat').nth(1).locator('strong')).toContainText('12')
-    await expect(page.getByText('Not connected', { exact: true })).toBeVisible()
+    await expect(page.getByText('Optional / gated', { exact: true })).toBeVisible()
     await expect(page.getByText(/hypothesis suggestions use deterministic templates/i)).toBeVisible()
     await expect(page.getByText(/Production identity, sandbox deployment, operations and independent scientific review still require live evidence/i)).toBeVisible()
 
