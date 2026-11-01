@@ -275,8 +275,11 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
   const [mathVariable, setMathVariable] = useState('x')
   const [mathResponse, setMathResponse] = useState<SymbolicResponse | null>(null)
 
+  const apiConfigured = Boolean(apiConfiguration.baseUrl)
+  const protectedActionsAvailable = apiConfigured && !import.meta.env.PROD
+
   useEffect(() => {
-    if (activeView !== 'records' || !apiConfiguration.baseUrl) return
+    if (activeView !== 'records' || !protectedActionsAvailable) return
 
     const controller = new AbortController()
     setRecordError(null)
@@ -291,7 +294,7 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
       })
 
     return () => controller.abort()
-  }, [activeView, recordsRefresh])
+  }, [activeView, recordsRefresh, protectedActionsAvailable])
 
   useEffect(() => {
     if (!plotUrl) return
@@ -299,7 +302,7 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
   }, [plotUrl])
 
   useEffect(() => {
-    if (activeView !== 'knowledge' || !apiConfiguration.baseUrl) return
+    if (activeView !== 'knowledge' || !protectedActionsAvailable) return
 
     const controller = new AbortController()
     setKnowledgeError(null)
@@ -324,7 +327,7 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
       })
 
     return () => controller.abort()
-  }, [activeView, knowledgeRefresh])
+  }, [activeView, knowledgeRefresh, protectedActionsAvailable])
 
   function beginAction(action: Exclude<BusyAction, null>) {
     setBusy(action)
@@ -703,7 +706,6 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
     if (view === 'records') setRecordsRefresh((value) => value + 1)
   }
 
-  const apiConfigured = Boolean(apiConfiguration.baseUrl)
   const savedForCurrentSearch = literatureResponse?.results.filter((item) => savedSourceUrls.includes(item.source_url)).length ?? 0
   const protectedNotice = import.meta.env.PROD
     ? 'Production OIDC sign-in and tenant selection are not yet connected to this frontend. Protected research-record and discovery actions will remain unavailable until a reviewed identity session is supplied.'
@@ -790,9 +792,9 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
                 <p>Health endpoint only; not a database or production-readiness certificate.</p>
               </article>
               <article className="workspace-stat">
-                <span className="card-label">LIVE WORKSPACES</span>
+                <span className="card-label">WORKSPACES IMPLEMENTED</span>
                 <strong>7 <small>/ 12</small></strong>
-                <p>Command center, agenda, literature, knowledge graph, hypothesis, analysis and mathematics.</p>
+                <p>Seven implemented screens. Protected records and discovery actions remain gated until reviewed OIDC sign-in and tenant selection are connected.</p>
               </article>
               <article className="workspace-stat">
                 <span className="card-label">AI INFERENCE</span>
@@ -867,10 +869,10 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
                   <label htmlFor="domain-context">Domain and boundary context</label>
                   <input id="domain-context" value={domainContext} onChange={(event) => setDomainContext(event.target.value)} maxLength={1000} placeholder="e.g. materials science; room temperature; controlled laboratory dataset" />
                   <div className="form-actions">
-                    <button className="primary-button" type="submit" disabled={busy !== null || !apiConfigured}>
+                    <button className="primary-button" type="submit" disabled={busy !== null || !protectedActionsAvailable}>
                       {busy === 'create-task' ? 'Saving task…' : 'Save research task'}
                     </button>
-                    <button className="secondary-button" type="button" disabled={busy !== null || !apiConfigured || researchQuestion.trim().length < 10} onClick={decomposeQuestion}>
+                    <button className="secondary-button" type="button" disabled={busy !== null || !protectedActionsAvailable || researchQuestion.trim().length < 10} onClick={decomposeQuestion}>
                       {busy === 'decompose' ? 'Structuring question…' : 'Structure question'}
                     </button>
                   </div>
@@ -970,7 +972,7 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
                 {literatureResponse.results.length > 0 && (
                   <section className="workspace-card source-save-panel">
                     <div><p className="card-label">PROVENANCE CAPTURE</p><h2>Save retrieved sources to the record store</h2><p>Saving creates tenant-authorized source records with bibliographic provenance. It does not copy or license the full text.</p></div>
-                    <button className="primary-button" type="button" onClick={persistLiteratureSources} disabled={busy !== null || savedForCurrentSearch >= literatureResponse.results.length}>{busy === 'save-sources' ? 'Saving sources…' : 'Save source records (' + savedForCurrentSearch + '/' + literatureResponse.results.length + ')'}</button>
+                    <button className="primary-button" type="button" onClick={persistLiteratureSources} disabled={busy !== null || !protectedActionsAvailable || savedForCurrentSearch >= literatureResponse.results.length}>{busy === 'save-sources' ? 'Saving sources…' : 'Save source records (' + savedForCurrentSearch + '/' + literatureResponse.results.length + ')'}</button>
                   </section>
                 )}
               </>
@@ -998,7 +1000,7 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
                     <div><label htmlFor="concept-domain">Scientific domain</label><select id="concept-domain" value={conceptDomain} onChange={(event) => setConceptDomain(event.target.value)}>{(knowledgeVocabulary?.scientific_domains ?? ['interdisciplinary']).map((item) => <option key={item} value={item}>{item.replaceAll('_', ' ')}</option>)}</select></div>
                     <div><label htmlFor="concept-type">Concept type</label><select id="concept-type" value={conceptType} onChange={(event) => setConceptType(event.target.value)}>{(knowledgeVocabulary?.concept_types ?? ['entity']).map((item) => <option key={item} value={item}>{item.replaceAll('_', ' ')}</option>)}</select></div>
                   </div>
-                  <button className="primary-button" type="submit" disabled={busy !== null || !apiConfigured || !knowledgeVocabulary}>{busy === 'knowledge-create' ? 'Saving concept…' : 'Save proposed concept'}</button>
+                  <button className="primary-button" type="submit" disabled={busy !== null || !protectedActionsAvailable || !knowledgeVocabulary}>{busy === 'knowledge-create' ? 'Saving concept…' : 'Save proposed concept'}</button>
                 </form>
               </section>
               <section className="workspace-card">
@@ -1010,15 +1012,16 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
                     <div className="vocabulary-tags">{knowledgeVocabulary.scientific_domains.map((item) => <span key={item}>{item.replaceAll('_', ' ')}</span>)}</div>
                     <p className="form-help">{knowledgeVocabulary.note}</p>
                   </>
-                ) : <div className="empty-state"><strong>Loading vocabulary</strong><p>The controlled vocabulary is read from the backend, not hard-coded as a complete ontology.</p></div>}
+                ) : <div className="empty-state"><strong>{protectedActionsAvailable ? 'Loading vocabulary' : 'Sign-in required'}</strong><p>{protectedActionsAvailable ? 'The controlled vocabulary is read from the backend, not hard-coded as a complete ontology.' : 'Concept search and graph operations require authenticated tenant access. Production identity is not yet connected to this frontend.'}</p></div>}
               </section>
             </div>
             <section className="workspace-card knowledge-registry">
               <div className="section-heading"><div><p className="card-label">TENANT-SCOPED CONCEPT SEARCH</p><h2>{knowledgeTotal} concept record(s)</h2></div><span className="section-index">IMMUTABLE RECORDS</span></div>
               <form className="workspace-search-form" onSubmit={searchKnowledgeConcepts}>
                 <div className="workspace-search-field"><label htmlFor="knowledge-search">Search concepts, aliases or definitions</label><input id="knowledge-search" value={knowledgeSearch} onChange={(event) => setKnowledgeSearch(event.target.value)} minLength={2} maxLength={200} placeholder="Search the concept registry" /></div>
-                <button className="primary-button" type="submit" disabled={busy !== null || !apiConfigured}>{busy === 'knowledge-search' ? 'Searching…' : 'Search concepts'}</button>
+                <button className="primary-button" type="submit" disabled={busy !== null || !protectedActionsAvailable}>{busy === 'knowledge-search' ? 'Searching…' : 'Search concepts'}</button>
               </form>
+              {!protectedActionsAvailable && <div className="workspace-alert workspace-alert-warning" role="note">Authenticated tenant access is required to browse and modify concept records. Production OIDC integration is pending.</div>}
               {knowledgeConcepts.length === 0 ? (
                 <div className="empty-state"><span>⌘</span><strong>No concept records found</strong><p>Create a proposed concept or search a broader term. Concepts are not automatically merged by similar names.</p></div>
               ) : (
@@ -1029,7 +1032,7 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
                       <h3>{String(concept.payload.preferred_label ?? 'Untitled concept')}</h3>
                       <p>{String(concept.payload.definition ?? '')}</p>
                       <small>{String(concept.payload.concept_type ?? 'other').replaceAll('_', ' ')} · {concept.id}</small>
-                      <button className="secondary-button" type="button" onClick={() => void loadKnowledgeGraph(concept.id)} disabled={busy !== null}>Explore neighborhood</button>
+                      <button className="secondary-button" type="button" onClick={() => void loadKnowledgeGraph(concept.id)} disabled={busy !== null || !protectedActionsAvailable}>Explore neighborhood</button>
                     </article>
                   ))}
                 </div>
@@ -1052,7 +1055,7 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
                     {knowledgeConcepts.map((concept) => <option key={concept.id} value={concept.id}>{String(concept.payload.preferred_label ?? concept.id)}</option>)}
                   </select>
                   <p className="form-help">New relationships are saved as proposed assertions without an evidence source. They must be reviewed before use as knowledge.</p>
-                  <button className="primary-button" type="submit" disabled={busy !== null || !apiConfigured || knowledgeConcepts.length < 2 || relationshipSourceId === relationshipTargetId}>{busy === 'knowledge-relation' ? 'Saving relationship…' : 'Save proposed relationship'}</button>
+                  <button className="primary-button" type="submit" disabled={busy !== null || !protectedActionsAvailable || knowledgeConcepts.length < 2 || relationshipSourceId === relationshipTargetId}>{busy === 'knowledge-relation' ? 'Saving relationship…' : 'Save proposed relationship'}</button>
                 </form>
               </section>
               <section className="workspace-card">
@@ -1095,7 +1098,7 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
                 <div><label htmlFor="hyp-context">Domain context</label><input id="hyp-context" value={domainContext} onChange={(event) => setDomainContext(event.target.value)} maxLength={1000} /></div>
               </div>
               <div className="form-actions">
-                <button className="primary-button" type="button" disabled={busy !== null || !apiConfigured || researchQuestion.trim().length < 10 || independentVariable.trim().length < 2 || dependentVariable.trim().length < 2 || systemOrPopulation.trim().length < 2} onClick={() => void generateHypotheses()}>{busy === 'generate' ? 'Generating…' : 'Generate candidate templates'}</button>
+                <button className="primary-button" type="button" disabled={busy !== null || !protectedActionsAvailable || researchQuestion.trim().length < 10 || independentVariable.trim().length < 2 || dependentVariable.trim().length < 2 || systemOrPopulation.trim().length < 2} onClick={() => void generateHypotheses()}>{busy === 'generate' ? 'Generating…' : 'Generate candidate templates'}</button>
                 <button className="secondary-button" type="button" onClick={() => selectView('missions')}>Edit research mission</button>
               </div>
             </section>
@@ -1117,8 +1120,8 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
                   ))}
                 </div>
                 <div className="form-actions">
-                  <button className="secondary-button" type="button" onClick={screenPriorWork} disabled={busy !== null || !apiConfigured}>{busy === 'prior-work' ? 'Screening metadata…' : 'Screen prior work'}</button>
-                  <button className="primary-button" type="button" onClick={assessAndPersistHypotheses} disabled={busy !== null || !apiConfigured}>{busy === 'assess' ? 'Assessing and saving…' : 'Assess and save candidates'}</button>
+                  <button className="secondary-button" type="button" onClick={screenPriorWork} disabled={busy !== null || !protectedActionsAvailable}>{busy === 'prior-work' ? 'Screening metadata…' : 'Screen prior work'}</button>
+                  <button className="primary-button" type="button" onClick={assessAndPersistHypotheses} disabled={busy !== null || !protectedActionsAvailable}>{busy === 'assess' ? 'Assessing and saving…' : 'Assess and save candidates'}</button>
                 </div>
                 {priorWorkResponse && (
                   <section className="workspace-card">
@@ -1264,8 +1267,9 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
             </div>
             <section className="workspace-card">
               <div className="section-heading"><div><p className="card-label">PERSISTED RECORDS</p><h2>{recordTotal} total record(s)</h2></div><button className="secondary-button" type="button" onClick={() => setRecordsRefresh((value) => value + 1)}>Refresh records</button></div>
+              {!protectedActionsAvailable && <div className="workspace-alert workspace-alert-warning" role="note">Record browsing requires an authenticated tenant session. Production OIDC sign-in and tenant selection are pending.</div>}
               {recordError && <div className="workspace-alert workspace-alert-error" role="alert">{recordError}</div>}
-              {records.length === 0 && !recordError ? (
+              {records.length === 0 && !recordError && protectedActionsAvailable ? (
                 <div className="empty-state"><span>▤</span><strong>No records returned</strong><p>Create a research task, save source metadata or assess hypotheses to begin a traceable record history.</p></div>
               ) : (
                 <div className="records-table-wrap">
