@@ -16,7 +16,8 @@ RECORD_ACTIONS = frozenset({
     "discovery:generate",
     "discovery:prior-work-screen",
     "discovery:assess",
-    "memory:list", "memory:read", "memory:write", "memory:contradict", "memory:rollback",
+    "memory:list", "memory:read", "memory:write",
+    "memory:contradict", "memory:rollback",
     "manuscript:list", "manuscript:read", "manuscript:create",
 })
 
