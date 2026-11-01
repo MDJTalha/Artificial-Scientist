@@ -37,7 +37,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main() -> int:
     args = build_parser().parse_args()
-    directory = TenantDirectory(get_settings().database_path)
+    directory = TenantDirectory(get_settings().database_url or get_settings().database_path)
     principal_id = directory.register_principal(args.issuer, args.subject)
     tenant_id = directory.create_tenant(args.tenant_key, args.tenant_name)
     directory.grant_membership(principal_id, tenant_id, args.role)
