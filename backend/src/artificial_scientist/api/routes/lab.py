@@ -2,7 +2,6 @@
 
 import asyncio
 import hashlib
-import hmac
 import io
 import json
 import re
