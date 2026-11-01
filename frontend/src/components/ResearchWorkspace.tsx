@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 
 import { apiClient, apiConfiguration } from '../lib/api'
 import type { ServiceStatus } from '../lib/status'
+import type { AuthenticatedSession, AuthenticationStatus } from '../lib/oidc'
 
 type WorkspaceView = 'overview' | 'missions' | 'literature' | 'knowledge' | 'hypotheses' | 'lab' | 'analysis' | 'journal' | 'memory' | 'manuscript' | 'governance' | 'math' | 'records'
 type BusyAction = 'create-task' | 'decompose' | 'literature' | 'save-sources' | 'knowledge-search' | 'knowledge-create' | 'knowledge-relation' | 'knowledge-graph' | 'generate' | 'prior-work' | 'assess' | 'statistics' | 'plot' | 'lab-run' | 'lab-history' | 'lab-verify' | 'memory-load' | 'memory-save' | 'memory-history' | 'memory-contradict' | 'memory-rollback' | 'manuscript-load' | 'manuscript-create' | 'governance-load' | 'math' | null
@@ -9,6 +10,13 @@ type BusyAction = 'create-task' | 'decompose' | 'literature' | 'save-sources' | 
 interface ResearchWorkspaceProps {
   apiStatus: ServiceStatus
   onRetry: () => void
+  authStatus: AuthenticationStatus
+  authSession: AuthenticatedSession | null
+  selectedTenantId: string | null
+  authError: string | null
+  onSignIn: () => void
+  onSignOut: () => void
+  onSelectTenant: (tenantId: string) => void
 }
 
 interface RecordEnvelope {
@@ -350,7 +358,17 @@ function formatDate(value: string): string {
     : date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
 }
 
-export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorkspaceProps) {
+export default function ResearchWorkspace({
+  apiStatus,
+  onRetry,
+  authStatus,
+  authSession,
+  selectedTenantId,
+  authError,
+  onSignIn,
+  onSignOut,
+  onSelectTenant,
+}: ResearchWorkspaceProps) {
   const [activeView, setActiveView] = useState<WorkspaceView>('overview')
   const [busy, setBusy] = useState<BusyAction>(null)
   const [notice, setNotice] = useState<string | null>(null)
@@ -474,7 +492,12 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
   const [mathResponse, setMathResponse] = useState<SymbolicResponse | null>(null)
 
   const apiConfigured = Boolean(apiConfiguration.baseUrl)
-  const protectedActionsAvailable = apiConfigured && !import.meta.env.PROD
+  const hasSelectedMembership = Boolean(
+    authSession &&
+    selectedTenantId &&
+    authSession.memberships.some((membership) => membership.tenant_id === selectedTenantId),
+  )
+  const protectedActionsAvailable = apiConfigured && (!import.meta.env.PROD || hasSelectedMembership)
   const labExecutionAvailable = apiConfigured && !import.meta.env.PROD
 
   useEffect(() => {
@@ -1253,8 +1276,14 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
 
   const savedForCurrentSearch = literatureResponse?.results.filter((item) => savedSourceUrls.includes(item.source_url)).length ?? 0
   const protectedNotice = import.meta.env.PROD
-    ? 'Production OIDC sign-in and tenant selection are not yet connected to this frontend. Protected research-record and discovery actions will remain unavailable until a reviewed identity session is supplied.'
-    : null
+    ? !authSession
+      ? 'Sign in using the configured OIDC provider before accessing protected research data.'
+      : authSession.memberships.length === 0
+        ? 'Your identity is authenticated, but no active tenant membership has been provisioned. Ask a tenant administrator to provision your account.'
+        : !hasSelectedMembership
+          ? 'Choose one of your active tenant memberships to access protected research records and services.'
+          : null
+    : 'Local development mode bypasses OIDC authorization. Use only isolated development data; this mode is not suitable for shared or production deployments.'
 
   return (
     <div className="app-shell">
@@ -1302,6 +1331,32 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
             <span>{apiStatus === 'connected' ? 'HEALTH ENDPOINT OK' : apiStatus === 'unavailable' ? 'API UNAVAILABLE' : 'CHECKING API'}</span>
             <button className="topbar-retry" type="button" onClick={onRetry}>Refresh</button>
           </div>
+          <div className="auth-controls" aria-label="Authentication and tenant">
+            {authStatus === 'authenticated' && authSession ? (
+              <>
+                <span className="auth-session-label">SIGNED IN</span>
+                {authSession.memberships.length > 0 ? (
+                  <select aria-label="Select active tenant" value={selectedTenantId ?? ''} onChange={(event) => onSelectTenant(event.target.value)}>
+                    <option value="">Choose tenant…</option>
+                    {authSession.memberships.map((membership) => (
+                      <option key={membership.tenant_id} value={membership.tenant_id}>
+                        {membership.tenant_name} · {membership.role.replaceAll('_', ' ')}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <span className="auth-session-label">NO TENANT ACCESS</span>
+                )}
+                <button className="topbar-retry" type="button" onClick={onSignOut}>Sign out</button>
+              </>
+            ) : authStatus === 'processing' ? (
+              <span className="auth-session-label" role="status">SIGNING IN…</span>
+            ) : authStatus === 'not-configured' ? (
+              <span className="auth-session-label" title="Configure the VITE_OIDC_* variables">OIDC NOT CONFIGURED</span>
+            ) : (
+              <button className="secondary-button auth-signin-button" type="button" onClick={onSignIn} disabled={!apiConfigured}>Sign in</button>
+            )}
+          </div>
         </header>
 
         {!apiConfigured && (
@@ -1311,6 +1366,7 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
           </div>
         )}
         {protectedNotice && <div className="workspace-alert workspace-alert-warning" role="note">{protectedNotice}</div>}
+        {authError && <div className="workspace-alert workspace-alert-error" role="alert">{authError}</div>}
         {notice && <div className="workspace-message" role="status" aria-live="polite">{notice}</div>}
         {pageError && <div className="workspace-alert workspace-alert-error" role="alert">{pageError}</div>}
 
