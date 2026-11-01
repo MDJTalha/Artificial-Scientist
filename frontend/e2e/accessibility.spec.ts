@@ -5,6 +5,7 @@ test.describe('research workspace', () => {
   test('supports keyboard navigation between functional workspaces', async ({ page }) => {
     await page.goto('/')
     await expect(page.getByRole('heading', { name: /From research question/i })).toBeVisible()
+    await expect(page.getByText('OIDC NOT CONFIGURED', { exact: true })).toBeVisible()
 
     const navigation = page.getByRole('navigation', { name: 'Research workspaces' })
     await expect(navigation).toBeVisible()
@@ -58,7 +59,7 @@ test.describe('research workspace', () => {
     await expect(page.locator('.workspace-stat').nth(1).locator('strong')).toContainText('12')
     await expect(page.getByText('Not connected', { exact: true })).toBeVisible()
     await expect(page.getByText(/hypothesis suggestions use deterministic templates/i)).toBeVisible()
-    await expect(page.getByText(/identity, sandbox deployment, operations and external scientific review remain open/i)).toBeVisible()
+    await expect(page.getByText(/Production identity, sandbox deployment, operations and independent scientific review still require live evidence/i)).toBeVisible()
 
     await page.getByRole('button', { name: 'Knowledge graph' }).click()
     await expect(page.getByRole('heading', { name: 'Build a traceable concept graph' })).toBeVisible()
