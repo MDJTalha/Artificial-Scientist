@@ -3,8 +3,8 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { apiClient, apiConfiguration } from '../lib/api'
 import type { ServiceStatus } from '../lib/status'
 
-type WorkspaceView = 'overview' | 'missions' | 'literature' | 'hypotheses' | 'math' | 'records'
-type BusyAction = 'create-task' | 'decompose' | 'literature' | 'save-sources' | 'generate' | 'prior-work' | 'assess' | 'math' | null
+type WorkspaceView = 'overview' | 'missions' | 'literature' | 'knowledge' | 'hypotheses' | 'math' | 'records'
+type BusyAction = 'create-task' | 'decompose' | 'literature' | 'save-sources' | 'knowledge-search' | 'knowledge-create' | 'knowledge-relation' | 'knowledge-graph' | 'generate' | 'prior-work' | 'assess' | 'math' | null
 
 interface ResearchWorkspaceProps {
   apiStatus: ServiceStatus
@@ -24,6 +24,31 @@ interface RecordListResponse {
   total: number
   limit: number
   offset: number
+}
+
+interface KnowledgeVocabulary {
+  concept_types: string[]
+  scientific_domains: string[]
+  concept_statuses: string[]
+  relationship_predicates: string[]
+  relationship_statuses: string[]
+  note: string
+}
+
+interface KnowledgeConceptResponse {
+  items: RecordEnvelope[]
+  total: number
+  limit: number
+  offset: number
+}
+
+interface KnowledgeGraphResponse {
+  root: RecordEnvelope
+  nodes: RecordEnvelope[]
+  relationships: RecordEnvelope[]
+  depth: number
+  truncated: boolean
+  note: string
 }
 
 interface DecompositionResponse {
@@ -135,6 +160,7 @@ const navigation: { id: WorkspaceView; label: string; symbol: string; detail: st
   { id: 'overview', label: 'Command center', symbol: '◫', detail: 'System overview and workspace maturity' },
   { id: 'missions', label: 'Research agenda', symbol: '⌖', detail: 'Create and structure research questions' },
   { id: 'literature', label: 'Literature explorer', symbol: '⌕', detail: 'Search scholarly metadata and save evidence' },
+  { id: 'knowledge', label: 'Knowledge graph', symbol: '⌘', detail: 'Create concepts, controlled vocabulary and evidence-linked relationships' },
   { id: 'hypotheses', label: 'Hypothesis lab', symbol: '◇', detail: 'Compare, screen and assess candidate hypotheses' },
   { id: 'math', label: 'Mathematics workbench', symbol: '∑', detail: 'Bounded symbolic calculations' },
   { id: 'records', label: 'Research records', symbol: '▤', detail: 'Browse immutable, provenance-aware records' },
@@ -144,7 +170,8 @@ const workspaceRoadmap = [
   { name: 'Scientific Command Center', status: 'AVAILABLE', note: 'Runtime health, maturity and release posture.' },
   { name: 'Research Agenda & Problem Observatory', status: 'AVAILABLE', note: 'Create tasks and decompose questions.' },
   { name: 'Literature & Evidence Explorer', status: 'AVAILABLE', note: 'OpenAlex and Crossref metadata retrieval.' },
-  { name: 'Scientific Knowledge Graph & Vocabulary', status: 'NEXT', note: 'Concept search, relationships and graph navigation.' },
+  { name: 'Scientific Knowledge Graph & Vocabulary', status: 'AVAILABLE', note: 'Create, search and explore tenant-scoped concepts and relationship assertions.' },
+
   { name: 'Hypothesis & Discovery Lab', status: 'AVAILABLE', note: 'Bounded templates, prior-work screen and assessment.' },
   { name: 'Mathematics & Formal Reasoning Workbench', status: 'AVAILABLE', note: 'Bounded symbolic calculation and review notes.' },
   { name: 'Computational Laboratory & Simulation Center', status: 'BACKEND READY / UI NEXT', note: 'Execution UI remains gated on reviewed sandbox deployment.' },
@@ -195,6 +222,21 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
   const [literatureResponse, setLiteratureResponse] = useState<LiteratureResponse | null>(null)
   const [savedSourceUrls, setSavedSourceUrls] = useState<string[]>([])
 
+  const [knowledgeVocabulary, setKnowledgeVocabulary] = useState<KnowledgeVocabulary | null>(null)
+  const [knowledgeConcepts, setKnowledgeConcepts] = useState<RecordEnvelope[]>([])
+  const [knowledgeTotal, setKnowledgeTotal] = useState(0)
+  const [knowledgeSearch, setKnowledgeSearch] = useState('')
+  const [knowledgeRefresh, setKnowledgeRefresh] = useState(0)
+  const [conceptLabel, setConceptLabel] = useState('')
+  const [conceptDefinition, setConceptDefinition] = useState('')
+  const [conceptDomain, setConceptDomain] = useState('interdisciplinary')
+  const [conceptType, setConceptType] = useState('entity')
+  const [relationshipSourceId, setRelationshipSourceId] = useState('')
+  const [relationshipTargetId, setRelationshipTargetId] = useState('')
+  const [relationshipPredicate, setRelationshipPredicate] = useState('related_to')
+  const [knowledgeGraph, setKnowledgeGraph] = useState<KnowledgeGraphResponse | null>(null)
+  const [knowledgeError, setKnowledgeError] = useState<string | null>(null)
+
   const [hypothesisResponse, setHypothesisResponse] = useState<HypothesisGenerationResponse | null>(null)
   const [priorWorkResponse, setPriorWorkResponse] = useState<PriorWorkResponse | null>(null)
   const [assessmentResponse, setAssessmentResponse] = useState<AssessmentResponse | null>(null)
@@ -226,6 +268,34 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
 
     return () => controller.abort()
   }, [activeView, recordsRefresh])
+
+  useEffect(() => {
+    if (activeView !== 'knowledge' || !apiConfiguration.baseUrl) return
+
+    const controller = new AbortController()
+    setKnowledgeError(null)
+    Promise.all([
+      apiClient.get<KnowledgeVocabulary>('/api/v1/knowledge/vocabulary', { signal: controller.signal }),
+      apiClient.get<KnowledgeConceptResponse>('/api/v1/knowledge/concepts?limit=50&offset=0', { signal: controller.signal }),
+    ])
+      .then(([vocabulary, result]) => {
+        setKnowledgeVocabulary(vocabulary)
+        setKnowledgeConcepts(result.items)
+        setKnowledgeTotal(result.total)
+        setConceptDomain((current) => vocabulary.scientific_domains.includes(current) ? current : 'interdisciplinary')
+        setConceptType((current) => vocabulary.concept_types.includes(current) ? current : 'entity')
+        setRelationshipPredicate((current) => vocabulary.relationship_predicates.includes(current) ? current : 'related_to')
+        if (result.items.length > 0) {
+          setRelationshipSourceId((current) => current || result.items[0].id)
+          if (result.items.length > 1) setRelationshipTargetId((current) => current || result.items[1].id)
+        }
+      })
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted) setKnowledgeError(errorText(error))
+      })
+
+    return () => controller.abort()
+  }, [activeView, knowledgeRefresh])
 
   function beginAction(action: Exclude<BusyAction, null>) {
     setBusy(action)
@@ -346,6 +416,105 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
         ' failed. Each saved source remains unassessed until a researcher reviews the original material.',
     )
     finishAction()
+  }
+
+  async function searchKnowledgeConcepts(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    beginAction('knowledge-search')
+    setKnowledgeError(null)
+    try {
+      const query = knowledgeSearch.trim()
+      const path = '/api/v1/knowledge/concepts?limit=50&offset=0' + (query ? '&query=' + encodeURIComponent(query) : '')
+      const result = await apiClient.get<KnowledgeConceptResponse>(path)
+      setKnowledgeConcepts(result.items)
+      setKnowledgeTotal(result.total)
+      setKnowledgeGraph(null)
+    } catch (error) {
+      setKnowledgeError(errorText(error))
+    } finally {
+      finishAction()
+    }
+  }
+
+  async function createKnowledgeConcept(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    beginAction('knowledge-create')
+    setKnowledgeError(null)
+    try {
+      const result = await apiClient.post<RecordEnvelope>('/api/v1/knowledge/concepts', {
+        record_type: 'knowledge_concept',
+        preferred_label: conceptLabel.trim(),
+        definition: conceptDefinition.trim(),
+        aliases: [],
+        concept_type: conceptType,
+        scientific_domain: conceptDomain,
+        language: 'en',
+        status: 'proposed',
+        external_identifiers: {},
+        source_record_ids: [],
+        assessment_notes: 'New concept captured by a researcher; definition and vocabulary mapping require domain review.',
+        provenance: {
+          method: 'human_provided',
+          notes: 'Created in the ASDS Scientific Knowledge Graph workspace.',
+        },
+      })
+      setKnowledgeConcepts((items) => [result, ...items.filter((item) => item.id !== result.id)])
+      setKnowledgeTotal((value) => value + 1)
+      setConceptLabel('')
+      setConceptDefinition('')
+      setNotice('Concept saved as a proposed, provenance-aware knowledge record. It is not treated as an established fact.')
+      setKnowledgeRefresh((value) => value + 1)
+    } catch (error) {
+      setKnowledgeError(errorText(error))
+    } finally {
+      finishAction()
+    }
+  }
+
+  async function createKnowledgeRelationship(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!relationshipSourceId || !relationshipTargetId || relationshipSourceId === relationshipTargetId) {
+      setKnowledgeError('Choose two different concepts before creating a relationship.')
+      return
+    }
+    beginAction('knowledge-relation')
+    setKnowledgeError(null)
+    try {
+      const result = await apiClient.post<RecordEnvelope>('/api/v1/knowledge/relationships', {
+        record_type: 'knowledge_relationship',
+        source_concept_id: relationshipSourceId,
+        target_concept_id: relationshipTargetId,
+        predicate: relationshipPredicate,
+        evidence_source_record_ids: [],
+        assertion_status: 'proposed',
+        notes: 'Researcher-created relationship assertion; not independently verified.',
+        provenance: {
+          method: 'human_provided',
+          notes: 'Created in the ASDS Scientific Knowledge Graph workspace.',
+        },
+      })
+      setNotice('Relationship saved with proposed status. It is an assertion requiring evidence and review, not a verified scientific fact.')
+      setKnowledgeGraph(null)
+      setKnowledgeRefresh((value) => value + 1)
+    } catch (error) {
+      setKnowledgeError(errorText(error))
+    } finally {
+      finishAction()
+    }
+  }
+
+  async function loadKnowledgeGraph(conceptId: string) {
+    beginAction('knowledge-graph')
+    setKnowledgeError(null)
+    try {
+      const path = '/api/v1/knowledge/graph/neighborhood?concept_id=' + encodeURIComponent(conceptId) + '&depth=2&limit=50'
+      const result = await apiClient.get<KnowledgeGraphResponse>(path)
+      setKnowledgeGraph(result)
+    } catch (error) {
+      setKnowledgeError(errorText(error))
+    } finally {
+      finishAction()
+    }
   }
 
   async function generateHypotheses() {
@@ -542,8 +711,8 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
               </article>
               <article className="workspace-stat">
                 <span className="card-label">LIVE WORKSPACES</span>
-                <strong>5 <small>/ 12</small></strong>
-                <p>Command center, agenda, literature, hypothesis and mathematics.</p>
+                <strong>6 <small>/ 12</small></strong>
+                <p>Command center, agenda, literature, knowledge graph, hypothesis and mathematics.</p>
               </article>
               <article className="workspace-stat">
                 <span className="card-label">AI INFERENCE</span>
@@ -726,6 +895,106 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
                 )}
               </>
             )}
+          </section>
+        )}
+
+        {activeView === 'knowledge' && (
+          <section className="workspace-page">
+            <div className="page-heading">
+              <p className="card-label">SCIENTIFIC KNOWLEDGE GRAPH & VOCABULARY</p>
+              <h1>Build a traceable concept graph</h1>
+              <p>Create versioned concepts, search controlled scientific vocabulary, assert typed relationships and inspect bounded graph neighborhoods. Proposed links are not scientific facts.</p>
+            </div>
+            {knowledgeError && <div className="workspace-alert workspace-alert-error" role="alert">{knowledgeError}</div>}
+            <div className="workspace-two-column">
+              <section className="workspace-card">
+                <div className="section-heading"><div><p className="card-label">CONCEPT REGISTRY</p><h2>Create a concept</h2></div><span className="section-index">PROPOSED / NEW</span></div>
+                <form className="workspace-form" onSubmit={createKnowledgeConcept}>
+                  <label htmlFor="concept-label">Preferred label</label>
+                  <input id="concept-label" value={conceptLabel} onChange={(event) => setConceptLabel(event.target.value)} minLength={2} maxLength={250} required placeholder="e.g. Thermal conductivity" />
+                  <label htmlFor="concept-definition">Definition</label>
+                  <textarea id="concept-definition" value={conceptDefinition} onChange={(event) => setConceptDefinition(event.target.value)} minLength={10} maxLength={4000} required rows={4} placeholder="Provide a precise definition and note the intended scientific context." />
+                  <div className="variable-grid">
+                    <div><label htmlFor="concept-domain">Scientific domain</label><select id="concept-domain" value={conceptDomain} onChange={(event) => setConceptDomain(event.target.value)}>{(knowledgeVocabulary?.scientific_domains ?? ['interdisciplinary']).map((item) => <option key={item} value={item}>{item.replaceAll('_', ' ')}</option>)}</select></div>
+                    <div><label htmlFor="concept-type">Concept type</label><select id="concept-type" value={conceptType} onChange={(event) => setConceptType(event.target.value)}>{(knowledgeVocabulary?.concept_types ?? ['entity']).map((item) => <option key={item} value={item}>{item.replaceAll('_', ' ')}</option>)}</select></div>
+                  </div>
+                  <button className="primary-button" type="submit" disabled={busy !== null || !apiConfigured || !knowledgeVocabulary}>{busy === 'knowledge-create' ? 'Saving concept…' : 'Save proposed concept'}</button>
+                </form>
+              </section>
+              <section className="workspace-card">
+                <div className="section-heading"><div><p className="card-label">CONTROLLED VOCABULARY</p><h2>Supported terms and domains</h2></div><span className="section-index">API / VOCABULARY</span></div>
+                {knowledgeVocabulary ? (
+                  <>
+                    <div className="vocabulary-summary"><div><strong>{knowledgeVocabulary.scientific_domains.length}</strong><span>scientific domains</span></div><div><strong>{knowledgeVocabulary.concept_types.length}</strong><span>concept types</span></div><div><strong>{knowledgeVocabulary.relationship_predicates.length}</strong><span>relationship predicates</span></div></div>
+                    <h3>Scientific domains</h3>
+                    <div className="vocabulary-tags">{knowledgeVocabulary.scientific_domains.map((item) => <span key={item}>{item.replaceAll('_', ' ')}</span>)}</div>
+                    <p className="form-help">{knowledgeVocabulary.note}</p>
+                  </>
+                ) : <div className="empty-state"><strong>Loading vocabulary</strong><p>The controlled vocabulary is read from the backend, not hard-coded as a complete ontology.</p></div>}
+              </section>
+            </div>
+            <section className="workspace-card knowledge-registry">
+              <div className="section-heading"><div><p className="card-label">TENANT-SCOPED CONCEPT SEARCH</p><h2>{knowledgeTotal} concept record(s)</h2></div><span className="section-index">IMMUTABLE RECORDS</span></div>
+              <form className="workspace-search-form" onSubmit={searchKnowledgeConcepts}>
+                <div className="workspace-search-field"><label htmlFor="knowledge-search">Search concepts, aliases or definitions</label><input id="knowledge-search" value={knowledgeSearch} onChange={(event) => setKnowledgeSearch(event.target.value)} minLength={2} maxLength={200} placeholder="Search the concept registry" /></div>
+                <button className="primary-button" type="submit" disabled={busy !== null || !apiConfigured}>{busy === 'knowledge-search' ? 'Searching…' : 'Search concepts'}</button>
+              </form>
+              {knowledgeConcepts.length === 0 ? (
+                <div className="empty-state"><span>⌘</span><strong>No concept records found</strong><p>Create a proposed concept or search a broader term. Concepts are not automatically merged by similar names.</p></div>
+              ) : (
+                <div className="knowledge-concept-grid">
+                  {knowledgeConcepts.map((concept) => (
+                    <article className="knowledge-concept" key={concept.id}>
+                      <div className="literature-result-top"><span className="result-chip">{String(concept.payload.status ?? 'proposed')}</span><span className="result-chip">{String(concept.payload.scientific_domain ?? 'unknown').replaceAll('_', ' ')}</span></div>
+                      <h3>{String(concept.payload.preferred_label ?? 'Untitled concept')}</h3>
+                      <p>{String(concept.payload.definition ?? '')}</p>
+                      <small>{String(concept.payload.concept_type ?? 'other').replaceAll('_', ' ')} · {concept.id}</small>
+                      <button className="secondary-button" type="button" onClick={() => void loadKnowledgeGraph(concept.id)} disabled={busy !== null}>Explore neighborhood</button>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </section>
+            <div className="workspace-two-column knowledge-bottom-grid">
+              <section className="workspace-card">
+                <div className="section-heading"><div><p className="card-label">RELATIONSHIP ASSERTIONS</p><h2>Connect two concepts</h2></div><span className="section-index">PROPOSED EDGE</span></div>
+                <form className="workspace-form" onSubmit={createKnowledgeRelationship}>
+                  <label htmlFor="relationship-source">Source concept</label>
+                  <select id="relationship-source" value={relationshipSourceId} onChange={(event) => setRelationshipSourceId(event.target.value)} required>
+                    <option value="">Select a concept</option>
+                    {knowledgeConcepts.map((concept) => <option key={concept.id} value={concept.id}>{String(concept.payload.preferred_label ?? concept.id)}</option>)}
+                  </select>
+                  <label htmlFor="relationship-predicate">Relationship predicate</label>
+                  <select id="relationship-predicate" value={relationshipPredicate} onChange={(event) => setRelationshipPredicate(event.target.value)}>{(knowledgeVocabulary?.relationship_predicates ?? ['related_to']).map((item) => <option key={item} value={item}>{item.replaceAll('_', ' ')}</option>)}</select>
+                  <label htmlFor="relationship-target">Target concept</label>
+                  <select id="relationship-target" value={relationshipTargetId} onChange={(event) => setRelationshipTargetId(event.target.value)} required>
+                    <option value="">Select a concept</option>
+                    {knowledgeConcepts.map((concept) => <option key={concept.id} value={concept.id}>{String(concept.payload.preferred_label ?? concept.id)}</option>)}
+                  </select>
+                  <p className="form-help">New relationships are saved as proposed assertions without an evidence source. They must be reviewed before use as knowledge.</p>
+                  <button className="primary-button" type="submit" disabled={busy !== null || !apiConfigured || knowledgeConcepts.length < 2 || relationshipSourceId === relationshipTargetId}>{busy === 'knowledge-relation' ? 'Saving relationship…' : 'Save proposed relationship'}</button>
+                </form>
+              </section>
+              <section className="workspace-card">
+                <div className="section-heading"><div><p className="card-label">GRAPH NEIGHBORHOOD</p><h2>Explore connected concepts</h2></div><span className="section-index">DEPTH 2 / BOUNDED</span></div>
+                {knowledgeGraph ? (
+                  <>
+                    <div className="graph-root"><span>ROOT CONCEPT</span><strong>{String(knowledgeGraph.root.payload.preferred_label ?? 'Concept')}</strong><small>{knowledgeGraph.nodes.length} node(s) · {knowledgeGraph.relationships.length} edge(s){knowledgeGraph.truncated ? ' · truncated' : ''}</small></div>
+                    <div className="graph-edge-list">
+                      {knowledgeGraph.relationships.map((edge) => (
+                        <div className="graph-edge" key={edge.id}>
+                          <strong>{String(edge.payload.predicate ?? 'related_to').replaceAll('_', ' ')}</strong>
+                          <span>{String(edge.payload.assertion_status ?? 'proposed')}</span>
+                          <small>{String(edge.payload.notes ?? 'No relationship notes supplied.')}</small>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="vocabulary-tags">{knowledgeGraph.nodes.filter((node) => node.id !== knowledgeGraph.root.id).map((node) => <button type="button" key={node.id} onClick={() => void loadKnowledgeGraph(node.id)}>{String(node.payload.preferred_label ?? node.id)}</button>)}</div>
+                    <p className="form-help">{knowledgeGraph.note}</p>
+                  </>
+                ) : <div className="empty-state"><span>⌘</span><strong>No graph neighborhood selected</strong><p>Select Explore neighborhood on a concept card to inspect its bounded relationships.</p></div>}
+              </section>
+            </div>
           </section>
         )}
 
