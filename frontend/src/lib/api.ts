@@ -23,6 +23,8 @@ export async function apiRequest<T = Json>(path: string, init: RequestInit = {})
   headers.set('Accept', 'application/json');
   if (init.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
   if (apiAccessToken) headers.set('Authorization', `Bearer ${apiAccessToken}`);
+  const tenantId = (import.meta.env.VITE_ASDS_TENANT_ID ?? '').trim();
+  if (tenantId) headers.set('X-Tenant-ID', tenantId);
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
     headers,
