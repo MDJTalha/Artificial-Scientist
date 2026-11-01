@@ -7,6 +7,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, ConfigDict, Field
 
+from artificial_scientist.ai_budget import AiBudgetExceeded, AiInvocationBudgetStore
 from artificial_scientist.ai_gateway import (
     ModelGatewayInvalidResponse,
     ModelGatewayUnavailable,
@@ -26,6 +27,8 @@ class AiCapabilityResponse(BaseModel):
     provider: str | None = None
     model: str | None = None
     max_output_tokens: int
+    daily_request_limit: int
+    daily_token_budget: int
     requires_human_review: bool = True
     note: str
 
@@ -61,6 +64,8 @@ def _capabilities() -> AiCapabilityResponse:
         return AiCapabilityResponse(
             configured=False,
             max_output_tokens=0,
+            daily_request_limit=0,
+            daily_token_budget=0,
             note="Model provider settings are incomplete or invalid; AI inference remains disabled.",
         )
     if config is None:
@@ -74,6 +79,8 @@ def _capabilities() -> AiCapabilityResponse:
         provider=config.provider,
         model=config.model,
         max_output_tokens=config.max_output_tokens,
+        daily_request_limit=int(settings.model_daily_request_limit),
+        daily_token_budget=int(settings.model_daily_token_budget),
         note=(
             "A manually invoked model can draft research assistance only. It does not "
             "retrieve evidence, validate claims, establish novelty or authorize experiments."
@@ -104,22 +111,57 @@ def generate_ai_assistance(
     """Manually invoke the configured model and persist hash-only provenance."""
     settings = get_settings()
     try:
+        gateway_config = resolve_model_gateway_config(settings)
+        if gateway_config is None:
+            raise ModelGatewayUnavailable('AI inference is not configured by the operator.')
+        if payload.max_output_tokens > gateway_config.max_output_tokens:
+            raise ValueError(
+                'Requested output tokens exceed the operator-configured model token cap.'
+            )
+        daily_request_limit = int(settings.model_daily_request_limit)
+        daily_token_budget = int(settings.model_daily_token_budget)
+    except (ValueError, TypeError) as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail='Model gateway or budget configuration is invalid.',
+        ) from error
+
+    budget_store = AiInvocationBudgetStore(settings.database_path)
+    try:
+        reservation_id = budget_store.reserve(
+            tenant_id=tenant_id or 'development',
+            requested_tokens=payload.max_output_tokens,
+            provider=gateway_config.provider,
+            model=gateway_config.model,
+            daily_request_limit=daily_request_limit,
+            daily_token_budget=daily_token_budget,
+        )
+    except AiBudgetExceeded as error:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=str(error),
+        ) from error
+
+    try:
         generation = generate_research_assistance(
             settings,
             payload.prompt,
             max_output_tokens=payload.max_output_tokens,
         )
     except ValueError as error:
+        budget_store.finalize(reservation_id, status='failed')
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=str(error),
         ) from error
     except ModelGatewayUnavailable as error:
+        budget_store.finalize(reservation_id, status='failed')
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=str(error),
         ) from error
     except ModelGatewayInvalidResponse as error:
+        budget_store.finalize(reservation_id, status='failed')
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Configured model provider returned an invalid response.",
@@ -146,11 +188,28 @@ def generate_ai_assistance(
     try:
         saved = store.create(record, tenant_id=tenant_id or "development")
     except RecordStoreError as error:
+        budget_store.finalize(
+            reservation_id,
+            status='unrecorded',
+            prompt_sha256=generation.prompt_sha256,
+            response_sha256=generation.response_sha256,
+            input_tokens=generation.input_tokens,
+            output_tokens=generation.output_tokens,
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Model output could not be linked to a persisted invocation record.",
         ) from error
 
+    budget_store.finalize(
+        reservation_id,
+        status='completed',
+        prompt_sha256=generation.prompt_sha256,
+        response_sha256=generation.response_sha256,
+        input_tokens=generation.input_tokens,
+        output_tokens=generation.output_tokens,
+        record_id=str(saved.id),
+    )
     request.state.model_invocation_record_id = str(saved.id)
     return AiGenerationResponse(
         invocation_record_id=str(saved.id),
