@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { ApiError, createApiClient } from './api'
+import { ApiError, createApiClient, setApiCredentials } from './api'
 
 describe('ASDS API client', () => {
   const fetchMock = vi.fn<typeof fetch>()
 
   beforeEach(() => {
+    setApiCredentials(null)
     fetchMock.mockReset()
     vi.stubGlobal('fetch', fetchMock)
   })
@@ -180,6 +181,64 @@ describe('ASDS API client', () => {
       status: 200,
       message: 'The API did not return the expected application/zip content type.',
     })
+  })
+
+
+  it('attaches the in-memory bearer token and explicitly selected tenant', async () => {
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    )
+    setApiCredentials({ accessToken: 'signed-access-token', tenantId: 'tenant-123' })
+    const client = createApiClient('https://api.example.test')
+
+    await client.get('/api/v1/records')
+
+    const request = fetchMock.mock.calls[0]?.[1]
+    const headers = new Headers(request?.headers)
+    expect(headers.get('Authorization')).toBe('Bearer signed-access-token')
+    expect(headers.get('X-Tenant-ID')).toBe('tenant-123')
+  })
+
+  it('can validate an OIDC session before a tenant is selected', async () => {
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ memberships: [] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    )
+    setApiCredentials({ accessToken: 'signed-access-token', tenantId: null })
+    const client = createApiClient('https://api.example.test')
+
+    await client.get('/api/v1/auth/session')
+
+    const headers = new Headers(fetchMock.mock.calls[0]?.[1]?.headers)
+    expect(headers.get('Authorization')).toBe('Bearer signed-access-token')
+    expect(headers.has('X-Tenant-ID')).toBe(false)
+  })
+
+  it('does not allow per-request headers to override the active identity', async () => {
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    )
+    setApiCredentials({ accessToken: 'trusted-token', tenantId: 'trusted-tenant' })
+    const client = createApiClient('https://api.example.test')
+
+    await client.get('/api/v1/records', {
+      headers: {
+        Authorization: 'Bearer attacker-token',
+        'X-Tenant-ID': 'attacker-tenant',
+      },
+    })
+
+    const headers = new Headers(fetchMock.mock.calls[0]?.[1]?.headers)
+    expect(headers.get('Authorization')).toBe('Bearer trusted-token')
+    expect(headers.get('X-Tenant-ID')).toBe('trusted-tenant')
   })
 
 })
