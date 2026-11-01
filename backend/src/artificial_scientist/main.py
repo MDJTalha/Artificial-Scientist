@@ -111,6 +111,10 @@ class OIDCAuthenticationMiddleware:
         await send({"type": "http.response.body", "body": body})
 
 
+# Backwards-compatible name retained for existing Cognito-era test/integration imports.
+CognitoAuthenticationMiddleware = OIDCAuthenticationMiddleware
+
+
 class Phase7RecordIsolationGateMiddleware:
     """Fail closed on shared research records until tenant-scoped access is implemented.
 
