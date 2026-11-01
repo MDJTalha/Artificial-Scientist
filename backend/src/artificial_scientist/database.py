@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from urllib.parse import parse_qs
 
 from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.engine import make_url
@@ -21,9 +20,7 @@ def normalize_postgres_url(database_url: str) -> str:
     except Exception as error:
         raise DatabaseConfigurationError("Database URL is invalid.") from error
 
-    if url.drivername == "postgres":
-        url = url.set(drivername="postgresql+psycopg")
-    elif url.drivername == "postgresql":
+    if url.drivername in {"postgres", "postgresql"}:
         url = url.set(drivername="postgresql+psycopg")
     elif url.drivername != "postgresql+psycopg":
         raise DatabaseConfigurationError("Only PostgreSQL with psycopg 3 is supported.")
