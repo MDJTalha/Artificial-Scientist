@@ -120,6 +120,7 @@ RecordType = Literal[
     "knowledge_concept",
     "knowledge_relationship",
     "manuscript",
+    "model_invocation",
 ]
 
 
@@ -389,6 +390,25 @@ class ManuscriptRecord(RecordBase):
     rendered_markdown: str = Field(min_length=100, max_length=100000)
     status: Literal["draft"] = "draft"
     submission_approved: Literal[False] = False
+
+
+class ModelInvocationRecord(RecordBase):
+    """Privacy-minimizing provenance for one operator-configured model invocation."""
+
+    record_type: Literal["model_invocation"] = "model_invocation"
+    provider: Literal["openai_compatible", "ollama"]
+    model: str = Field(min_length=1, max_length=200)
+    prompt_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    response_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    prompt_bytes: int = Field(ge=1, le=48 * 1024)
+    response_bytes: int = Field(ge=1, le=64 * 1024)
+    input_tokens: int | None = Field(default=None, ge=0, le=10**9)
+    output_tokens: int | None = Field(default=None, ge=0, le=10**9)
+    finish_reason: str | None = Field(default=None, max_length=100)
+    status: Literal["completed"] = "completed"
+    retention_note: Literal[
+        "Prompt and generated content are not stored in this record; hashes and usage metadata only."
+    ] = "Prompt and generated content are not stored in this record; hashes and usage metadata only."
 
 
 class RecordEnvelope(BaseModel):
