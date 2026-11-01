@@ -161,6 +161,7 @@ def test_audit_accepts_bounded_operational_metadata(tmp_path):
                 "autonomy:workflow:read", "autonomy:workflow:write", "autonomy:workflow:approve",
                 "memory:list", "memory:read", "memory:write",
                 "memory:contradict", "memory:rollback",
+                "manuscript:list", "manuscript:read", "manuscript:create",
             },
         ),
         (
@@ -175,6 +176,7 @@ def test_audit_accepts_bounded_operational_metadata(tmp_path):
                 "autonomy:workflow:write", "autonomy:workflow:approve",
                 "memory:list", "memory:read", "memory:write",
                 "memory:contradict", "memory:rollback",
+                "manuscript:list", "manuscript:read", "manuscript:create",
             },
         ),
         (
@@ -183,7 +185,7 @@ def test_audit_accepts_bounded_operational_metadata(tmp_path):
                 "run:list", "run:read", "run:export", "artifact:read",
                 "record:read", "record:list", "record:search",
                 "discovery:decompose", "discovery:prior-work-screen", "autonomy:workflow:read",
-                "memory:list", "memory:read",
+                "memory:list", "memory:read", "manuscript:list", "manuscript:read",
             },
         ),
         (
@@ -191,7 +193,7 @@ def test_audit_accepts_bounded_operational_metadata(tmp_path):
             {
                 "run:list", "run:read", "run:export", "artifact:read",
                 "record:read", "record:list", "record:audit:read",
-                "memory:list", "memory:read",
+                "memory:list", "memory:read", "manuscript:list", "manuscript:read",
             },
         ),
     ],
