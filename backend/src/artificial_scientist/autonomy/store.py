@@ -279,7 +279,9 @@ class AutonomyStore:
             latest_version = int(row[0])
             if supersedes_version != (latest_version or None):
                 connection.rollback()
-                raise ValueError("memory version changed concurrently; reload before writing")
+                raise ValueError(
+                    "memory version changed concurrently; reload before writing"
+                )
             version = latest_version + 1
             connection.execute(
                 "INSERT INTO autonomy_memory "
