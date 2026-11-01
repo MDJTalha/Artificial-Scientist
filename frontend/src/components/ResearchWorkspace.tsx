@@ -3,8 +3,8 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { apiClient, apiConfiguration } from '../lib/api'
 import type { ServiceStatus } from '../lib/status'
 
-type WorkspaceView = 'overview' | 'missions' | 'literature' | 'knowledge' | 'hypotheses' | 'lab' | 'analysis' | 'journal' | 'memory' | 'math' | 'records'
-type BusyAction = 'create-task' | 'decompose' | 'literature' | 'save-sources' | 'knowledge-search' | 'knowledge-create' | 'knowledge-relation' | 'knowledge-graph' | 'generate' | 'prior-work' | 'assess' | 'statistics' | 'plot' | 'lab-run' | 'lab-history' | 'lab-verify' | 'memory-load' | 'memory-save' | 'memory-history' | 'memory-contradict' | 'memory-rollback' | 'math' | null
+type WorkspaceView = 'overview' | 'missions' | 'literature' | 'knowledge' | 'hypotheses' | 'lab' | 'analysis' | 'journal' | 'memory' | 'manuscript' | 'math' | 'records'
+type BusyAction = 'create-task' | 'decompose' | 'literature' | 'save-sources' | 'knowledge-search' | 'knowledge-create' | 'knowledge-relation' | 'knowledge-graph' | 'generate' | 'prior-work' | 'assess' | 'statistics' | 'plot' | 'lab-run' | 'lab-history' | 'lab-verify' | 'memory-load' | 'memory-save' | 'memory-history' | 'memory-contradict' | 'memory-rollback' | 'manuscript-load' | 'manuscript-create' | 'math' | null
 
 interface ResearchWorkspaceProps {
   apiStatus: ServiceStatus
@@ -257,6 +257,30 @@ interface MemoryHistoryResponse {
   total: number
 }
 
+interface ManuscriptSummary {
+  id: string
+  title: string
+  created_at: string
+  content_sha256: string
+  claim_count: number
+  citation_count: number
+  status: string
+  submission_approved: boolean
+}
+
+interface ManuscriptListResponse {
+  items: ManuscriptSummary[]
+  total: number
+  limit: number
+  offset: number
+}
+
+interface ManuscriptClaimDraft {
+  id: number
+  text: string
+  sourceIds: string[]
+}
+
 const navigation: { id: WorkspaceView; label: string; symbol: string; detail: string }[] = [
   { id: 'overview', label: 'Command center', symbol: '◫', detail: 'System overview and workspace maturity' },
   { id: 'missions', label: 'Research agenda', symbol: '⌖', detail: 'Create and structure research questions' },
@@ -266,6 +290,7 @@ const navigation: { id: WorkspaceView; label: string; symbol: string; detail: st
   { id: 'lab', label: 'Computational lab', symbol: '⌬', detail: 'Run bounded, allowlisted computational experiments' },
   { id: 'journal', label: 'Experiment journal', symbol: '▧', detail: 'Inspect run history, artifacts and reproducibility evidence' },
   { id: 'memory', label: 'Scientific memory', symbol: '◈', detail: 'Maintain evidence-linked, versioned scientific knowledge' },
+  { id: 'manuscript', label: 'Manuscript studio', symbol: '✎', detail: 'Prepare and export evidence-linked manuscript drafts' },
   { id: 'analysis', label: 'Data analysis', symbol: '∿', detail: 'Descriptive statistics and mathematical plots' },
   { id: 'math', label: 'Mathematics workbench', symbol: '∑', detail: 'Bounded symbolic calculations' },
   { id: 'records', label: 'Research records', symbol: '▤', detail: 'Browse immutable, provenance-aware records' },
@@ -283,6 +308,7 @@ const workspaceRoadmap = [
   { name: 'Data Analysis & Results Observatory', status: 'AVAILABLE', note: 'Descriptive statistics and bounded function plots.' },
   { name: 'Experiment Journal & Reproducibility', status: 'AVAILABLE / DEV ONLY', note: 'Browse run history, hashes and artifacts; replay and export remain disabled in production pending identity and sandbox review.' },
   { name: 'Scientific Memory & Learning', status: 'AVAILABLE / TENANT GATED', note: 'Evidence-linked versioning, contradiction tracking and rollback; protected access requires identity integration.' },
+  { name: 'Scientific Manuscript & Publication Studio', status: 'AVAILABLE / DRAFT ONLY', note: 'Claim-to-source citation mapping and persistent drafts; external submission is disabled.' },
   { name: 'Scientific Manuscript & Publication Studio', status: 'BACKEND READY / UI NEXT', note: 'Evidence-linked writing; external submission stays gated.' },
   { name: 'Independent Review, Evaluation & Governance', status: 'NEXT', note: 'Review queues, benchmark evidence and approvals.' },
 ]
@@ -404,6 +430,20 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
   const [memoryError, setMemoryError] = useState<string | null>(null)
   const [memoryRefresh, setMemoryRefresh] = useState(0)
 
+  const [manuscriptItems, setManuscriptItems] = useState<ManuscriptSummary[]>([])
+  const [manuscriptSources, setManuscriptSources] = useState<RecordEnvelope[]>([])
+  const [manuscriptTotal, setManuscriptTotal] = useState(0)
+  const [manuscriptTitle, setManuscriptTitle] = useState('')
+  const [manuscriptAbstract, setManuscriptAbstract] = useState('')
+  const [manuscriptClaims, setManuscriptClaims] = useState<ManuscriptClaimDraft[]>([{ id: 1, text: '', sourceIds: [] }])
+  const [nextManuscriptClaimId, setNextManuscriptClaimId] = useState(2)
+  const [manuscriptMethods, setManuscriptMethods] = useState('')
+  const [manuscriptLimitations, setManuscriptLimitations] = useState('')
+  const [manuscriptDataStatement, setManuscriptDataStatement] = useState('')
+  const [manuscriptRecord, setManuscriptRecord] = useState<RecordEnvelope | null>(null)
+  const [manuscriptError, setManuscriptError] = useState<string | null>(null)
+  const [manuscriptRefresh, setManuscriptRefresh] = useState(0)
+
   const [mathOperation, setMathOperation] = useState<'simplify' | 'differentiate' | 'integrate' | 'solve' | 'evaluate'>('simplify')
   const [mathExpression, setMathExpression] = useState('x**2 + 2*x + 1')
   const [mathVariable, setMathVariable] = useState('x')
@@ -430,6 +470,32 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
 
     return () => controller.abort()
   }, [activeView, recordsRefresh, protectedActionsAvailable])
+
+  useEffect(() => {
+    if (activeView !== 'manuscript' || !protectedActionsAvailable) return
+
+    const controller = new AbortController()
+    setManuscriptError(null)
+    Promise.all([
+      apiClient.get<ManuscriptListResponse>('/api/v1/manuscripts?limit=50&offset=0', { signal: controller.signal }),
+      apiClient.get<RecordListResponse>('/api/v1/records?record_type=source&limit=100&offset=0', { signal: controller.signal }),
+    ])
+      .then(([manuscriptResult, sourceResult]) => {
+        setManuscriptItems(manuscriptResult.items)
+        setManuscriptTotal(manuscriptResult.total)
+        setManuscriptSources(sourceResult.items.filter((record) => {
+          const identifier = record.payload.external_identifier
+          const assessment = record.payload.assessment_status
+          return typeof identifier === 'string' && identifier.trim().length > 0 &&
+            !['retracted', 'disputed', 'unavailable'].includes(String(assessment))
+        }))
+      })
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted) setManuscriptError(errorText(error))
+      })
+
+    return () => controller.abort()
+  }, [activeView, manuscriptRefresh, protectedActionsAvailable])
 
   useEffect(() => {
     if (activeView !== 'memory' || !protectedActionsAvailable) return
@@ -1056,6 +1122,66 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
     }
   }
 
+  async function createManuscriptDraft(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    beginAction('manuscript-create')
+    setManuscriptError(null)
+    try {
+      const invalidClaim = manuscriptClaims.find((claim) => claim.text.trim().length < 5 || claim.sourceIds.length === 0)
+      if (invalidClaim) throw new Error('Every claim must contain at least five characters and cite at least one source record.')
+      const result = await apiClient.post<RecordEnvelope>('/api/v1/manuscripts', {
+        title: manuscriptTitle.trim(),
+        abstract: manuscriptAbstract.trim(),
+        claims: manuscriptClaims.map((claim) => ({
+          text: claim.text.trim(),
+          source_record_ids: claim.sourceIds,
+        })),
+        methods: manuscriptMethods.trim(),
+        limitations: manuscriptLimitations.trim(),
+        data_statement: manuscriptDataStatement.trim(),
+      })
+      setManuscriptRecord(result)
+      setManuscriptRefresh((value) => value + 1)
+      setNotice('Manuscript draft saved. Each citation resolves to an integrity-checked tenant source record; this does not verify that the source supports its mapped claim.')
+    } catch (error) {
+      setManuscriptError(errorText(error))
+    } finally {
+      finishAction()
+    }
+  }
+
+  async function openManuscript(manuscriptId: string) {
+    beginAction('manuscript-load')
+    setManuscriptError(null)
+    try {
+      const result = await apiClient.get<RecordEnvelope>(`/api/v1/manuscripts/${encodeURIComponent(manuscriptId)}`)
+      setManuscriptRecord(result)
+    } catch (error) {
+      setManuscriptError(errorText(error))
+    } finally {
+      finishAction()
+    }
+  }
+
+  function downloadManuscript() {
+    const markdown = manuscriptRecord?.payload.rendered_markdown
+    if (typeof markdown !== 'string' || !manuscriptRecord) return
+    const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `asds-manuscript-${manuscriptRecord.id}.md`
+    link.rel = 'noopener'
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+  }
+
+  function updateManuscriptClaim(id: number, patch: Partial<ManuscriptClaimDraft>) {
+    setManuscriptClaims((current) => current.map((claim) => claim.id === id ? { ...claim, ...patch } : claim))
+  }
+
   function selectView(view: WorkspaceView) {
     setActiveView(view)
     setNotice(null)
@@ -1063,6 +1189,7 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
     if (view === 'records') setRecordsRefresh((value) => value + 1)
     if (view === 'lab' || view === 'journal') setLabHistoryRefresh((value) => value + 1)
     if (view === 'memory') setMemoryRefresh((value) => value + 1)
+    if (view === 'manuscript') setManuscriptRefresh((value) => value + 1)
   }
 
   const savedForCurrentSearch = literatureResponse?.results.filter((item) => savedSourceUrls.includes(item.source_url)).length ?? 0
@@ -1152,8 +1279,8 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
               </article>
               <article className="workspace-stat">
                 <span className="card-label">WORKSPACES IMPLEMENTED</span>
-                <strong>10 <small>/ 12</small></strong>
-                <p>Ten workspace screens implemented. Protected research records and memory remain disabled in production until reviewed OIDC identity and tenant access are integrated.</p>
+                <strong>11 <small>/ 12</small></strong>
+                <p>Eleven capability screens implemented. Protected research records, memory and manuscript persistence remain disabled in production until reviewed OIDC identity and tenant access are integrated.</p>
               </article>
               <article className="workspace-stat">
                 <span className="card-label">AI INFERENCE</span>
@@ -1607,6 +1734,67 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
               </div>
             )}
             {labVerification && <section className="workspace-card lab-verification"><div className="section-heading"><div><p className="card-label">REPRODUCIBILITY RESULT</p><h2>{labVerification.reproducible ? 'Replay matched' : 'Replay differences detected'}</h2></div><span className="section-index">RUN REPLAY</span></div><div className="vocabulary-tags"><span>Configuration: {labVerification.configuration_matches ? 'MATCH' : 'DIFFERENT'}</span><span>Environment: {labVerification.environment_matches ? 'MATCH' : 'DIFFERENT'}</span><span>Outputs: {labVerification.outputs_match ? 'MATCH' : 'DIFFERENT'}</span></div><p className="workspace-caveat">A matching replay supports computational reproducibility under the recorded runtime. It does not certify scientific truth or source validity.</p></section>}
+          </section>
+        )}
+
+        {activeView === 'manuscript' && (
+          <section className="workspace-page">
+            <div className="page-heading">
+              <p className="card-label">SCIENTIFIC MANUSCRIPT & PUBLICATION STUDIO</p>
+              <h1>Prepare an evidence-linked research draft</h1>
+              <p>Write and structure each claim, map it to specific source records, document methods and limitations, then persist and export a traceable Markdown draft.</p>
+            </div>
+            {!protectedActionsAvailable && <div className="workspace-alert workspace-alert-warning" role="note"><strong>Manuscript persistence is protected in this production build.</strong><span>Authenticated tenant access and OIDC sign-in are required. Draft storage and source lookup remain disabled until a reviewed identity session is connected.</span></div>}
+            {manuscriptError && <div className="workspace-alert workspace-alert-error" role="alert">{manuscriptError}</div>}
+            <section className="workspace-card">
+              <div className="section-heading"><div><p className="card-label">PERSISTED DRAFTS</p><h2>{manuscriptTotal} manuscript draft(s)</h2></div><button className="secondary-button" type="button" onClick={() => setManuscriptRefresh((value) => value + 1)} disabled={!protectedActionsAvailable || busy !== null}>Refresh drafts</button></div>
+              {protectedActionsAvailable && manuscriptItems.length === 0 ? <div className="empty-state"><span>✎</span><strong>No manuscript drafts</strong><p>Create a draft below. Each claim must cite one or more source records that exist in this tenant.</p></div> : null}
+              {manuscriptItems.length > 0 && <div className="manuscript-draft-list">{manuscriptItems.map((item) => <button className="manuscript-draft-item" type="button" key={item.id} onClick={() => void openManuscript(item.id)} disabled={busy !== null}><span><strong>{item.title}</strong><small>{formatDate(item.created_at)} · {item.claim_count} claim(s) · {item.citation_count} source(s) · {item.content_sha256.slice(0, 12)}…</small></span><span className="result-chip">{item.status}</span></button>)}</div>}
+            </section>
+            <div className="workspace-two-column manuscript-edit-grid">
+              <section className="workspace-card">
+                <div className="section-heading"><div><p className="card-label">MANUSCRIPT STRUCTURE</p><h2>Research draft inputs</h2></div><span className="section-index">RESEARCHER AUTHORED</span></div>
+                <form className="workspace-form" onSubmit={createManuscriptDraft}>
+                  <label htmlFor="manuscript-title">Manuscript title</label>
+                  <input id="manuscript-title" value={manuscriptTitle} onChange={(event) => setManuscriptTitle(event.target.value)} minLength={3} maxLength={300} required placeholder="Enter a precise working title" />
+                  <label htmlFor="manuscript-abstract">Abstract (optional)</label>
+                  <textarea id="manuscript-abstract" value={manuscriptAbstract} onChange={(event) => setManuscriptAbstract(event.target.value)} rows={3} maxLength={5000} placeholder="Provide a draft abstract; the system does not invent scientific results." />
+                  <div className="section-heading manuscript-claims-heading"><div><p className="card-label">CLAIMS & SOURCE MAPPING</p><h2>Map evidence to each claim</h2></div><button className="secondary-button" type="button" onClick={() => { setManuscriptClaims((current) => [...current, { id: nextManuscriptClaimId, text: '', sourceIds: [] }]); setNextManuscriptClaimId((value) => value + 1) }} disabled={manuscriptClaims.length >= 100}>Add claim</button></div>
+                  {manuscriptClaims.map((claim, index) => (
+                    <fieldset className="manuscript-claim-fieldset" key={claim.id}>
+                      <legend>Claim {index + 1}</legend>
+                      <label htmlFor={`manuscript-claim-${claim.id}`}>Claim statement</label>
+                      <textarea id={`manuscript-claim-${claim.id}`} value={claim.text} onChange={(event) => updateManuscriptClaim(claim.id, { text: event.target.value })} rows={3} minLength={5} maxLength={5000} required />
+                      <label htmlFor={`manuscript-sources-${claim.id}`}>Supporting source records</label>
+                      <select id={`manuscript-sources-${claim.id}`} className="memory-evidence-select" multiple size={Math.min(7, Math.max(3, manuscriptSources.length))} value={claim.sourceIds} onChange={(event) => updateManuscriptClaim(claim.id, { sourceIds: Array.from(event.currentTarget.selectedOptions).map((option) => option.value) })}>
+                        {manuscriptSources.map((source) => <option key={source.id} value={source.id}>{recordTitle(source)} · {String(source.payload.external_identifier)}</option>)}
+                      </select>
+                      <small>{claim.sourceIds.length} source record(s) selected. The backend validates tenant ownership, record integrity and identifier presence.</small>
+                      {manuscriptClaims.length > 1 && <button className="text-button" type="button" onClick={() => setManuscriptClaims((current) => current.filter((item) => item.id !== claim.id))}>Remove claim</button>}
+                    </fieldset>
+                  ))}
+                  <label htmlFor="manuscript-methods">Methods</label>
+                  <textarea id="manuscript-methods" value={manuscriptMethods} onChange={(event) => setManuscriptMethods(event.target.value)} rows={4} minLength={10} maxLength={12000} required placeholder="Describe actual methods, materials, measurement conditions and analysis decisions." />
+                  <label htmlFor="manuscript-limitations">Limitations</label>
+                  <textarea id="manuscript-limitations" value={manuscriptLimitations} onChange={(event) => setManuscriptLimitations(event.target.value)} rows={4} minLength={10} maxLength={12000} required placeholder="State uncertainties, weaknesses, assumptions and scope boundaries." />
+                  <label htmlFor="manuscript-data">Data availability statement</label>
+                  <textarea id="manuscript-data" value={manuscriptDataStatement} onChange={(event) => setManuscriptDataStatement(event.target.value)} rows={3} minLength={5} maxLength={5000} required placeholder="Describe what data exists and whether it can be accessed or shared." />
+                  <p className="form-help">The editor does not generate findings or infer claims. Every claim must have explicit source mappings; the service verifies record integrity and identifiers but cannot determine whether a source supports the wording.</p>
+                  <button className="primary-button" type="submit" disabled={!protectedActionsAvailable || busy !== null || manuscriptSources.length === 0 || manuscriptClaims.some((claim) => claim.text.trim().length < 5 || claim.sourceIds.length === 0)}>{busy === 'manuscript-create' ? 'Saving manuscript draft…' : 'Save manuscript draft'}</button>
+                </form>
+              </section>
+              <section className="workspace-card manuscript-preview-card">
+                <div className="section-heading"><div><p className="card-label">MANUSCRIPT PREVIEW</p><h2>Rendered Markdown draft</h2></div><span className="section-index">NOT SUBMITTED</span></div>
+                {manuscriptRecord ? (
+                  <>
+                    <div className="literature-result-top"><span className="result-chip">{String(manuscriptRecord.payload.status ?? 'draft')}</span><span className="result-chip">{manuscriptRecord.content_sha256.slice(0, 16)}…</span></div>
+                    <pre className="manuscript-markdown-preview">{String(manuscriptRecord.payload.rendered_markdown ?? '')}</pre>
+                    <div className="form-actions"><button className="secondary-button" type="button" onClick={downloadManuscript}>Export Markdown</button><span className="manuscript-approval-state">External submission disabled · Approval: {manuscriptRecord.payload.submission_approved ? 'approved' : 'not approved'}</span></div>
+                  </>
+                ) : <div className="empty-state"><span>✎</span><strong>No draft preview selected</strong><p>Save a new manuscript or open a draft from the persisted list to inspect the rendered Markdown.</p></div>}
+              </section>
+            </div>
+            <div className="workspace-alert workspace-alert-warning"><strong>Publication control:</strong><span>This studio creates research drafts only. It does not submit manuscripts, post preprints, contact journals, claim peer review, or certify that citations support claims. All substantive content and source interpretation remain the responsibility of qualified human researchers.</span></div>
           </section>
         )}
 
