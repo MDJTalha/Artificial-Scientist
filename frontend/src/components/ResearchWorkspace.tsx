@@ -3,8 +3,8 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { apiClient, apiConfiguration } from '../lib/api'
 import type { ServiceStatus } from '../lib/status'
 
-type WorkspaceView = 'overview' | 'missions' | 'literature' | 'knowledge' | 'hypotheses' | 'math' | 'records'
-type BusyAction = 'create-task' | 'decompose' | 'literature' | 'save-sources' | 'knowledge-search' | 'knowledge-create' | 'knowledge-relation' | 'knowledge-graph' | 'generate' | 'prior-work' | 'assess' | 'math' | null
+type WorkspaceView = 'overview' | 'missions' | 'literature' | 'knowledge' | 'hypotheses' | 'analysis' | 'math' | 'records'
+type BusyAction = 'create-task' | 'decompose' | 'literature' | 'save-sources' | 'knowledge-search' | 'knowledge-create' | 'knowledge-relation' | 'knowledge-graph' | 'generate' | 'prior-work' | 'assess' | 'statistics' | 'plot' | 'math' | null
 
 interface ResearchWorkspaceProps {
   apiStatus: ServiceStatus
@@ -156,12 +156,27 @@ interface SymbolicResponse {
   note: string
 }
 
+interface StatisticsResponse {
+  count: number
+  mean: number
+  median: number
+  variance: number
+  standard_deviation: number
+  minimum: number
+  maximum: number
+  quartiles: Record<string, number>
+  variance_mode: 'sample' | 'population'
+  method: string
+  note: string
+}
+
 const navigation: { id: WorkspaceView; label: string; symbol: string; detail: string }[] = [
   { id: 'overview', label: 'Command center', symbol: '◫', detail: 'System overview and workspace maturity' },
   { id: 'missions', label: 'Research agenda', symbol: '⌖', detail: 'Create and structure research questions' },
   { id: 'literature', label: 'Literature explorer', symbol: '⌕', detail: 'Search scholarly metadata and save evidence' },
   { id: 'knowledge', label: 'Knowledge graph', symbol: '⌘', detail: 'Create concepts, controlled vocabulary and evidence-linked relationships' },
   { id: 'hypotheses', label: 'Hypothesis lab', symbol: '◇', detail: 'Compare, screen and assess candidate hypotheses' },
+  { id: 'analysis', label: 'Data analysis', symbol: '∿', detail: 'Descriptive statistics and mathematical plots' },
   { id: 'math', label: 'Mathematics workbench', symbol: '∑', detail: 'Bounded symbolic calculations' },
   { id: 'records', label: 'Research records', symbol: '▤', detail: 'Browse immutable, provenance-aware records' },
 ]
@@ -175,7 +190,7 @@ const workspaceRoadmap = [
   { name: 'Hypothesis & Discovery Lab', status: 'AVAILABLE', note: 'Bounded templates, prior-work screen and assessment.' },
   { name: 'Mathematics & Formal Reasoning Workbench', status: 'AVAILABLE', note: 'Bounded symbolic calculation and review notes.' },
   { name: 'Computational Laboratory & Simulation Center', status: 'BACKEND READY / UI NEXT', note: 'Execution UI remains gated on reviewed sandbox deployment.' },
-  { name: 'Data Analysis & Results Observatory', status: 'NEXT', note: 'Statistics, result comparison and visual analysis.' },
+  { name: 'Data Analysis & Results Observatory', status: 'AVAILABLE', note: 'Descriptive statistics and bounded function plots.' },
   { name: 'Experiment Journal & Reproducibility', status: 'NEXT', note: 'Run history, manifests, verification and exports.' },
   { name: 'Scientific Memory & Learning', status: 'BACKEND READY / UI NEXT', note: 'Versioned memory and contradiction review.' },
   { name: 'Scientific Manuscript & Publication Studio', status: 'BACKEND READY / UI NEXT', note: 'Evidence-linked writing; external submission stays gated.' },
@@ -246,6 +261,15 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
   const [recordError, setRecordError] = useState<string | null>(null)
   const [recordsRefresh, setRecordsRefresh] = useState(0)
 
+  const [sampleValues, setSampleValues] = useState('12, 14, 14, 15, 18, 21, 23')
+  const [varianceMode, setVarianceMode] = useState<'sample' | 'population'>('sample')
+  const [statisticsResponse, setStatisticsResponse] = useState<StatisticsResponse | null>(null)
+  const [plotExpression, setPlotExpression] = useState('sin(x)')
+  const [plotVariable, setPlotVariable] = useState('x')
+  const [plotLower, setPlotLower] = useState('-10')
+  const [plotUpper, setPlotUpper] = useState('10')
+  const [plotUrl, setPlotUrl] = useState<string | null>(null)
+
   const [mathOperation, setMathOperation] = useState<'simplify' | 'differentiate' | 'integrate' | 'solve' | 'evaluate'>('simplify')
   const [mathExpression, setMathExpression] = useState('x**2 + 2*x + 1')
   const [mathVariable, setMathVariable] = useState('x')
@@ -268,6 +292,11 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
 
     return () => controller.abort()
   }, [activeView, recordsRefresh])
+
+  useEffect(() => {
+    if (!plotUrl) return
+    return () => URL.revokeObjectURL(plotUrl)
+  }, [plotUrl])
 
   useEffect(() => {
     if (activeView !== 'knowledge' || !apiConfiguration.baseUrl) return
@@ -596,6 +625,56 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
     }
   }
 
+  async function runStatistics(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    beginAction('statistics')
+    try {
+      const values = sampleValues.split(/[\\s,;]+/).filter(Boolean).map(Number)
+      if (values.length < 2 || values.length > 100000 || values.some((value) => !Number.isFinite(value))) {
+        throw new Error('Enter between 2 and 100,000 finite numeric values, separated by commas or whitespace.')
+      }
+      const result = await apiClient.post<StatisticsResponse>('/api/v1/math/statistics', {
+        values,
+        variance_mode: varianceMode,
+      })
+      setStatisticsResponse(result)
+      setNotice('Descriptive statistics calculated from the supplied values. No inference about sampling quality or causality is made.')
+    } catch (error) {
+      setPageError(errorText(error))
+    } finally {
+      finishAction()
+    }
+  }
+
+  async function renderFunctionPlot(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    beginAction('plot')
+    try {
+      const lower = Number(plotLower)
+      const upper = Number(plotUpper)
+      if (!Number.isFinite(lower) || !Number.isFinite(upper) || lower >= upper) {
+        throw new Error('Plot bounds must be finite numbers, with the lower bound smaller than the upper bound.')
+      }
+      const blob = await apiClient.postBlob('/api/v1/math/plot', {
+        expression: plotExpression.trim(),
+        variable: plotVariable.trim(),
+        parameters: {},
+        lower,
+        upper,
+        points: 500,
+        title: 'ASDS mathematical function plot',
+        x_label: plotVariable.trim(),
+        y_label: 'f(' + plotVariable.trim() + ')',
+      })
+      setPlotUrl(URL.createObjectURL(blob))
+      setNotice('PNG plot generated by the bounded mathematical plotting service.')
+    } catch (error) {
+      setPageError(errorText(error))
+    } finally {
+      finishAction()
+    }
+  }
+
   async function runSymbolicTool(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     beginAction('math')
@@ -712,8 +791,8 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
               </article>
               <article className="workspace-stat">
                 <span className="card-label">LIVE WORKSPACES</span>
-                <strong>6 <small>/ 12</small></strong>
-                <p>Command center, agenda, literature, knowledge graph, hypothesis and mathematics.</p>
+                <strong>7 <small>/ 12</small></strong>
+                <p>Command center, agenda, literature, knowledge graph, hypothesis, analysis and mathematics.</p>
               </article>
               <article className="workspace-stat">
                 <span className="card-label">AI INFERENCE</span>
@@ -1072,6 +1151,63 @@ export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorksp
                 )}
               </>
             )}
+          </section>
+        )}
+
+        {activeView === 'analysis' && (
+          <section className="workspace-page">
+            <div className="page-heading">
+              <p className="card-label">DATA ANALYSIS & RESULTS OBSERVATORY</p>
+              <h1>Explore numerical evidence</h1>
+              <p>Calculate descriptive statistics for supplied samples and create bounded mathematical plots. These tools describe the inputs; they do not infer causality or establish scientific significance.</p>
+            </div>
+            <div className="workspace-two-column">
+              <section className="workspace-card">
+                <div className="section-heading"><div><p className="card-label">DESCRIPTIVE STATISTICS</p><h2>Analyze a numeric sample</h2></div><span className="section-index">NUMPY / BOUNDED</span></div>
+                <form className="workspace-form" onSubmit={runStatistics}>
+                  <label htmlFor="sample-values">Numeric values</label>
+                  <textarea id="sample-values" value={sampleValues} onChange={(event) => setSampleValues(event.target.value)} rows={5} required placeholder="Enter values separated by commas, spaces or new lines" />
+                  <label htmlFor="variance-mode">Variance interpretation</label>
+                  <select id="variance-mode" value={varianceMode} onChange={(event) => setVarianceMode(event.target.value as typeof varianceMode)}><option value="sample">Sample variance</option><option value="population">Population variance</option></select>
+                  <button className="primary-button" type="submit" disabled={busy !== null || !apiConfigured}>{busy === 'statistics' ? 'Analyzing…' : 'Calculate statistics'}</button>
+                </form>
+                {statisticsResponse ? (
+                  <div className="statistics-result">
+                    <div className="statistics-grid">
+                      {[
+                        ['Count', statisticsResponse.count],
+                        ['Mean', statisticsResponse.mean],
+                        ['Median', statisticsResponse.median],
+                        ['Std. deviation', statisticsResponse.standard_deviation],
+                        ['Variance', statisticsResponse.variance],
+                        ['Minimum', statisticsResponse.minimum],
+                        ['Maximum', statisticsResponse.maximum],
+                      ].map(([label, value]) => <div className="statistics-cell" key={String(label)}><span>{label}</span><strong>{typeof value === 'number' ? Number(value.toPrecision(7)).toString() : value}</strong></div>)}
+                    </div>
+                    <h3>Quartiles</h3>
+                    <div className="vocabulary-tags">{Object.entries(statisticsResponse.quartiles).map(([label, value]) => <span key={label}>{label}: {Number(value.toPrecision(7)).toString()}</span>)}</div>
+                    <p className="form-help">{statisticsResponse.method}. {statisticsResponse.note}</p>
+                  </div>
+                ) : <div className="empty-state"><span>∿</span><strong>No statistics computed</strong><p>Enter a numeric sample to calculate descriptive measures.</p></div>}
+              </section>
+              <section className="workspace-card">
+                <div className="section-heading"><div><p className="card-label">FUNCTION PLOTTING</p><h2>Render a mathematical function</h2></div><span className="section-index">PNG / BOUNDED</span></div>
+                <form className="workspace-form" onSubmit={renderFunctionPlot}>
+                  <label htmlFor="plot-expression">Mathematical expression</label>
+                  <input id="plot-expression" value={plotExpression} onChange={(event) => setPlotExpression(event.target.value)} minLength={1} maxLength={500} required />
+                  <div className="variable-grid">
+                    <div><label htmlFor="plot-variable">Variable</label><input id="plot-variable" value={plotVariable} onChange={(event) => setPlotVariable(event.target.value)} minLength={1} maxLength={32} required /></div>
+                    <div><label htmlFor="plot-lower">Lower bound</label><input id="plot-lower" type="number" value={plotLower} onChange={(event) => setPlotLower(event.target.value)} step="any" required /></div>
+                    <div><label htmlFor="plot-upper">Upper bound</label><input id="plot-upper" type="number" value={plotUpper} onChange={(event) => setPlotUpper(event.target.value)} step="any" required /></div>
+                  </div>
+                  <button className="primary-button" type="submit" disabled={busy !== null || !apiConfigured}>{busy === 'plot' ? 'Rendering plot…' : 'Render plot'}</button>
+                </form>
+                {plotUrl ? (
+                  <figure className="plot-result"><img src={plotUrl} alt={'Plot of ' + plotExpression + ' over ' + plotVariable + ' from ' + plotLower + ' to ' + plotUpper} /><figcaption>Generated PNG · {plotExpression} · {plotVariable} ∈ [{plotLower}, {plotUpper}]</figcaption></figure>
+                ) : <div className="empty-state"><span>⌁</span><strong>No plot generated</strong><p>Submit a bounded expression and finite interval to render a PNG image.</p></div>}
+              </section>
+            </div>
+            <div className="workspace-caveat">Statistical summaries depend on the supplied sample and variance mode. They do not establish representativeness, independence, statistical significance, causal effects or measurement validity. Review data provenance and assumptions separately.</div>
           </section>
         )}
 
