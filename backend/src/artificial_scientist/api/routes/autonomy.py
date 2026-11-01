@@ -34,9 +34,18 @@ class WorkflowCheckpointRequest(BaseModel):
 
 
 def _engine(tenant_id: str | None) -> WorkflowEngine:
+    settings = get_settings()
+    if getattr(settings, "database_url", None):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                "PostgreSQL is configured, but autonomy persistence is not migrated. "
+                "Requests are blocked to prevent split-database writes."
+            ),
+        )
     effective_tenant = tenant_id or "development"
     return WorkflowEngine(
-        AutonomyStore(get_settings().database_path),
+        AutonomyStore(settings.database_path),
         tenant_id=effective_tenant,
     )
 
