@@ -19,6 +19,7 @@ RECORD_ACTIONS = frozenset({
     "memory:list", "memory:read", "memory:write",
     "memory:contradict", "memory:rollback",
     "manuscript:list", "manuscript:read", "manuscript:create",
+    "ai:inference",
 })
 
 # Explicit permissions prevent an unknown role or action from inheriting access.
@@ -37,6 +38,7 @@ _ROLE_ACTIONS = {
         "discovery:assess",
         "memory:list", "memory:read", "memory:write", "memory:contradict", "memory:rollback",
         "manuscript:list", "manuscript:read", "manuscript:create",
+        "ai:inference",
     }),
     "viewer": frozenset({
         "record:read", "record:list", "record:search",
