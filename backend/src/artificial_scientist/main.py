@@ -27,7 +27,7 @@ LAB_RUN_BODY_LIMIT_BYTES = 64 * 1024
 DISCOVERY_BODY_LIMIT_BYTES = 1024 * 1024
 
 
-class CognitoAuthenticationMiddleware:
+class OIDCAuthenticationMiddleware:
     """Require a configured OIDC access token on every non-public API route."""
 
     def __init__(self, app: ASGIApp) -> None:
@@ -39,18 +39,17 @@ class CognitoAuthenticationMiddleware:
             return
         path = scope.get("path", "")
         public_paths = {"/api/v1/health", "/api/v1/ready", "/api/v1/knowledge/vocabulary"}
-        route_guarded_prefixes = (
-            "/api/v1/lab",
-            "/api/v1/records",
-            "/api/v1/knowledge",
-            "/api/v1/literature",
-            "/api/v1/discovery",
-            "/api/v1/autonomy",
+        # Lab and records routers validate OIDC and tenant membership in their own
+        # dependencies. All other versioned API routes must pass this middleware.
+        route_guarded_prefixes = ("/api/v1/lab", "/api/v1/records")
+        is_route_guarded = any(
+            path == prefix or path.startswith(f"{prefix}/")
+            for prefix in route_guarded_prefixes
         )
         if (
             not path.startswith("/api/v1/")
             or path in public_paths
-            or path.startswith(route_guarded_prefixes)
+            or is_route_guarded
         ):
             await self.app(scope, receive, send)
             return
@@ -114,6 +113,10 @@ class CognitoAuthenticationMiddleware:
         ]
         await send({"type": "http.response.start", "status": status_code, "headers": headers})
         await send({"type": "http.response.body", "body": body})
+
+
+# Backwards-compatible name retained for existing Cognito-era test/integration imports.
+CognitoAuthenticationMiddleware = OIDCAuthenticationMiddleware
 
 
 class Phase7RecordIsolationGateMiddleware:
@@ -372,14 +375,15 @@ app = FastAPI(
     ),
 )
 app.add_middleware(LabRequestBodyLimitMiddleware)
-app.add_middleware(CognitoAuthenticationMiddleware)
+app.add_middleware(Phase7RecordIsolationGateMiddleware)
+app.add_middleware(OIDCAuthenticationMiddleware)
 app.add_middleware(LabSecurityAuditMiddleware, database_path=settings.database_path)
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=list(settings.allowed_origins),
     allow_credentials=False,
-    allow_methods=["GET", "POST"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 

@@ -15,7 +15,6 @@ class Settings:
     database_path: str
     openalex_api_key: str | None
     crossref_contact_email: str | None
-    lab_api_key: str | None
     oidc_issuer: str | None
     oidc_audience: str | None
     oidc_jwks_url: str | None
@@ -46,7 +45,6 @@ def get_settings() -> Settings:
         ),
         openalex_api_key=os.getenv("OPENALEX_API_KEY") or None,
         crossref_contact_email=os.getenv("CROSSREF_CONTACT_EMAIL") or None,
-        lab_api_key=os.getenv("ARTIFICIAL_SCIENTIST_LAB_API_KEY") or None,
         oidc_issuer=os.getenv("ARTIFICIAL_SCIENTIST_OIDC_ISSUER") or None,
         oidc_audience=os.getenv("ARTIFICIAL_SCIENTIST_OIDC_AUDIENCE") or None,
         oidc_jwks_url=os.getenv("ARTIFICIAL_SCIENTIST_OIDC_JWKS_URL") or None,

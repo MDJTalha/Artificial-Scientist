@@ -6,11 +6,11 @@ The FastAPI backend is containerized, but **no remote backend has been deployed*
 
 The production deployment is deliberately blocked until the following gates are closed:
 
-1. **Identity and authorization:** configure a real OIDC issuer, audience, and JWKS endpoint; validate authentication on every non-public API route; implement the frontend authorization-code-with-PKCE login flow and bearer-token handling. The current backend has route-level protections for selected records, discovery, knowledge, and lab operations, but literature and mathematics routes are not protected by a global authentication layer. Do not expose the API to the public internet in this state.
+1. **Identity and authorization:** configure and verify a real OIDC issuer, exact API audience, and JWKS endpoint; validate authentication on every non-public `/api/v1` route; verify the frontend authorization-code-with-PKCE login flow and bearer-token handling against the deployed API. The backend now applies a global OIDC authentication middleware to non-public versioned API routes, while lab and records routers perform their own token validation and tenant-membership checks. Authentication alone is not tenant authorization: tenant-scoped authorization and negative cross-tenant tests must cover every persisted resource before public exposure.
 2. **Tenant and data isolation:** verify tenant-scoped access for every persisted resource and review cross-tenant negative tests. Existing production fail-closed guards are intentional and must not be bypassed.
 3. **Durable database:** the current persistence implementation is SQLite. The default database path is local to the container filesystem. A production service needs a supported durable database architecture, migration and rollback plan, backup/restore rehearsal, and concurrency validation. Do not put a multi-replica SQLite database on a shared network filesystem.
 4. **Deployment identity:** use a dedicated least-privilege deployment role with GitHub Actions OIDC federation. Do not use AWS root credentials or long-lived root access keys for deployment.
-5. **Operational controls:** configure TLS, exact CORS origins, secret management, logs/metrics/alerts, resource limits, vulnerability scanning, and an independently reviewed recovery procedure.
+5. **Operational controls:** configure TLS, exact CORS origins, secret management, logs/metrics/alerts, resource limits, vulnerability scanning, and an independently reviewed recovery procedure. The repository's current container/CI checks are not evidence of a live deployment; production acceptance requires a verified deployed commit, real Auth0 positive/negative tests, and database recovery evidence.
 
 ## Local container
 
@@ -43,35 +43,38 @@ The named Docker volume `asds-backend-data` retains local SQLite data across con
 
 Never commit real secrets or put credentials in the image. Inject them from a managed secret store at runtime.
 
-## Amazon Cognito identity provider
+## Auth0 identity provider
 
-The repository includes `infra/aws/cognito-user-pool.yaml`. It provisions an Amazon Cognito User Pool, a public OAuth authorization-code client (no client secret), PKCE-compatible hosted UI domain, and the `asds-api/access` resource-server scope. Self-registration defaults to disabled; create users through a controlled administrator workflow until tenant onboarding and abuse controls are accepted. After an administrator role and Cognito service access are available, deploy it with `aws cloudformation deploy --template-file infra/aws/cognito-user-pool.yaml --stack-name asds-identity --region <region> --parameter-overrides DomainPrefix=<unique-prefix> CallbackUrls=https://<frontend-domain>/auth/callback LogoutUrls=https://<frontend-domain>/ EnableSelfRegistration=false`. Inspect the change set and outputs before configuring either application.
+The current frontend integration uses Auth0 Authorization Code Flow with PKCE through the Auth0 React SDK. The Cognito CloudFormation template and Cognito instructions below are legacy artifacts; they are not the active identity-provider configuration for this application.
 
-Configure the API with the CloudFormation outputs:
+Known Auth0 tenant configuration:
+- Domain: `asds-artificial-scientist.us.auth0.com`
+- Issuer: `https://asds-artificial-scientist.us.auth0.com/`
+- JWKS: `https://asds-artificial-scientist.us.auth0.com/.well-known/jwks.json`
+- SPA Client ID: public client identifier configured in the frontend; never treat it as an API audience or secret.
 
-- `ARTIFICIAL_SCIENTIST_OIDC_ISSUER`: `https://cognito-idp.<region>.amazonaws.com/<user-pool-id>`
-- `ARTIFICIAL_SCIENTIST_OIDC_AUDIENCE`: User Pool app client ID
-- `ARTIFICIAL_SCIENTIST_OIDC_JWKS_URL`: `<issuer>/.well-known/jwks.json`
-- `ARTIFICIAL_SCIENTIST_OIDC_AUDIENCE_CLAIM=client_id`
-- `ARTIFICIAL_SCIENTIST_OIDC_TOKEN_USE=access`
-- `ARTIFICIAL_SCIENTIST_OIDC_REQUIRED_SCOPE=asds-api/access`
+Before enabling protected API calls, the tenant owner must create or confirm an Auth0 API and its exact Identifier. The Identifier is not established by this repository and must not be guessed. Configure that exact value in both `VITE_AUTH0_AUDIENCE` and `ARTIFICIAL_SCIENTIST_OIDC_AUDIENCE`. Define scopes in the Auth0 API only when required by the deployed authorization policy; do not invent a scope name.
 
-The browser uses the Cognito hosted UI authorization-code flow with PKCE and sends the short-lived access token as a bearer token. Configure `VITE_COGNITO_DOMAIN`, `VITE_COGNITO_CLIENT_ID`, `VITE_COGNITO_REDIRECT_URI`, `VITE_COGNITO_LOGOUT_URI`, and `VITE_COGNITO_SCOPES` in the frontend hosting environment. Callback and logout URLs must exactly match the Cognito app-client allowlists and use HTTPS in hosted environments. The web client has no embedded secret.
+Backend configuration:
+- `ARTIFICIAL_SCIENTIST_OIDC_ISSUER=https://asds-artificial-scientist.us.auth0.com/`
+- `ARTIFICIAL_SCIENTIST_OIDC_AUDIENCE=<exact-auth0-api-identifier>`
+- `ARTIFICIAL_SCIENTIST_OIDC_JWKS_URL=https://asds-artificial-scientist.us.auth0.com/.well-known/jwks.json`
+- `ARTIFICIAL_SCIENTIST_OIDC_AUDIENCE_CLAIM=aud`
+- Leave `ARTIFICIAL_SCIENTIST_OIDC_TOKEN_USE` unset for Auth0 unless a provider-specific contract is deliberately implemented and tested.
+- Configure `ARTIFICIAL_SCIENTIST_OIDC_REQUIRED_SCOPE` only when the matching scope is actually defined on the Auth0 API and requested by the SPA.
 
-### Tenant onboarding
+Frontend configuration:
+- `VITE_AUTH0_DOMAIN=asds-artificial-scientist.us.auth0.com`
+- `VITE_AUTH0_CLIENT_ID=<public-spa-client-id>`
+- `VITE_AUTH0_AUDIENCE=<exact-auth0-api-identifier>`
+- `VITE_API_BASE_URL=<verified-backend-origin>`
+- `VITE_ASDS_TENANT_ID=<operator-provisioned-tenant-id>` only after membership is explicitly provisioned.
 
-Authentication is not tenant membership. Research-record, knowledge-write, and lab APIs continue to require an active server-side tenant membership. After verifying the Cognito user `sub` in the User Pool, run the trusted operator command against the same persistent authorization database used by the API:
+For local development, configure the exact callback and logout URL `http://localhost:5173/` and web origin `http://localhost:5173` in Auth0. Hosted preview/production callback, logout, and web-origin allowlists must be configured with the exact deployed frontend origins and paths. Never put a client secret in Vite variables.
 
-\`\`\`bash
-PYTHONPATH=backend/src python backend/scripts/bootstrap_tenant_membership.py \\
-  --database /app/data/asds.sqlite3 \\
-  --issuer https://cognito-idp.<region>.amazonaws.com/<user-pool-id> \\
-  --subject <verified-cognito-sub> \\
-  --tenant-key <operator-controlled-tenant-key> \\
-  --tenant-name "ASDS Research"
-\`\`\`
+Authentication is not tenant membership. The API must validate the access-token signature, issuer, audience, expiry, and required scope (if configured), then check active server-side tenant membership and role. A client-supplied tenant ID is only a selector. The tenant directory is currently SQLite-backed; controlled operator provisioning is not a substitute for the outstanding durable-database migration and production recovery rehearsal.
 
-Set the resulting tenant ID as `VITE_ASDS_TENANT_ID` in the frontend deployment. Never accept a tenant ID as proof of membership; the API checks membership and role against its own directory. The current SQLite-backed directory means this bootstrap procedure is only suitable for controlled staging until the persistence migration is complete.
+The Auth0 settings above describe the repository's intended provider contract, not proof that the deployed Auth0 tenant/API and backend environment are configured. Production acceptance requires a real access token and negative/positive end-to-end tests against the deployed API. Keep all protected routes fail-closed until those tests pass.
 
 ## AWS deployment target
 
