@@ -9,7 +9,7 @@ This document records what this branch introduces. It does not supersede the ext
 
 ## Delivered user-facing surfaces
 
-The previous overview-only page is replaced by a navigable React research workspace. The first eleven planned capability areas now have working screens backed by API endpoints:
+The previous overview-only page is replaced by a navigable React research workspace. All twelve planned capability areas now have initial screens backed by existing API endpoints or explicit evidence-gated states:
 
 | Surface | Frontend behavior | API integration |
 |---|---|---|
@@ -22,11 +22,12 @@ The previous overview-only page is replaced by a navigable React research worksp
 | Experiment Journal & Reproducibility | Browse persisted run history; inspect run records, hashes, environment manifests and result artifacts; compare a replay; download a checksum-manifest ZIP | `GET /api/v1/lab/runs`, `GET /api/v1/lab/runs/{run_id}`, `GET /api/v1/lab/runs/{run_id}/artifacts`, `POST /api/v1/lab/runs/{run_id}/verify`, `GET /api/v1/lab/runs/{run_id}/export` |
 | Scientific Memory & Learning | Create immutable, evidence-linked versions; browse history; append contradiction and rollback versions under tenant-aware authorization | `GET /api/v1/memory`, `GET /api/v1/memory/{key}`, `POST /api/v1/memory/{key}`, `POST /api/v1/memory/{key}/contradict`, `POST /api/v1/memory/{key}/rollback` |
 | Scientific Manuscript & Publication Studio | Save and browse structured manuscript drafts; map each claim to explicit bibliographic source records; render Markdown and export locally | `POST /api/v1/manuscripts`, `GET /api/v1/manuscripts`, `GET /api/v1/manuscripts/{manuscript_id}`, `GET /api/v1/records?record_type=source` |
+| Independent Review, Evaluation & Governance | Inspect tenant-scoped review records, approval requests and server-generated record audit events; clearly distinguish stored assertions from verified reviewer identity and approvals | `GET /api/v1/records?record_type=review`, `GET /api/v1/records?record_type=approval_request`, `GET /api/v1/records/audit-events` |
 | Data Analysis & Results Observatory | Calculate descriptive statistics and bounded function plots from supplied numeric inputs | `POST /api/v1/math/statistics`, `POST /api/v1/math/plot` |
 | Mathematics & Formal Reasoning Workbench | Submit bounded symbolic simplification, differentiation, integration, solving and evaluation | \`POST /api/v1/math/symbolic\` |
 | Research Records (supporting surface) | Browse paginated immutable record envelopes and their content identifiers | \`GET /api/v1/records\` |
 
-The record browser is a supporting surface rather than a claim that all 12 planned panels are complete. The initial release now contains eleven implemented capability screens; several data-mutating screens remain gated in production until OIDC is connected. The knowledge-graph UI preserves the backend's distinction between proposed, reviewed, disputed and rejected relationships; creating an edge does not establish that it is true.
+The record browser is a supporting surface rather than a claim that all 12 planned panels are complete. The initial release now contains all twelve planned workspace screens, including an evidence viewer for governance; several data-mutating screens remain gated in production until OIDC is connected. The knowledge-graph UI preserves the backend's distinction between proposed, reviewed, disputed and rejected relationships; creating an edge does not establish that it is true.
 
 ## API client controls
 
@@ -51,6 +52,7 @@ The production API origin continues to use the existing fail-closed \`resolveApi
 - Knowledge graph concepts and relationships are immutable records. Newly created concepts are proposed; newly created relationships are proposed assertions without independent source verification. Neighborhood traversal is bounded and excludes rejected edges.
 - Retrieved source records are saved as \`unassessed\`; users must inspect original material.
 - Manuscript drafts are persisted as immutable tenant records. Each claim must map to at least one source record. The API validates tenant ownership, record integrity and identifier presence; sources marked retracted, disputed or unavailable are rejected. This does not independently establish the source's scientific validity or support for the claim. External submission remains disabled.
+- The Governance workspace is an evidence viewer only. Stored review records contain reviewer labels and outcome assertions, but the generic record-creation flow does not authenticate a named reviewer or prove independence. Approval requests are not approvals. The current server-generated audit event identifies its actor as `local-api-client`, not a specific human principal.
 - The browser client does not yet have a reviewed OIDC sign-in/session or tenant-selection adapter. In production, protected write, record, discovery and knowledge-graph operations are disabled in the UI until that adapter and a real identity provider are configured. Development-only bypasses do not imply production identity readiness.
 - The Data Analysis workspace uses the existing descriptive-statistics and plot endpoints. Statistics describe only supplied values; plots are bounded mathematical visualizations, not scientific conclusions.
 - The Computational Laboratory UI accepts declarative JSON only and exposes the existing bounded operations: symbolic math, integration, root finding, statistics and unit conversion. The run definition is validated by the backend; arbitrary code, notebook execution and shell commands are not accepted.
@@ -61,7 +63,7 @@ The production API origin continues to use the existing fail-closed \`resolveApi
 ## Verification introduced
 
 - API-client unit tests cover missing configuration, unsafe paths, JSON GET/POST behavior, response errors and refusal of non-JSON success responses.
-- Playwright covers keyboard operation across the new workspaces, visible capability boundaries, knowledge-graph, computational-lab, experiment-journal, scientific-memory, manuscript and data-analysis navigation, and the research-record surface.
+- Playwright covers keyboard operation across the new workspaces, visible capability boundaries, knowledge-graph, computational-lab, experiment-journal, scientific-memory, manuscript, governance and data-analysis navigation, and the research-record surface.
 - Automated axe accessibility checks remain part of the frontend workflow.
 - Type-check, unit tests, production build, E2E, Python suites and release-gate jobs are required CI evidence for the exact branch head.
 
@@ -69,7 +71,7 @@ A passing frontend test suite verifies the interface and API-client contract. It
 
 ## Remaining frontend sequence
 
-1. Add Independent Review, Evaluation & Governance through the existing benchmark and approval services.
+1. Expand governance beyond the evidence viewer: bind authenticated reviewer identities, enforce separation of duties, make review and approval transitions server-side, and retain signed decision provenance.
 2. Add OIDC login/session and tenant selection only after selecting and configuring a real provider; never replace identity with a client-side role selector.
 3. Complete real browser acceptance for each role and protected API operation; add end-to-end tests with isolated test identities and tenant fixtures.
 4. Add a provider-independent AI model gateway only after provider choice, data-governance and operating-cost approval.
