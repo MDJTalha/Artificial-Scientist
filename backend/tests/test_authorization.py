@@ -294,3 +294,13 @@ def test_memory_actions_follow_least_privilege():
     assert not role_allows("viewer", "memory:write")
     assert not role_allows("auditor", "memory:write")
     assert not role_allows("unknown", "memory:read")
+
+
+def test_optional_ai_inference_permission_is_limited_to_research_roles():
+    from artificial_scientist.authorization import role_allows
+
+    assert role_allows("tenant_admin", "ai:inference")
+    assert role_allows("researcher", "ai:inference")
+    assert not role_allows("viewer", "ai:inference")
+    assert not role_allows("auditor", "ai:inference")
+    assert not role_allows("unknown", "ai:inference")
