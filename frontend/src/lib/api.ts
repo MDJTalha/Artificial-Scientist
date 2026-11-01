@@ -1,12 +1,16 @@
-import { getCognitoAccessToken } from './cognito';
-
 export type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
 
 const configuredBase = (import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.DEV ? 'http://127.0.0.1:8000' : '')).trim().replace(/\/+$/, '');
 export const API_BASE_URL = configuredBase;
 export const API_PREFIX = '/api/v1';
 
-// Keep short-lived OIDC access tokens in memory only; the auth integration supplies them.
+// The Auth0 React SDK supplies short-lived API access tokens in memory only.
+let accessTokenProvider: (() => Promise<string | null>) | null = null;
+
+export function setAccessTokenProvider(provider: (() => Promise<string | null>) | null): void {
+  accessTokenProvider = provider;
+}
+
 export class ApiError extends Error {
   status: number;
   detail: unknown;
@@ -19,7 +23,7 @@ export async function apiRequest<T = Json>(path: string, init: RequestInit = {})
   const headers = new Headers(init.headers);
   headers.set('Accept', 'application/json');
   if (init.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
-  const accessToken = await getCognitoAccessToken();
+  const accessToken = accessTokenProvider ? await accessTokenProvider() : null;
   if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
   const tenantId = (import.meta.env.VITE_ASDS_TENANT_ID ?? '').trim();
   if (tenantId) headers.set('X-Tenant-ID', tenantId);
