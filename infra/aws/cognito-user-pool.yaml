@@ -1,0 +1,108 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: ASDS Cognito User Pool and public OAuth 2.0 authorization-code client with PKCE.
+
+Parameters:
+  DomainPrefix:
+    Type: String
+    Description: Globally unique Cognito hosted-UI domain prefix for this AWS Region.
+    AllowedPattern: "^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$"
+    ConstraintDescription: Use 1-63 lowercase letters, numbers, or hyphens.
+  CallbackUrls:
+    Type: CommaDelimitedList
+    Description: Exact HTTPS frontend callback URLs (for example https://app.example.com/auth/callback).
+  LogoutUrls:
+    Type: CommaDelimitedList
+    Description: Exact HTTPS frontend logout URLs.
+  EnableSelfRegistration:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    Description: Keep false until the initial tenant onboarding and abuse controls are ready.
+
+Conditions:
+  SelfRegistrationEnabled: !Equals [!Ref EnableSelfRegistration, "true"]
+
+Resources:
+  AsdsUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: ASDS-Identity
+      UsernameAttributes: [email]
+      AutoVerifiedAttributes: [email]
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: !Not [!Condition SelfRegistrationEnabled]
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - Name: verified_email
+            Priority: 1
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 14
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+          RequireUppercase: true
+          TemporaryPasswordValidityDays: 3
+      MfaConfiguration: OPTIONAL
+      EnabledMfas: [SOFTWARE_TOKEN_MFA]
+      UserPoolAddOns:
+        AdvancedSecurityMode: ENFORCED
+      Schema:
+        - Name: email
+          Required: true
+          Mutable: true
+
+  AsdsApiResourceServer:
+    Type: AWS::Cognito::UserPoolResourceServer
+    Properties:
+      Identifier: asds-api
+      Name: ASDS API
+      UserPoolId: !Ref AsdsUserPool
+      Scopes:
+        - ScopeName: access
+          ScopeDescription: Access the ASDS research API.
+
+  AsdsWebClient:
+    Type: AWS::Cognito::UserPoolClient
+    DependsOn: AsdsApiResourceServer
+    Properties:
+      ClientName: ASDS-Web-PKCE
+      UserPoolId: !Ref AsdsUserPool
+      GenerateSecret: false
+      PreventUserExistenceErrors: ENABLED
+      EnableTokenRevocation: true
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthFlows: [code]
+      AllowedOAuthScopes: [openid, email, profile, asds-api/access]
+      SupportedIdentityProviders: [COGNITO]
+      CallbackURLs: !Ref CallbackUrls
+      LogoutURLs: !Ref LogoutUrls
+      AccessTokenValidity: 15
+      IdTokenValidity: 15
+      RefreshTokenValidity: 30
+      TokenValidityUnits:
+        AccessToken: minutes
+        IdToken: minutes
+        RefreshToken: days
+
+  AsdsHostedUiDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      Domain: !Ref DomainPrefix
+      UserPoolId: !Ref AsdsUserPool
+
+Outputs:
+  UserPoolId:
+    Value: !Ref AsdsUserPool
+  UserPoolClientId:
+    Value: !Ref AsdsWebClient
+  Issuer:
+    Value: !Sub "https://cognito-idp.${AWS::Region}.amazonaws.com/${AsdsUserPool}"
+  JwksUrl:
+    Value: !Sub "https://cognito-idp.${AWS::Region}.amazonaws.com/${AsdsUserPool}/.well-known/jwks.json"
+  AudienceClaim:
+    Value: client_id
+  ExpectedTokenUse:
+    Value: access
+  HostedUiDomain:
+    Value: !Sub "https://${DomainPrefix}.auth.${AWS::Region}.amazoncognito.com"
