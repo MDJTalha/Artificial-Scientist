@@ -1,0 +1,893 @@
+import { useEffect, useState, type FormEvent } from 'react'
+
+import { apiClient, apiConfiguration } from '../lib/api'
+import type { ServiceStatus } from '../lib/status'
+
+type WorkspaceView = 'overview' | 'missions' | 'literature' | 'hypotheses' | 'math' | 'records'
+type BusyAction = 'create-task' | 'decompose' | 'literature' | 'save-sources' | 'generate' | 'prior-work' | 'assess' | 'math' | null
+
+interface ResearchWorkspaceProps {
+  apiStatus: ServiceStatus
+  onRetry: () => void
+}
+
+interface RecordEnvelope {
+  id: string
+  record_type: string
+  created_at: string
+  content_sha256: string
+  payload: Record<string, unknown>
+}
+
+interface RecordListResponse {
+  items: RecordEnvelope[]
+  total: number
+  limit: number
+  offset: number
+}
+
+interface DecompositionResponse {
+  research_question: string
+  question_type: string
+  independent_variable: string | null
+  dependent_variable: string | null
+  system_or_population: string | null
+  context: string | null
+  missing_elements: string[]
+  clarification_prompts: string[]
+  method: string
+  limitations: string[]
+}
+
+interface HypothesisCandidate {
+  title: string
+  statement: string
+  assumptions: string[]
+  alternative_explanations: string[]
+  predictions: string[]
+  falsification_criteria: string[]
+  discriminating_test: string
+  source_record_ids: string[]
+  claim_record_ids: string[]
+}
+
+interface GeneratedHypothesis {
+  candidate: HypothesisCandidate
+  generation_method: string
+  review_status: string
+}
+
+interface HypothesisGenerationResponse {
+  research_question: string
+  candidates: GeneratedHypothesis[]
+  limitations: string[]
+}
+
+interface LiteratureResult {
+  title: string
+  authors: string[]
+  doi: string | null
+  publication_date: string | null
+  publication_year: number | null
+  source_url: string
+  source_kind: 'journal_article' | 'preprint' | 'dataset' | 'standard' | 'other'
+  matched_providers: string[]
+  is_retracted: boolean | null
+  has_open_access_location: boolean | null
+  cited_by_count: number | null
+  saved_record_id: string | null
+}
+
+interface LiteratureResponse {
+  query: string
+  status: 'ok' | 'partial' | 'unavailable'
+  total_results: number
+  results: LiteratureResult[]
+  providers: { provider: string; status: string; result_count: number; message: string | null }[]
+  note: string
+}
+
+interface PriorWorkResponse {
+  overall_status: 'complete' | 'partial' | 'unavailable'
+  limitations: string[]
+  results: {
+    title: string
+    search_status: string
+    total_results: number
+    matches: {
+      title: string
+      doi: string | null
+      publication_year: number | null
+      source_url: string
+      cited_by_count: number | null
+      is_retracted: boolean | null
+    }[]
+    interpretation: string
+  }[]
+}
+
+interface AssessmentResponse {
+  overall_status: string
+  assessments: {
+    title: string
+    completeness_score: number
+    rubric: Record<string, boolean>
+    concerns: string[]
+    near_duplicate_of: string | null
+    novelty_status: string
+    persisted_record_id: string | null
+  }[]
+  limitations: string[]
+}
+
+interface SymbolicResponse {
+  operation: string
+  expression: string
+  result: string
+  results: string[]
+  free_symbols: string[]
+  numeric_value: number | null
+  method: string
+  note: string
+}
+
+const navigation: { id: WorkspaceView; label: string; symbol: string; detail: string }[] = [
+  { id: 'overview', label: 'Command center', symbol: '◫', detail: 'System overview and workspace maturity' },
+  { id: 'missions', label: 'Research agenda', symbol: '⌖', detail: 'Create and structure research questions' },
+  { id: 'literature', label: 'Literature explorer', symbol: '⌕', detail: 'Search scholarly metadata and save evidence' },
+  { id: 'hypotheses', label: 'Hypothesis lab', symbol: '◇', detail: 'Compare, screen and assess candidate hypotheses' },
+  { id: 'math', label: 'Mathematics workbench', symbol: '∑', detail: 'Bounded symbolic calculations' },
+  { id: 'records', label: 'Research records', symbol: '▤', detail: 'Browse immutable, provenance-aware records' },
+]
+
+const workspaceRoadmap = [
+  { name: 'Scientific Command Center', status: 'AVAILABLE', note: 'Runtime health, maturity and release posture.' },
+  { name: 'Research Agenda & Problem Observatory', status: 'AVAILABLE', note: 'Create tasks and decompose questions.' },
+  { name: 'Literature & Evidence Explorer', status: 'AVAILABLE', note: 'OpenAlex and Crossref metadata retrieval.' },
+  { name: 'Scientific Knowledge Graph & Vocabulary', status: 'NEXT', note: 'Concept search, relationships and graph navigation.' },
+  { name: 'Hypothesis & Discovery Lab', status: 'AVAILABLE', note: 'Bounded templates, prior-work screen and assessment.' },
+  { name: 'Mathematics & Formal Reasoning Workbench', status: 'AVAILABLE', note: 'Bounded symbolic calculation and review notes.' },
+  { name: 'Computational Laboratory & Simulation Center', status: 'BACKEND READY / UI NEXT', note: 'Execution UI remains gated on reviewed sandbox deployment.' },
+  { name: 'Data Analysis & Results Observatory', status: 'NEXT', note: 'Statistics, result comparison and visual analysis.' },
+  { name: 'Experiment Journal & Reproducibility', status: 'NEXT', note: 'Run history, manifests, verification and exports.' },
+  { name: 'Scientific Memory & Learning', status: 'BACKEND READY / UI NEXT', note: 'Versioned memory and contradiction review.' },
+  { name: 'Scientific Manuscript & Publication Studio', status: 'BACKEND READY / UI NEXT', note: 'Evidence-linked writing; external submission stays gated.' },
+  { name: 'Independent Review, Evaluation & Governance', status: 'NEXT', note: 'Review queues, benchmark evidence and approvals.' },
+]
+
+function errorText(error: unknown): string {
+  return error instanceof Error ? error.message : 'The operation could not be completed.'
+}
+
+function recordTitle(record: RecordEnvelope): string {
+  const payload = record.payload
+  for (const key of ['title', 'preferred_label', 'claim_text', 'research_question', 'hypothesis']) {
+    const value = payload[key]
+    if (typeof value === 'string' && value.trim()) return value
+  }
+  return 'Untitled ' + record.record_type.replaceAll('_', ' ')
+}
+
+function formatDate(value: string): string {
+  const date = new Date(value)
+  return Number.isNaN(date.getTime())
+    ? value
+    : date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+}
+
+export default function ResearchWorkspace({ apiStatus, onRetry }: ResearchWorkspaceProps) {
+  const [activeView, setActiveView] = useState<WorkspaceView>('overview')
+  const [busy, setBusy] = useState<BusyAction>(null)
+  const [notice, setNotice] = useState<string | null>(null)
+  const [pageError, setPageError] = useState<string | null>(null)
+
+  const [taskTitle, setTaskTitle] = useState('')
+  const [researchQuestion, setResearchQuestion] = useState('')
+  const [objective, setObjective] = useState('')
+  const [domainContext, setDomainContext] = useState('')
+  const [createdTask, setCreatedTask] = useState<RecordEnvelope | null>(null)
+  const [decomposition, setDecomposition] = useState<DecompositionResponse | null>(null)
+  const [independentVariable, setIndependentVariable] = useState('')
+  const [dependentVariable, setDependentVariable] = useState('')
+  const [systemOrPopulation, setSystemOrPopulation] = useState('')
+
+  const [literatureQuery, setLiteratureQuery] = useState('')
+  const [literatureResponse, setLiteratureResponse] = useState<LiteratureResponse | null>(null)
+  const [saveSources, setSaveSources] = useState(false)
+  const [savedSourceCount, setSavedSourceCount] = useState(0)
+
+  const [hypothesisResponse, setHypothesisResponse] = useState<HypothesisGenerationResponse | null>(null)
+  const [priorWorkResponse, setPriorWorkResponse] = useState<PriorWorkResponse | null>(null)
+  const [assessmentResponse, setAssessmentResponse] = useState<AssessmentResponse | null>(null)
+
+  const [records, setRecords] = useState<RecordEnvelope[]>([])
+  const [recordTotal, setRecordTotal] = useState(0)
+  const [recordError, setRecordError] = useState<string | null>(null)
+  const [recordsRefresh, setRecordsRefresh] = useState(0)
+
+  const [mathOperation, setMathOperation] = useState<'simplify' | 'differentiate' | 'integrate' | 'solve' | 'evaluate'>('simplify')
+  const [mathExpression, setMathExpression] = useState('x**2 + 2*x + 1')
+  const [mathVariable, setMathVariable] = useState('x')
+  const [mathResponse, setMathResponse] = useState<SymbolicResponse | null>(null)
+
+  useEffect(() => {
+    if (activeView !== 'records' || !apiConfiguration.baseUrl) return
+
+    const controller = new AbortController()
+    setRecordError(null)
+    apiClient
+      .get<RecordListResponse>('/api/v1/records?limit=50&offset=0', { signal: controller.signal })
+      .then((result) => {
+        setRecords(result.items)
+        setRecordTotal(result.total)
+      })
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted) setRecordError(errorText(error))
+      })
+
+    return () => controller.abort()
+  }, [activeView, recordsRefresh])
+
+  function beginAction(action: Exclude<BusyAction, null>) {
+    setBusy(action)
+    setNotice(null)
+    setPageError(null)
+  }
+
+  function finishAction() {
+    setBusy(null)
+  }
+
+  async function createResearchTask(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    beginAction('create-task')
+    try {
+      const task = await apiClient.post<RecordEnvelope>('/api/v1/records', {
+        record_type: 'research_task',
+        title: taskTitle.trim(),
+        research_question: researchQuestion.trim(),
+        objective: objective.trim(),
+        status: 'created',
+        priority: 'normal',
+        provenance: {
+          method: 'human_provided',
+          notes: 'Created by the ASDS Research Agenda workspace.',
+        },
+      })
+      setCreatedTask(task)
+      setRecordsRefresh((value) => value + 1)
+      setNotice('Research task saved as an immutable research record.')
+    } catch (error) {
+      setPageError(errorText(error))
+    } finally {
+      finishAction()
+    }
+  }
+
+  async function decomposeQuestion() {
+    if (researchQuestion.trim().length < 10) {
+      setPageError('Enter a research question containing at least 10 characters.')
+      return
+    }
+    beginAction('decompose')
+    try {
+      const result = await apiClient.post<DecompositionResponse>('/api/v1/discovery/decompose', {
+        research_question: researchQuestion.trim(),
+        domain_context: domainContext.trim() || null,
+      })
+      setDecomposition(result)
+      setIndependentVariable(result.independent_variable ?? '')
+      setDependentVariable(result.dependent_variable ?? '')
+      setSystemOrPopulation(result.system_or_population ?? '')
+      setNotice('Question structure returned. Confirm or edit every extracted field before proceeding.')
+    } catch (error) {
+      setPageError(errorText(error))
+    } finally {
+      finishAction()
+    }
+  }
+
+  async function searchLiterature(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    beginAction('literature')
+    setSavedSourceCount(0)
+    try {
+      const result = await apiClient.post<LiteratureResponse>('/api/v1/literature/search', {
+        query: literatureQuery.trim(),
+        limit: 8,
+        providers: ['openalex', 'crossref'],
+        persist_results: false,
+      })
+      setLiteratureResponse(result)
+      setNotice(
+        result.status === 'ok'
+          ? 'Metadata search completed. Inspect original sources before relying on any claim.'
+          : 'Metadata search returned partial or unavailable provider results.',
+      )
+    } catch (error) {
+      setPageError(errorText(error))
+    } finally {
+      finishAction()
+    }
+  }
+
+  async function persistLiteratureSources() {
+    if (!literatureResponse || literatureResponse.results.length === 0) return
+    beginAction('save-sources')
+    let saved = 0
+    let failed = 0
+    for (const result of literatureResponse.results) {
+      try {
+        await apiClient.post<RecordEnvelope>('/api/v1/records', {
+          record_type: 'source',
+          title: result.title,
+          source_url: result.source_url,
+          source_kind: result.source_kind,
+          authors: result.authors,
+          published_date: result.publication_date,
+          external_identifier: result.doi,
+          assessment_status: 'unassessed',
+          provenance: {
+            method: 'literature_retrieval',
+            notes: 'Bibliographic metadata retrieved from: ' + result.matched_providers.join(', ') +
+              '. Metadata is a discovery lead, not scientific verification.',
+          },
+        })
+        saved += 1
+      } catch {
+        failed += 1
+      }
+    }
+    setSavedSourceCount(saved)
+    setRecordsRefresh((value) => value + 1)
+    setNotice(
+      saved + ' source record(s) saved; ' + failed +
+        ' failed. Each saved source remains unassessed until a researcher reviews the original material.',
+    )
+    finishAction()
+  }
+
+  async function generateHypotheses(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    beginAction('generate')
+    setPriorWorkResponse(null)
+    setAssessmentResponse(null)
+    try {
+      const result = await apiClient.post<HypothesisGenerationResponse>('/api/v1/discovery/generate', {
+        research_question: researchQuestion.trim(),
+        independent_variable: independentVariable.trim(),
+        dependent_variable: dependentVariable.trim(),
+        system_or_population: systemOrPopulation.trim(),
+        context: domainContext.trim() || null,
+        include_null: true,
+        include_inverse: true,
+      })
+      setHypothesisResponse(result)
+      setNotice('Bounded candidate templates generated. These are not AI inference, evidence, novelty or truth claims.')
+    } catch (error) {
+      setPageError(errorText(error))
+    } finally {
+      finishAction()
+    }
+  }
+
+  async function screenPriorWork() {
+    const candidates = hypothesisResponse?.candidates.map((item) => ({
+      title: item.candidate.title,
+      statement: item.candidate.statement,
+    })) ?? []
+    if (candidates.length < 2) {
+      setPageError('Generate at least two candidate hypotheses before prior-work screening.')
+      return
+    }
+    beginAction('prior-work')
+    try {
+      const result = await apiClient.post<PriorWorkResponse>('/api/v1/discovery/prior-work-screen', {
+        research_question: researchQuestion.trim(),
+        candidates,
+        providers: ['openalex', 'crossref'],
+        results_per_candidate: 5,
+      })
+      setPriorWorkResponse(result)
+      setNotice(
+        'Prior-work metadata screen completed with status: ' + result.overall_status +
+          '. A metadata search cannot establish novelty.',
+      )
+    } catch (error) {
+      setPageError(errorText(error))
+    } finally {
+      finishAction()
+    }
+  }
+
+  async function assessAndPersistHypotheses() {
+    const candidates = hypothesisResponse?.candidates.map((item) => item.candidate) ?? []
+    if (candidates.length < 2) {
+      setPageError('Generate at least two candidate hypotheses before assessment.')
+      return
+    }
+    beginAction('assess')
+    try {
+      const hasCompleteMetadataScreen = priorWorkResponse?.overall_status === 'complete'
+      const result = await apiClient.post<AssessmentResponse>('/api/v1/discovery/assess', {
+        research_question: researchQuestion.trim(),
+        candidates,
+        novelty_screen_status: hasCompleteMetadataScreen ? 'screened' : 'not_run',
+        novelty_screen_notes: hasCompleteMetadataScreen
+          ? 'A bounded OpenAlex/Crossref metadata screen was completed. This is not a full-text review or proof of novelty.'
+          : null,
+      })
+      setAssessmentResponse(result)
+      setRecordsRefresh((value) => value + 1)
+      setNotice('Hypothesis assessment saved. Rubric scores measure structural completeness, not probability or scientific merit.')
+    } catch (error) {
+      setPageError(errorText(error))
+    } finally {
+      finishAction()
+    }
+  }
+
+  async function runSymbolicTool(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    beginAction('math')
+    try {
+      const requiresVariable = ['differentiate', 'integrate', 'solve'].includes(mathOperation)
+      const result = await apiClient.post<SymbolicResponse>('/api/v1/math/symbolic', {
+        operation: mathOperation,
+        expression: mathExpression.trim(),
+        symbols: [mathVariable.trim()],
+        variable: requiresVariable ? mathVariable.trim() : null,
+        substitutions: {},
+      })
+      setMathResponse(result)
+      setNotice('Calculation completed. Review the assumptions and mathematical domain before scientific use.')
+    } catch (error) {
+      setPageError(errorText(error))
+    } finally {
+      finishAction()
+    }
+  }
+
+  function selectView(view: WorkspaceView) {
+    setActiveView(view)
+    setNotice(null)
+    setPageError(null)
+    if (view === 'records') setRecordsRefresh((value) => value + 1)
+  }
+
+  const apiConfigured = Boolean(apiConfiguration.baseUrl)
+  const protectedNotice = import.meta.env.PROD
+    ? 'Production OIDC sign-in and tenant selection are not yet connected to this frontend. Protected research-record and discovery actions will remain unavailable until a reviewed identity session is supplied.'
+    : null
+
+  return (
+    <div className="app-shell">
+      <aside className="sidebar">
+        <div className="brand">
+          <div className="brand-mark" aria-hidden="true"><span /><span /><span /></div>
+          <div>
+            <p className="brand-name">ARTIFICIAL</p>
+            <p className="brand-name brand-name-secondary">SCIENTIST</p>
+          </div>
+        </div>
+        <div className="sidebar-section-label">RESEARCH WORKSPACES</div>
+        <nav aria-label="Research workspaces">
+          {navigation.map((item) => (
+            <button
+              className={'nav-item' + (activeView === item.id ? ' nav-item-active' : '')}
+              key={item.id}
+              type="button"
+              aria-current={activeView === item.id ? 'page' : undefined}
+              title={item.detail}
+              onClick={() => selectView(item.id)}
+            >
+              <span className="nav-symbol" aria-hidden="true">{item.symbol}</span>
+              {item.label}
+              {activeView === item.id && <span className="nav-indicator" />}
+            </button>
+          ))}
+        </nav>
+        <div className="sidebar-bottom">
+          <div className="sidebar-orbit" aria-hidden="true"><span /><span /><span /></div>
+          <p className="sidebar-note">Research before autonomy.</p>
+          <p className="sidebar-subnote">Evidence, falsification, provenance and authorization are system invariants.</p>
+          <div className="sidebar-version">RESEARCH WORKSPACE · V1</div>
+        </div>
+      </aside>
+
+      <main className="main-content">
+        <header className="topbar">
+          <div className="breadcrumb">
+            <span>ASDS</span><span className="breadcrumb-divider">/</span>
+            <strong>{navigation.find((item) => item.id === activeView)?.label ?? 'Workspace'}</strong>
+          </div>
+          <div className="topbar-status">
+            <span className={apiStatus === 'connected' ? 'status-dot status-dot-ok' : apiStatus === 'unavailable' ? 'status-dot status-dot-error' : 'status-dot'} />
+            <span>{apiStatus === 'connected' ? 'HEALTH ENDPOINT OK' : apiStatus === 'unavailable' ? 'API UNAVAILABLE' : 'CHECKING API'}</span>
+            <button className="topbar-retry" type="button" onClick={onRetry}>Refresh</button>
+          </div>
+        </header>
+
+        {!apiConfigured && (
+          <div className="workspace-alert" role="status">
+            <strong>API endpoint not configured.</strong>
+            <span>{apiConfiguration.error ?? 'Configure VITE_API_BASE_URL to connect this workspace.'}</span>
+          </div>
+        )}
+        {protectedNotice && <div className="workspace-alert workspace-alert-warning" role="note">{protectedNotice}</div>}
+        {notice && <div className="workspace-message" role="status" aria-live="polite">{notice}</div>}
+        {pageError && <div className="workspace-alert workspace-alert-error" role="alert">{pageError}</div>}
+
+        {activeView === 'overview' && (
+          <>
+            <section className="workspace-hero">
+              <div className="eyebrow"><span /> ARTIFICIAL SCIENTIST · RESEARCH-FIRST SYSTEM</div>
+              <h1>From research question<br /><span>to traceable scientific work.</span></h1>
+              <p>
+                ASDS provides a governed environment for recording questions, locating scholarly
+                evidence, structuring hypotheses and running bounded mathematical tools. Each
+                capability is exposed only at the level supported by its implementation and evidence.
+              </p>
+              <div className="workspace-hero-actions">
+                <button className="primary-button" type="button" onClick={() => selectView('missions')}>Start a research mission <span aria-hidden="true">↗</span></button>
+                <button className="secondary-button" type="button" onClick={() => selectView('records')}>Open research records</button>
+              </div>
+            </section>
+
+            <section className="workspace-stats" aria-label="Workspace status">
+              <article className="workspace-stat">
+                <span className="card-label">API HEALTH</span>
+                <strong>{apiStatus === 'connected' ? 'Connected' : apiStatus === 'checking' ? 'Checking' : 'Unavailable'}</strong>
+                <p>Health endpoint only; not a database or production-readiness certificate.</p>
+              </article>
+              <article className="workspace-stat">
+                <span className="card-label">LIVE WORKSPACES</span>
+                <strong>5 <small>/ 12</small></strong>
+                <p>Command center, agenda, literature, hypothesis and mathematics.</p>
+              </article>
+              <article className="workspace-stat">
+                <span className="card-label">AI INFERENCE</span>
+                <strong>Not connected</strong>
+                <p>Hypothesis suggestions use deterministic templates; no provider model is invoked.</p>
+              </article>
+              <article className="workspace-stat">
+                <span className="card-label">RELEASE POSTURE</span>
+                <strong>Evidence-gated</strong>
+                <p>Identity, sandbox deployment, operations and external scientific review remain open.</p>
+              </article>
+            </section>
+
+            <section className="workspace-card workspace-roadmap">
+              <div className="section-heading">
+                <div><p className="card-label">TWELVE RESEARCH WORKSPACES</p><h2>Capability and integration status</h2></div>
+                <span className="section-index">PRODUCT MAP / 01</span>
+              </div>
+              <div className="workspace-roadmap-grid">
+                {workspaceRoadmap.map((item, index) => (
+                  <article className="workspace-roadmap-item" key={item.name}>
+                    <div className="workspace-roadmap-top">
+                      <span className="capability-number">{String(index + 1).padStart(2, '0')}</span>
+                      <span className={item.status === 'AVAILABLE' ? 'workspace-state workspace-state-live' : 'workspace-state'}>{item.status}</span>
+                    </div>
+                    <h3>{item.name}</h3>
+                    <p>{item.note}</p>
+                  </article>
+                ))}
+              </div>
+            </section>
+
+            <section className="workspace-card">
+              <div className="section-heading">
+                <div><p className="card-label">CONTROLLED RESEARCH FLOW</p><h2>Run a first end-to-end research cycle</h2></div>
+                <span className="section-index">WORKFLOW / 01</span>
+              </div>
+              <div className="workflow-strip">
+                {[
+                  ['01', 'Define', 'Create a research task and scope.'],
+                  ['02', 'Retrieve', 'Search scholarly metadata and save reviewed sources.'],
+                  ['03', 'Compare', 'Generate, screen and assess competing hypotheses.'],
+                  ['04', 'Calculate', 'Use bounded symbolic tools and retain the result.'],
+                  ['05', 'Review', 'Inspect traceability and decide the next approved step.'],
+                ].map(([number, title, detail]) => (
+                  <div className="workflow-step" key={number}>
+                    <span>{number}</span><strong>{title}</strong><p>{detail}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+          </>
+        )}
+
+        {activeView === 'missions' && (
+          <section className="workspace-page">
+            <div className="page-heading">
+              <p className="card-label">RESEARCH AGENDA & PROBLEM OBSERVATORY</p>
+              <h1>Define a research mission</h1>
+              <p>Capture the question and objective as a durable record, then structure its unknowns before forming hypotheses.</p>
+            </div>
+            <div className="workspace-two-column">
+              <section className="workspace-card">
+                <div className="section-heading"><div><p className="card-label">MISSION DEFINITION</p><h2>Research task</h2></div><span className="section-index">RECORD / 01</span></div>
+                <form className="workspace-form" onSubmit={createResearchTask}>
+                  <label htmlFor="task-title">Mission title</label>
+                  <input id="task-title" value={taskTitle} onChange={(event) => setTaskTitle(event.target.value)} minLength={3} maxLength={200} required placeholder="e.g. Relationship between material composition and conductivity" />
+                  <label htmlFor="research-question">Research question</label>
+                  <textarea id="research-question" value={researchQuestion} onChange={(event) => setResearchQuestion(event.target.value)} minLength={10} maxLength={5000} required rows={4} placeholder="State one clear, researchable question. Include variables, system and context where known." />
+                  <label htmlFor="research-objective">Research objective</label>
+                  <textarea id="research-objective" value={objective} onChange={(event) => setObjective(event.target.value)} minLength={3} maxLength={4000} required rows={3} placeholder="What should this investigation establish, compare, measure or explain?" />
+                  <label htmlFor="domain-context">Domain and boundary context</label>
+                  <input id="domain-context" value={domainContext} onChange={(event) => setDomainContext(event.target.value)} maxLength={1000} placeholder="e.g. materials science; room temperature; controlled laboratory dataset" />
+                  <div className="form-actions">
+                    <button className="primary-button" type="submit" disabled={busy !== null || !apiConfigured}>
+                      {busy === 'create-task' ? 'Saving task…' : 'Save research task'}
+                    </button>
+                    <button className="secondary-button" type="button" disabled={busy !== null || !apiConfigured || researchQuestion.trim().length < 10} onClick={decomposeQuestion}>
+                      {busy === 'decompose' ? 'Structuring question…' : 'Structure question'}
+                    </button>
+                  </div>
+                </form>
+                {createdTask && (
+                  <div className="inline-result" role="status">
+                    <strong>Task record saved</strong>
+                    <span>{createdTask.id}</span>
+                    <small>SHA-256: {createdTask.content_sha256}</small>
+                  </div>
+                )}
+              </section>
+              <section className="workspace-card">
+                <div className="section-heading"><div><p className="card-label">QUESTION DECOMPOSITION</p><h2>Review the structure</h2></div><span className="section-index">HEURISTIC / 01</span></div>
+                {decomposition ? (
+                  <div className="decomposition-result">
+                    <div className="result-chip-row"><span className="result-chip">{decomposition.question_type}</span><span className="result-chip">{decomposition.method}</span></div>
+                    <dl className="result-definition-list">
+                      <div><dt>Independent variable</dt><dd>{decomposition.independent_variable ?? 'Not identified — enter manually'}</dd></div>
+                      <div><dt>Dependent variable</dt><dd>{decomposition.dependent_variable ?? 'Not identified — enter manually'}</dd></div>
+                      <div><dt>System / population</dt><dd>{decomposition.system_or_population ?? 'Not identified — enter manually'}</dd></div>
+                      <div><dt>Domain context</dt><dd>{decomposition.context ?? 'Not supplied'}</dd></div>
+                    </dl>
+                    <h3>Missing elements</h3>
+                    {decomposition.missing_elements.length > 0
+                      ? <ul className="workspace-list">{decomposition.missing_elements.map((item) => <li key={item}>{item.replaceAll('_', ' ')}</li>)}</ul>
+                      : <p>No missing elements were flagged by the heuristic. Human review is still required.</p>}
+                    <h3>Clarification prompts</h3>
+                    <ul className="workspace-list">{decomposition.clarification_prompts.map((item) => <li key={item}>{item}</li>)}</ul>
+                    <div className="workspace-caveat">{decomposition.limitations.join(' ')}</div>
+                  </div>
+                ) : (
+                  <div className="empty-state"><span>⌖</span><strong>No decomposition yet</strong><p>Structure the question to extract conservative variable hints and identify missing information.</p></div>
+                )}
+              </section>
+            </div>
+            {decomposition && (
+              <section className="workspace-card variable-editor">
+                <div className="section-heading"><div><p className="card-label">RESEARCHER CONFIRMATION</p><h2>Confirm the variables before hypothesis drafting</h2></div><span className="section-index">HUMAN REVIEW</span></div>
+                <div className="workspace-form variable-grid">
+                  <div><label htmlFor="independent-variable">Independent variable</label><input id="independent-variable" value={independentVariable} onChange={(event) => setIndependentVariable(event.target.value)} minLength={2} maxLength={300} /></div>
+                  <div><label htmlFor="dependent-variable">Dependent variable</label><input id="dependent-variable" value={dependentVariable} onChange={(event) => setDependentVariable(event.target.value)} minLength={2} maxLength={300} /></div>
+                  <div><label htmlFor="system-population">System / population</label><input id="system-population" value={systemOrPopulation} onChange={(event) => setSystemOrPopulation(event.target.value)} minLength={2} maxLength={500} /></div>
+                  <button className="primary-button" type="button" disabled={!researchQuestion.trim() || !independentVariable.trim() || !dependentVariable.trim() || !systemOrPopulation.trim()} onClick={() => selectView('hypotheses')}>Continue to hypothesis lab</button>
+                </div>
+              </section>
+            )}
+          </section>
+        )}
+
+        {activeView === 'literature' && (
+          <section className="workspace-page">
+            <div className="page-heading">
+              <p className="card-label">LITERATURE & EVIDENCE EXPLORER</p>
+              <h1>Find scholarly metadata</h1>
+              <p>Search OpenAlex and Crossref, inspect provider coverage and save individual results as unassessed source records.</p>
+            </div>
+            <section className="workspace-card">
+              <form className="workspace-search-form" onSubmit={searchLiterature}>
+                <div className="workspace-search-field"><label htmlFor="literature-query">Search terms</label><input id="literature-query" value={literatureQuery} onChange={(event) => setLiteratureQuery(event.target.value)} minLength={3} maxLength={500} required placeholder="Search by concept, method, material, population or research question" /></div>
+                <button className="primary-button" type="submit" disabled={busy !== null || !apiConfigured}>{busy === 'literature' ? 'Searching…' : 'Search metadata'}</button>
+              </form>
+              <p className="form-help">Search results are bibliographic leads. Full-text retrieval, claim extraction and scientific truth assessment are not part of this search endpoint.</p>
+            </section>
+            {literatureResponse && (
+              <>
+                <section className="workspace-card">
+                  <div className="section-heading"><div><p className="card-label">RETRIEVAL STATUS</p><h2>{literatureResponse.total_results} metadata result(s)</h2></div><span className={'result-chip result-chip-' + literatureResponse.status}>{literatureResponse.status}</span></div>
+                  <div className="provider-status-grid">
+                    {literatureResponse.providers.map((provider) => (
+                      <div className="provider-status" key={provider.provider}>
+                        <strong>{provider.provider}</strong><span>{provider.status} · {provider.result_count} result(s)</span>
+                        {provider.message && <small>{provider.message}</small>}
+                      </div>
+                    ))}
+                  </div>
+                  <p className="form-help">{literatureResponse.note}</p>
+                </section>
+                <div className="literature-result-list">
+                  {literatureResponse.results.map((result, index) => (
+                    <article className="workspace-card literature-result" key={result.doi ?? result.source_url}>
+                      <div className="literature-result-top"><span className="result-chip">SOURCE {String(index + 1).padStart(2, '0')}</span><span className={result.is_retracted ? 'result-chip result-chip-danger' : 'result-chip'}>{result.is_retracted ? 'RETRACTION FLAG' : 'METADATA ONLY'}</span></div>
+                      <h2>{result.title}</h2>
+                      <p>{result.authors.slice(0, 5).join(', ') || 'Author metadata unavailable'}{result.authors.length > 5 ? ' et al.' : ''}</p>
+                      <div className="literature-metadata">
+                        <span>{result.publication_year ?? 'Year unknown'}</span>
+                        <span>{result.doi ? 'DOI: ' + result.doi : 'No DOI supplied'}</span>
+                        <span>{result.cited_by_count === null ? 'Citation count unavailable' : result.cited_by_count + ' citations reported'}</span>
+                      </div>
+                      <div className="literature-result-actions">
+                        <a href={result.source_url} target="_blank" rel="noreferrer noopener">Open source record ↗</a>
+                        <span>{result.matched_providers.join(' + ')}</span>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+                {literatureResponse.results.length > 0 && (
+                  <section className="workspace-card source-save-panel">
+                    <div><p className="card-label">PROVENANCE CAPTURE</p><h2>Save retrieved sources to the record store</h2><p>Saving creates tenant-authorized source records with bibliographic provenance. It does not copy or license the full text.</p></div>
+                    <button className="primary-button" type="button" onClick={persistLiteratureSources} disabled={busy !== null || savedSourceCount === literatureResponse.results.length}>{busy === 'save-sources' ? 'Saving sources…' : 'Save source records'}</button>
+                  </section>
+                )}
+              </>
+            )}
+          </section>
+        )}
+
+        {activeView === 'hypotheses' && (
+          <section className="workspace-page">
+            <div className="page-heading">
+              <p className="card-label">HYPOTHESIS & DISCOVERY LAB</p>
+              <h1>Develop competing explanations</h1>
+              <p>Use researcher-confirmed variables to create bounded candidate templates, screen prior-work metadata and save structured assessments.</p>
+            </div>
+            <section className="workspace-card">
+              <div className="section-heading"><div><p className="card-label">INPUT REVIEW</p><h2>Question and variable definitions</h2></div><span className="section-index">HUMAN-LED</span></div>
+              <div className="workspace-form variable-grid">
+                <div className="variable-grid-question"><label htmlFor="hypothesis-question">Research question</label><textarea id="hypothesis-question" rows={3} value={researchQuestion} onChange={(event) => setResearchQuestion(event.target.value)} minLength={10} maxLength={5000} /></div>
+                <div><label htmlFor="hyp-iv">Independent variable</label><input id="hyp-iv" value={independentVariable} onChange={(event) => setIndependentVariable(event.target.value)} minLength={2} maxLength={300} /></div>
+                <div><label htmlFor="hyp-dv">Dependent variable</label><input id="hyp-dv" value={dependentVariable} onChange={(event) => setDependentVariable(event.target.value)} minLength={2} maxLength={300} /></div>
+                <div><label htmlFor="hyp-system">System / population</label><input id="hyp-system" value={systemOrPopulation} onChange={(event) => setSystemOrPopulation(event.target.value)} minLength={2} maxLength={500} /></div>
+                <div><label htmlFor="hyp-context">Domain context</label><input id="hyp-context" value={domainContext} onChange={(event) => setDomainContext(event.target.value)} maxLength={1000} /></div>
+              </div>
+              <div className="form-actions">
+                <button className="primary-button" type="button" disabled={busy !== null || !apiConfigured || researchQuestion.trim().length < 10 || independentVariable.trim().length < 2 || dependentVariable.trim().length < 2 || systemOrPopulation.trim().length < 2} onClick={(event) => void generateHypotheses(event as unknown as FormEvent<HTMLFormElement>)}>{busy === 'generate' ? 'Generating…' : 'Generate candidate templates'}</button>
+                <button className="secondary-button" type="button" onClick={() => selectView('missions')}>Edit research mission</button>
+              </div>
+            </section>
+            {hypothesisResponse && (
+              <>
+                <div className="workspace-alert workspace-alert-warning"><strong>Interpretation boundary:</strong> The API uses deterministic directional templates. It does not invoke an LLM, infer evidence, establish truth, predict probabilities or guarantee novelty. Every candidate requires human review.</div>
+                <div className="hypothesis-grid">
+                  {hypothesisResponse.candidates.map((item) => (
+                    <article className="workspace-card hypothesis-card" key={item.candidate.title}>
+                      <div className="literature-result-top"><span className="result-chip">{item.generation_method.replaceAll('_', ' ')}</span><span className="result-chip">{item.review_status.replaceAll('_', ' ')}</span></div>
+                      <h2>{item.candidate.title}</h2>
+                      <p className="hypothesis-statement">{item.candidate.statement}</p>
+                      <h3>Assumptions</h3><ul className="workspace-list">{item.candidate.assumptions.map((text) => <li key={text}>{text}</li>)}</ul>
+                      <h3>Alternative explanations</h3><ul className="workspace-list">{item.candidate.alternative_explanations.map((text) => <li key={text}>{text}</li>)}</ul>
+                      <h3>Predictions</h3><ul className="workspace-list">{item.candidate.predictions.map((text) => <li key={text}>{text}</li>)}</ul>
+                      <h3>Falsification criteria</h3><ul className="workspace-list">{item.candidate.falsification_criteria.map((text) => <li key={text}>{text}</li>)}</ul>
+                      <h3>Discriminating test</h3><p>{item.candidate.discriminating_test}</p>
+                    </article>
+                  ))}
+                </div>
+                <div className="form-actions">
+                  <button className="secondary-button" type="button" onClick={screenPriorWork} disabled={busy !== null || !apiConfigured}>{busy === 'prior-work' ? 'Screening metadata…' : 'Screen prior work'}</button>
+                  <button className="primary-button" type="button" onClick={assessAndPersistHypotheses} disabled={busy !== null || !apiConfigured}>{busy === 'assess' ? 'Assessing and saving…' : 'Assess and save candidates'}</button>
+                </div>
+                {priorWorkResponse && (
+                  <section className="workspace-card">
+                    <div className="section-heading"><div><p className="card-label">PRIOR-WORK METADATA SCREEN</p><h2>Search status: {priorWorkResponse.overall_status}</h2></div><span className="section-index">NOT A NOVELTY PROOF</span></div>
+                    {priorWorkResponse.results.map((result) => (
+                      <div className="prior-work-result" key={result.title}>
+                        <h3>{result.title}</h3><p>{result.interpretation}</p>
+                        <span className="result-chip">{result.search_status} · {result.total_results} match(es)</span>
+                        {result.matches.map((match) => <div className="prior-work-match" key={match.doi ?? match.source_url}><a href={match.source_url} target="_blank" rel="noreferrer noopener">{match.title} ↗</a><small>{match.publication_year ?? 'Year unknown'}{match.doi ? ' · DOI ' + match.doi : ''}{match.is_retracted ? ' · RETRACTION FLAG' : ''}</small></div>)}
+                      </div>
+                    ))}
+                    <div className="workspace-caveat">{priorWorkResponse.limitations.join(' ')}</div>
+                  </section>
+                )}
+                {assessmentResponse && (
+                  <section className="workspace-card">
+                    <div className="section-heading"><div><p className="card-label">STRUCTURAL ASSESSMENT</p><h2>{assessmentResponse.overall_status.replaceAll('_', ' ')}</h2></div><span className="section-index">PERSISTED</span></div>
+                    <div className="assessment-grid">
+                      {assessmentResponse.assessments.map((item) => (
+                        <article className="assessment-item" key={item.title}>
+                          <h3>{item.title}</h3><strong>{item.completeness_score}%</strong>
+                          <p>Completeness rubric score — not truth, probability or scientific merit.</p>
+                          <small>{item.persisted_record_id ? 'Record: ' + item.persisted_record_id : 'Record identifier unavailable'}</small>
+                          {item.concerns.length > 0 && <ul className="workspace-list">{item.concerns.map((concern) => <li key={concern}>{concern}</li>)}</ul>}
+                        </article>
+                      ))}
+                    </div>
+                    <div className="workspace-caveat">{assessmentResponse.limitations.join(' ')}</div>
+                  </section>
+                )}
+              </>
+            )}
+          </section>
+        )}
+
+        {activeView === 'math' && (
+          <section className="workspace-page">
+            <div className="page-heading">
+              <p className="card-label">MATHEMATICS & FORMAL REASONING WORKBENCH</p>
+              <h1>Run a bounded symbolic calculation</h1>
+              <p>Use the allowlisted mathematical engine for explicit expressions. Inputs are parsed as mathematical expressions, not executed as arbitrary code.</p>
+            </div>
+            <div className="workspace-two-column">
+              <section className="workspace-card">
+                <div className="section-heading"><div><p className="card-label">SYMBOLIC TOOL</p><h2>Calculation input</h2></div><span className="section-index">BOUNDED / 01</span></div>
+                <form className="workspace-form" onSubmit={runSymbolicTool}>
+                  <label htmlFor="math-operation">Operation</label>
+                  <select id="math-operation" value={mathOperation} onChange={(event) => setMathOperation(event.target.value as typeof mathOperation)}>
+                    <option value="simplify">Simplify</option>
+                    <option value="differentiate">Differentiate</option>
+                    <option value="integrate">Integrate</option>
+                    <option value="solve">Solve</option>
+                    <option value="evaluate">Evaluate</option>
+                  </select>
+                  <label htmlFor="math-expression">Expression</label>
+                  <textarea id="math-expression" rows={4} value={mathExpression} onChange={(event) => setMathExpression(event.target.value)} minLength={1} maxLength={500} required />
+                  <label htmlFor="math-variable">Variable</label>
+                  <input id="math-variable" value={mathVariable} onChange={(event) => setMathVariable(event.target.value)} minLength={1} maxLength={32} required />
+                  <div className="form-actions"><button className="primary-button" type="submit" disabled={busy !== null || !apiConfigured}>{busy === 'math' ? 'Calculating…' : 'Run calculation'}</button></div>
+                </form>
+              </section>
+              <section className="workspace-card">
+                <div className="section-heading"><div><p className="card-label">COMPUTATION RESULT</p><h2>Review output</h2></div><span className="section-index">RESULT / 01</span></div>
+                {mathResponse ? (
+                  <div className="math-result">
+                    <span className="result-chip">{mathResponse.method}</span>
+                    <p className="math-expression">{mathResponse.expression}</p>
+                    <div className="math-result-value">{mathResponse.result}</div>
+                    {mathResponse.results.length > 1 && <ul className="workspace-list">{mathResponse.results.map((item) => <li key={item}>{item}</li>)}</ul>}
+                    <p>{mathResponse.note}</p>
+                  </div>
+                ) : (
+                  <div className="empty-state"><span>∑</span><strong>No calculation yet</strong><p>Submit an expression to inspect the bounded engine output and its stated limitations.</p></div>
+                )}
+              </section>
+            </div>
+          </section>
+        )}
+
+        {activeView === 'records' && (
+          <section className="workspace-page">
+            <div className="page-heading">
+              <p className="card-label">SCIENTIFIC MEMORY FOUNDATION · RECORD STORE</p>
+              <h1>Research records</h1>
+              <p>Browse append-only research records with server-generated identifiers, timestamps and content digests.</p>
+            </div>
+            <section className="workspace-card">
+              <div className="section-heading"><div><p className="card-label">PERSISTED RECORDS</p><h2>{recordTotal} total record(s)</h2></div><button className="secondary-button" type="button" onClick={() => setRecordsRefresh((value) => value + 1)}>Refresh records</button></div>
+              {recordError && <div className="workspace-alert workspace-alert-error" role="alert">{recordError}</div>}
+              {records.length === 0 && !recordError ? (
+                <div className="empty-state"><span>▤</span><strong>No records returned</strong><p>Create a research task, save source metadata or assess hypotheses to begin a traceable record history.</p></div>
+              ) : (
+                <div className="records-table-wrap">
+                  <table className="records-table">
+                    <thead><tr><th scope="col">Type</th><th scope="col">Record</th><th scope="col">Created</th><th scope="col">Identifier</th></tr></thead>
+                    <tbody>
+                      {records.map((record) => (
+                        <tr key={record.id}>
+                          <td><span className="result-chip">{record.record_type.replaceAll('_', ' ')}</span></td>
+                          <td><strong>{recordTitle(record)}</strong></td>
+                          <td>{formatDate(record.created_at)}</td>
+                          <td><code>{record.id}</code></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              <p className="form-help">Record payloads are immutable through the public API. The content SHA-256 digest supports integrity checking; it does not verify the truth of the payload.</p>
+            </section>
+          </section>
+        )}
+
+        <footer className="page-footer">
+          <div><span className="footer-mark" /> ARTIFICIAL SCIENTIST <span className="footer-version">ASDS</span></div>
+          <p>Research-first · evidence-led · bounded autonomy · scientific claims require independent evidence and review.</p>
+        </footer>
+      </main>
+    </div>
+  )
+}
