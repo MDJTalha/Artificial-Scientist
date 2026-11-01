@@ -30,7 +30,7 @@ test.describe('research workspace', () => {
 
     await navigation.getByRole('button', { name: 'Experiment journal' }).click()
     await expect(page.getByRole('heading', { name: 'Inspect the computational evidence trail' })).toBeVisible()
-    await expect(page.getByText(/computational reproducibility/i)).toBeVisible()
+    await expect(page.getByText(/does not prove a scientific claim/i)).toBeVisible()
 
     await navigation.getByRole('button', { name: 'Scientific memory' }).click()
     await expect(page.getByRole('heading', { name: 'Maintain evidence-linked research memory' })).toBeVisible()
