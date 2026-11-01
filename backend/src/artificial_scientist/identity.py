@@ -83,7 +83,7 @@ def validate_oidc_bearer_token(
             audience=audience if audience_claim == "aud" else None,
             issuer=issuer,
             options={
-                "require": ["exp", "iat", "iss", "aud", "sub"],
+                "require": ["exp", "iat", "iss", audience_claim, "sub"],
                 "verify_signature": True,
                 "verify_exp": True,
                 "verify_iat": True,
