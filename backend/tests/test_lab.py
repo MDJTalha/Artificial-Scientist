@@ -650,82 +650,87 @@ def test_retention_purge_requires_timezone_and_bounded_limit(tmp_path) -> None:
 
 
 
-def test_lab_api_requires_constant_time_key_outside_development(monkeypatch, tmp_path) -> None:
+def test_lab_api_requires_per_user_oidc_and_tenant_membership(monkeypatch, tmp_path) -> None:
+    from artificial_scientist.authorization import TenantDirectory, stable_principal_id
+    from artificial_scientist.identity import AuthenticatedPrincipal
+
     database_path = str(tmp_path / "authenticated-lab.sqlite3")
+    principal = AuthenticatedPrincipal(
+        subject="user-123",
+        issuer="https://tenant.example/",
+        audience="https://api.example",
+    )
     monkeypatch.setattr(
         lab_routes,
         "get_settings",
         lambda: SimpleNamespace(
             environment="production",
-            lab_api_key="test-secret-value-that-is-at-least-32-chars",
             database_path=database_path,
+            oidc_issuer="https://tenant.example/",
+            oidc_audience="https://api.example",
+            oidc_jwks_url="https://tenant.example/.well-known/jwks.json",
+            oidc_audience_claim="aud",
+            oidc_token_use=None,
+            oidc_required_scope=None,
+            lab_api_key="legacy-shared-key-must-not-authenticate",
         ),
     )
+    monkeypatch.setattr(lab_routes, "validate_oidc_bearer_token", lambda *args, **kwargs: principal)
     store = LabRunStore(database_path)
-    # A valid deployment API key authenticates the legacy principal, but it must
-    # not bypass production tenant membership and role authorization.
-    from artificial_scientist.authorization import TenantDirectory
-
     directory = TenantDirectory(database_path)
-    principal_id = directory.register_principal(
-        "deployment-configured", "legacy-shared-api-key"
-    )
+    principal_id = stable_principal_id(principal.issuer, principal.subject)
+    directory.register_principal(principal.issuer, principal.subject)
     tenant_id = directory.create_tenant("test-tenant", "Test Tenant")
     directory.grant_membership(principal_id, tenant_id, "researcher")
 
     app.dependency_overrides[get_lab_store] = lambda: store
     client = TestClient(app)
-    headers = {
-        "X-Lab-API-Key": "test-secret-value-that-is-at-least-32-chars",
-        "X-Tenant-ID": tenant_id,
-    }
     try:
         assert client.get("/api/v1/lab/runs").status_code == 401
         assert client.get(
-            "/api/v1/lab/runs", headers={"X-Lab-API-Key": "wrong"}
+            "/api/v1/lab/runs",
+            headers={"X-Lab-API-Key": "legacy-shared-key-must-not-authenticate"},
         ).status_code == 401
         denied_without_tenant = client.get(
-            "/api/v1/lab/runs",
-            headers={"X-Lab-API-Key": "test-secret-value-that-is-at-least-32-chars"},
+            "/api/v1/lab/runs", headers={"Authorization": "Bearer valid-token"}
         )
-        # A valid deployment key authenticates the request but does not select
-        # an authorized tenant.
         assert denied_without_tenant.status_code == 403
-        assert (
-            denied_without_tenant.json()["detail"]
-            == "Authenticated tenant membership is required."
+        accepted = client.get(
+            "/api/v1/lab/runs",
+            headers={
+                "Authorization": "Bearer valid-token",
+                "X-Tenant-ID": tenant_id,
+            },
         )
-        accepted = client.get("/api/v1/lab/runs", headers=headers)
         assert accepted.status_code == 200
     finally:
         app.dependency_overrides.pop(get_lab_store, None)
 
 
-def test_lab_api_fails_closed_when_production_key_is_missing(monkeypatch) -> None:
+def test_lab_api_fails_closed_when_production_oidc_is_missing(monkeypatch) -> None:
     monkeypatch.setattr(
         lab_routes,
         "get_settings",
-        lambda: SimpleNamespace(environment="production", lab_api_key=None),
+        lambda: SimpleNamespace(environment="production", oidc_issuer=None,
+                                oidc_audience=None, oidc_jwks_url=None),
     )
     response = TestClient(app).get("/api/v1/lab/runs")
     assert response.status_code == 503
-    assert response.json()["detail"] == "Lab API authentication is not configured."
+    assert response.json()["detail"] == "OIDC authentication is not fully configured."
 
 
-def test_lab_api_fails_closed_when_production_key_is_too_short(monkeypatch) -> None:
+def test_lab_api_rejects_legacy_shared_key_even_when_configured(monkeypatch) -> None:
     monkeypatch.setattr(
         lab_routes,
         "get_settings",
-        lambda: SimpleNamespace(environment="production", lab_api_key="short-key"),
+        lambda: SimpleNamespace(environment="production", lab_api_key="a" * 40,
+                                oidc_issuer=None, oidc_audience=None, oidc_jwks_url=None),
     )
     response = TestClient(app).get(
-        "/api/v1/lab/runs",
-        headers={"X-Lab-API-Key": "short-key"},
+        "/api/v1/lab/runs", headers={"X-Lab-API-Key": "a" * 40}
     )
     assert response.status_code == 503
-    assert response.json()["detail"] == (
-        "Lab API authentication requires a configured key of at least 32 characters."
-    )
+    assert response.json()["detail"] == "OIDC authentication is not fully configured."
 
 
 
