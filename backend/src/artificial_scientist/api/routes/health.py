@@ -31,6 +31,16 @@ def _valid_https_endpoint(value: str | None) -> bool:
     )
 
 
+def _valid_https_origin(value: str) -> bool:
+    if not _valid_https_endpoint(value):
+        return False
+    try:
+        parsed = urlsplit(value)
+    except ValueError:
+        return False
+    return parsed.path in {"", "/"} and parsed.hostname != "*"
+
+
 def _check_database(database_path: str) -> tuple[bool, str]:
     if not database_path or database_path == ":memory:":
         return False, "A durable SQLite file path is required."
@@ -94,7 +104,7 @@ def readiness_check(response: Response) -> dict[str, object]:
         )
 
         origins_ok = bool(settings.allowed_origins) and all(
-            _valid_https_endpoint(origin) for origin in settings.allowed_origins
+            _valid_https_origin(origin) for origin in settings.allowed_origins
         )
         checks["https_cors_origins"] = origins_ok
         details["https_cors_origins"] = (
