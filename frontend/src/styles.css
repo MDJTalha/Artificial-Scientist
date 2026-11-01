@@ -612,3 +612,20 @@ h1 span { color: #82a5aa; font-weight: 430; }
   .lab-history-item { grid-template-columns: minmax(0, 1fr); }
   .lab-history-actions { justify-content: flex-start; }
 }
+
+
+/* Experiment journal and reproducibility evidence */
+.journal-detail-grid { margin-top: 13px; }
+.journal-subheading { margin: 17px 0 8px; color: #bbced3; font-size: 10px; }
+.manifest-list, .artifact-list { display: grid; gap: 7px; }
+.manifest-list > div { display: grid; grid-template-columns: minmax(90px, .8fr) minmax(0, 1.2fr); gap: 9px; padding: 8px; border-bottom: 1px solid var(--line-soft); }
+.manifest-list span, .artifact-item span { color: #7e98a2; font-size: 8px; overflow-wrap: anywhere; }
+.manifest-list code, .artifact-item code { color: #aec6c6; font-size: 8px; overflow-wrap: anywhere; }
+.artifact-item { display: grid; gap: 5px; padding: 10px; border: 1px solid var(--line); border-radius: 5px; background: rgba(5, 16, 24, .35); }
+.artifact-item strong { color: #d1e0e2; font-size: 9px; }
+.artifact-item small { color: #6f8791; font-size: 7px; overflow-wrap: anywhere; }
+.lab-history-item > div:first-child small { display: block; margin-top: 5px; color: #708994; font-size: 8px; }
+@media (max-width: 760px) {
+  .manifest-list > div { grid-template-columns: 1fr; }
+  .journal-detail-grid { margin-top: 12px; }
+}
