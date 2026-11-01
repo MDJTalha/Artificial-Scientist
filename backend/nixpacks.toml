@@ -3,8 +3,8 @@ nixPkgs = ["python312", "python312Packages.pip", "gcc"]
 
 [phases.install]
 cmds = [
-  "python3.12 -m pip install ."
+  "pip install ."
 ]
 
 [start]
-cmd = "python3.12 -m uvicorn artificial_scientist.main:app --host 0.0.0.0 --port $PORT"
+cmd = "uvicorn artificial_scientist.main:app --host 0.0.0.0 --port $PORT"
