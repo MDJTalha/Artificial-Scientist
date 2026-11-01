@@ -216,11 +216,18 @@ def create_memory_version(
     except MemoryError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
     except ValueError as error:
-        raise HTTPException(status_code=409, detail="Memory version changed concurrently.") from error
+        raise HTTPException(
+            status_code=409,
+            detail="Memory version changed concurrently.",
+        ) from error
     return _serialize(item)
 
 
-@router.post("/{key}/contradict", response_model=MemoryVersionResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/{key}/contradict",
+    response_model=MemoryVersionResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 def contradict_memory(
     request: MemoryContradictionRequest,
     key: Annotated[str, Depends(_key)],
@@ -239,7 +246,11 @@ def contradict_memory(
     return _serialize(item)
 
 
-@router.post("/{key}/rollback", response_model=MemoryVersionResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/{key}/rollback",
+    response_model=MemoryVersionResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 def rollback_memory(
     request: MemoryRollbackRequest,
     key: Annotated[str, Depends(_key)],
