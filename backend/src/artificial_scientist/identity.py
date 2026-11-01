@@ -41,6 +41,8 @@ def validate_oidc_bearer_token(
     expected_scope: str | None = None,
 ) -> AuthenticatedPrincipal:
     """Validate a signed OIDC access token using only RS256 and configured trust values."""
+    if audience_claim not in {"aud", "client_id"}:
+        raise IdentityConfigurationError("OIDC audience claim must be aud or client_id.")
     if (
         not isinstance(issuer, str)
         or not issuer.strip()
