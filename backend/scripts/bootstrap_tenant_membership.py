@@ -14,12 +14,19 @@ from artificial_scientist.authorization import TenantDirectory
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--database", required=True, help="Path to the API authorization SQLite database")
+    parser.add_argument(
+        "--database", required=True,
+        help="Path to the API authorization SQLite database",
+    )
     parser.add_argument("--issuer", required=True, help="Exact Cognito User Pool issuer URL")
     parser.add_argument("--subject", required=True, help="Verified Cognito user sub claim")
     parser.add_argument("--tenant-key", required=True, help="Operator-controlled stable tenant key")
     parser.add_argument("--tenant-name", required=True, help="Display name for the tenant")
-    parser.add_argument("--role", choices=("tenant_admin", "researcher", "viewer", "auditor"), default="tenant_admin")
+    parser.add_argument(
+        "--role",
+        choices=("tenant_admin", "researcher", "viewer", "auditor"),
+        default="tenant_admin",
+    )
     args = parser.parse_args()
 
     directory = TenantDirectory(args.database)
