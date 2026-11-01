@@ -2,6 +2,9 @@
 nixPkgs = ["python312", "python312Packages.pip", "gcc"]
 
 [phases.install]
+# Nixpacks' Python provider otherwise caches only pyproject.toml before pip install.
+# Include the package source and project README so setuptools can build the project.
+onlyIncludeFiles = ["pyproject.toml", "README.md", "src"]
 cmds = [
   "pip install ."
 ]
