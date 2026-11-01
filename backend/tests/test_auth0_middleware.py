@@ -122,3 +122,31 @@ def test_phase7_record_and_discovery_gate_is_active_outside_development(monkeypa
     for path in ("/api/v1/records", "/api/v1/discovery/decompose"):
         messages = invoke_asgi(middleware, path)
         assert response_status(messages) == 503
+
+def test_oidc_middleware_does_not_bypass_similarly_named_routes(monkeypatch):
+    monkeypatch.setattr(
+        main,
+        "get_settings",
+        lambda: SimpleNamespace(
+            environment="production",
+            oidc_issuer="https://tenant.example/",
+            oidc_audience="https://api.example",
+            oidc_jwks_url="https://tenant.example/.well-known/jwks.json",
+            oidc_audience_claim="aud",
+            oidc_token_use=None,
+            oidc_required_scope=None,
+        ),
+    )
+    called = []
+
+    async def downstream(scope, receive, send):
+        called.append(scope["path"])
+        await send({"type": "http.response.start", "status": 200, "headers": []})
+        await send({"type": "http.response.body", "body": b"ok"})
+
+    middleware = main.OIDCAuthenticationMiddleware(downstream)
+    for path in ("/api/v1/labyrinth", "/api/v1/records-export"):
+        messages = invoke_asgi(middleware, path)
+        assert response_status(messages) == 401
+    assert called == []
+
