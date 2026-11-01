@@ -6,11 +6,11 @@ The FastAPI backend is containerized, but **no remote backend has been deployed*
 
 The production deployment is deliberately blocked until the following gates are closed:
 
-1. **Identity and authorization:** configure a real OIDC issuer, audience, and JWKS endpoint; validate authentication on every non-public API route; implement the frontend authorization-code-with-PKCE login flow and bearer-token handling. The current backend has route-level protections for selected records, discovery, knowledge, and lab operations, but literature and mathematics routes are not protected by a global authentication layer. Do not expose the API to the public internet in this state.
+1. **Identity and authorization:** configure and verify a real OIDC issuer, exact API audience, and JWKS endpoint; validate authentication on every non-public `/api/v1` route; verify the frontend authorization-code-with-PKCE login flow and bearer-token handling against the deployed API. The backend now applies a global OIDC authentication middleware to non-public versioned API routes, while lab and records routers perform their own token validation and tenant-membership checks. Authentication alone is not tenant authorization: tenant-scoped authorization and negative cross-tenant tests must cover every persisted resource before public exposure.
 2. **Tenant and data isolation:** verify tenant-scoped access for every persisted resource and review cross-tenant negative tests. Existing production fail-closed guards are intentional and must not be bypassed.
 3. **Durable database:** the current persistence implementation is SQLite. The default database path is local to the container filesystem. A production service needs a supported durable database architecture, migration and rollback plan, backup/restore rehearsal, and concurrency validation. Do not put a multi-replica SQLite database on a shared network filesystem.
 4. **Deployment identity:** use a dedicated least-privilege deployment role with GitHub Actions OIDC federation. Do not use AWS root credentials or long-lived root access keys for deployment.
-5. **Operational controls:** configure TLS, exact CORS origins, secret management, logs/metrics/alerts, resource limits, vulnerability scanning, and an independently reviewed recovery procedure.
+5. **Operational controls:** configure TLS, exact CORS origins, secret management, logs/metrics/alerts, resource limits, vulnerability scanning, and an independently reviewed recovery procedure. The repository's current container/CI checks are not evidence of a live deployment; production acceptance requires a verified deployed commit, real Auth0 positive/negative tests, and database recovery evidence.
 
 ## Local container
 
