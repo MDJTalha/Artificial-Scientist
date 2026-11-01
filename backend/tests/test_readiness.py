@@ -98,3 +98,15 @@ def test_development_readiness_is_explicitly_scoped(monkeypatch):
     assert response.json()["scope"] == "core_api_configuration_and_storage"
     assert response.json()["checks"] == {"development_mode": True}
     assert "Do not expose" in response.json()["details"]["development_mode"]
+
+
+def test_readiness_rejects_wildcard_or_path_bearing_https_origins(monkeypatch, tmp_path):
+    settings = _production_settings(str(tmp_path / "wildcard-origin.sqlite3"))
+    settings.allowed_origins = ("https://*",)
+    monkeypatch.setattr(health_routes, "get_settings", lambda: settings)
+
+    with TestClient(app) as client:
+        response = client.get("/api/v1/ready")
+
+    assert response.status_code == 503
+    assert response.json()["checks"]["https_cors_origins"] is False
