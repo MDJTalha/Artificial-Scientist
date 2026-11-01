@@ -180,10 +180,10 @@ def require_tenant_access(request: Request, action: str) -> str | None:
         )
 
     tenant_id = str(parsed_tenant_id)
-    directory = TenantDirectory((
+    directory = TenantDirectory(
         getattr(settings, "database_url", None)
         or getattr(settings, "database_path", None)
-    ))
+    )
     path_params = request.path_params
     target_id = next(
         (
