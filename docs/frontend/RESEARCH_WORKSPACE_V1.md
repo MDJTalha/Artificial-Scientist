@@ -9,7 +9,7 @@ This document records what this branch introduces. It does not supersede the ext
 
 ## Delivered user-facing surfaces
 
-The previous overview-only page is replaced by a navigable React research workspace. The first nine planned capability areas now have working screens backed by existing API endpoints:
+The previous overview-only page is replaced by a navigable React research workspace. The first ten planned capability areas now have working screens backed by existing API endpoints:
 
 | Surface | Frontend behavior | API integration |
 |---|---|---|
@@ -20,11 +20,12 @@ The previous overview-only page is replaced by a navigable React research worksp
 | Hypothesis & Discovery Lab | Create deterministic directional candidate templates; perform bounded prior-work metadata screen; assess and persist candidates | \`POST /api/v1/discovery/generate\`, \`POST /api/v1/discovery/prior-work-screen\`, \`POST /api/v1/discovery/assess\` |
 | Computational Laboratory & Simulation Center | Submit bounded declarative lab runs using allowlisted operations; inspect step outcomes, hashes and run history; replay and compare outputs in development only | `POST /api/v1/lab/runs`, `GET /api/v1/lab/runs`, `GET /api/v1/lab/runs/{run_id}`, `POST /api/v1/lab/runs/{run_id}/verify` |
 | Experiment Journal & Reproducibility | Browse persisted run history; inspect run records, hashes, environment manifests and result artifacts; compare a replay; download a checksum-manifest ZIP | `GET /api/v1/lab/runs`, `GET /api/v1/lab/runs/{run_id}`, `GET /api/v1/lab/runs/{run_id}/artifacts`, `POST /api/v1/lab/runs/{run_id}/verify`, `GET /api/v1/lab/runs/{run_id}/export` |
+| Scientific Memory & Learning | Create immutable, evidence-linked versions; browse history; append contradiction and rollback versions under tenant-aware authorization | `GET /api/v1/memory`, `GET /api/v1/memory/{key}`, `POST /api/v1/memory/{key}`, `POST /api/v1/memory/{key}/contradict`, `POST /api/v1/memory/{key}/rollback` |
 | Data Analysis & Results Observatory | Calculate descriptive statistics and bounded function plots from supplied numeric inputs | `POST /api/v1/math/statistics`, `POST /api/v1/math/plot` |
 | Mathematics & Formal Reasoning Workbench | Submit bounded symbolic simplification, differentiation, integration, solving and evaluation | \`POST /api/v1/math/symbolic\` |
 | Research Records (supporting surface) | Browse paginated immutable record envelopes and their content identifiers | \`GET /api/v1/records\` |
 
-The record browser is a supporting surface rather than a claim that all 12 planned panels are complete. The initial release now contains nine implemented capability screens; several data-mutating screens remain gated in production until OIDC is connected. The knowledge-graph UI preserves the backend's distinction between proposed, reviewed, disputed and rejected relationships; creating an edge does not establish that it is true.
+The record browser is a supporting surface rather than a claim that all 12 planned panels are complete. The initial release now contains ten implemented capability screens; several data-mutating screens remain gated in production until OIDC is connected. The knowledge-graph UI preserves the backend's distinction between proposed, reviewed, disputed and rejected relationships; creating an edge does not establish that it is true.
 
 ## API client controls
 
@@ -45,6 +46,7 @@ The production API origin continues to use the existing fail-closed \`resolveApi
 - Candidate hypotheses are deterministic templates, not LLM outputs or scientific discoveries.
 - Completeness rubric scores describe required structure; they are not probabilities, confidence estimates or measures of truth.
 - Literature search retrieves bibliographic metadata only. It does not download full text, extract claims or prove novelty.
+- Scientific memory uses an append-only, tenant-scoped version store. Each new or contradictory version must reference existing research records within the same tenant; the API validates ownership before writes. Contradiction and rollback operations append versions and preserve the previous history. A linked evidence record is not automatically a verified claim.
 - Knowledge graph concepts and relationships are immutable records. Newly created concepts are proposed; newly created relationships are proposed assertions without independent source verification. Neighborhood traversal is bounded and excludes rejected edges.
 - Retrieved source records are saved as \`unassessed\`; users must inspect original material.
 - The browser client does not yet have a reviewed OIDC sign-in/session or tenant-selection adapter. In production, protected write, record, discovery and knowledge-graph operations are disabled in the UI until that adapter and a real identity provider are configured. Development-only bypasses do not imply production identity readiness.
@@ -57,7 +59,7 @@ The production API origin continues to use the existing fail-closed \`resolveApi
 ## Verification introduced
 
 - API-client unit tests cover missing configuration, unsafe paths, JSON GET/POST behavior, response errors and refusal of non-JSON success responses.
-- Playwright covers keyboard operation across the new workspaces, visible capability boundaries, knowledge-graph, computational-lab, experiment-journal and data-analysis navigation, and the research-record surface.
+- Playwright covers keyboard operation across the new workspaces, visible capability boundaries, knowledge-graph, computational-lab, experiment-journal, scientific-memory and data-analysis navigation, and the research-record surface.
 - Automated axe accessibility checks remain part of the frontend workflow.
 - Type-check, unit tests, production build, E2E, Python suites and release-gate jobs are required CI evidence for the exact branch head.
 
@@ -65,7 +67,7 @@ A passing frontend test suite verifies the interface and API-client contract. It
 
 ## Remaining frontend sequence
 
-1. Add Scientific Memory and Learning, Manuscript Studio, and Review/Governance interfaces through existing backend services and documented approval semantics.
+1. Add Scientific Manuscript & Publication Studio and Independent Review, Evaluation & Governance through the existing writing, benchmark and approval services.
 2. Add OIDC login/session and tenant selection only after selecting and configuring a real provider; never replace identity with a client-side role selector.
 3. Complete real browser acceptance for each role and protected API operation; add end-to-end tests with isolated test identities and tenant fixtures.
 4. Add a provider-independent AI model gateway only after provider choice, data-governance and operating-cost approval.
