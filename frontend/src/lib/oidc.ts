@@ -330,7 +330,20 @@ async function validateIdToken(
   if (!validSignature) throw new Error("ID token signature validation failed.")
 }
 
-export async function completeOidcCallback(
+let callbackInFlight: Promise<OidcTokenResult | null> | null = null
+
+export function completeOidcCallback(
+  search: string,
+  config: OidcClientConfiguration,
+): Promise<OidcTokenResult | null> {
+  if (callbackInFlight) return callbackInFlight
+  callbackInFlight = processOidcCallback(search, config).finally(() => {
+    callbackInFlight = null
+  })
+  return callbackInFlight
+}
+
+async function processOidcCallback(
   search: string,
   config: OidcClientConfiguration,
 ): Promise<OidcTokenResult | null> {
