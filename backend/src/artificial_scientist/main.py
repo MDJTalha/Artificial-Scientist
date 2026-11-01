@@ -38,8 +38,20 @@ class CognitoAuthenticationMiddleware:
             await self.app(scope, receive, send)
             return
         path = scope.get("path", "")
-        public_paths = {"/api/v1/health", "/api/v1/ready"}
-        if not path.startswith("/api/v1/") or path in public_paths:
+        public_paths = {"/api/v1/health", "/api/v1/ready", "/api/v1/knowledge/vocabulary"}
+        route_guarded_prefixes = (
+            "/api/v1/lab/",
+            "/api/v1/records/",
+            "/api/v1/knowledge/",
+            "/api/v1/literature/",
+            "/api/v1/discovery/",
+            "/api/v1/autonomy/",
+        )
+        if (
+            not path.startswith("/api/v1/")
+            or path in public_paths
+            or path.startswith(route_guarded_prefixes)
+        ):
             await self.app(scope, receive, send)
             return
         settings = get_settings()
