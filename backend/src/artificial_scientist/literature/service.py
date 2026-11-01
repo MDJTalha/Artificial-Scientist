@@ -168,7 +168,9 @@ class LiteratureService:
         if incoming.doi:
             existing.source_url = incoming.source_url
 
-    def search(self, request: LiteratureSearchRequest) -> LiteratureSearchResponse:
+    def search(
+        self, request: LiteratureSearchRequest, *, tenant_id: str | None = None
+    ) -> LiteratureSearchResponse:
         """Search the selected providers, deduplicate works, and optionally persist metadata."""
         provider_map = {
             "openalex": OpenAlexProvider(),
@@ -258,12 +260,12 @@ class LiteratureService:
                     item, query=request.query, retrieved_at=retrieved_at
                 )
                 try:
-                    existing_record = self.store.find_source_by_identity(source_record)
+                    existing_record = self.store.find_source_by_identity(source_record, tenant_id=tenant_id)
                     if existing_record is None:
                         try:
-                            saved = self.store.create(source_record)
+                            saved = self.store.create(source_record, tenant_id=tenant_id)
                         except DuplicateSource as duplicate:
-                            saved = self.store.get(duplicate.existing_record_id)
+                            saved = self.store.get(duplicate.existing_record_id, tenant_id=tenant_id)
                         item.saved_record_id = saved.id
                     else:
                         item.saved_record_id = existing_record.id
