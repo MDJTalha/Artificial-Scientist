@@ -16,10 +16,91 @@ from artificial_scientist.api.routes.math_tools import router as math_tools_rout
 from artificial_scientist.api.routes.records import router as records_router
 from artificial_scientist.authorization import TenantDirectory
 from artificial_scientist.config import get_settings
+from artificial_scientist.identity import (
+    IdentityConfigurationError,
+    InvalidIdentityError,
+    validate_oidc_bearer_token,
+)
 
 settings = get_settings()
 LAB_RUN_BODY_LIMIT_BYTES = 64 * 1024
 DISCOVERY_BODY_LIMIT_BYTES = 1024 * 1024
+
+
+class CognitoAuthenticationMiddleware:
+    """Require a configured OIDC access token on every non-public API route."""
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope.get("type") != "http":
+            await self.app(scope, receive, send)
+            return
+        path = scope.get("path", "")
+        public_paths = {"/api/v1/health", "/api/v1/ready"}
+        if not path.startswith("/api/v1/") or path in public_paths:
+            await self.app(scope, receive, send)
+            return
+        settings = get_settings()
+        if settings.environment.lower() == "development":
+            await self.app(scope, receive, send)
+            return
+        if not all((settings.oidc_issuer, settings.oidc_audience, settings.oidc_jwks_url)):
+            await self._reject(send, 503, "OIDC authentication is not fully configured.")
+            return
+        headers = {key.lower(): value for key, value in scope.get("headers", [])}
+        authorization = headers.get(b"authorization", b"").decode("latin-1")
+        if not authorization.startswith("Bearer "):
+            await self._reject(
+                send, 401, "Valid bearer token required.",
+                extra_headers=[(b"www-authenticate", b"Bearer")],
+            )
+            return
+        token = authorization.removeprefix("Bearer ").strip()
+        if not token or any(character.isspace() for character in token):
+            await self._reject(
+                send, 401, "Valid bearer token required.",
+                extra_headers=[(b"www-authenticate", b"Bearer")],
+            )
+            return
+        try:
+            principal = validate_oidc_bearer_token(
+                token,
+                issuer=settings.oidc_issuer,
+                audience=settings.oidc_audience,
+                jwks_url=settings.oidc_jwks_url,
+                audience_claim=settings.oidc_audience_claim,
+                expected_token_use=settings.oidc_token_use,
+            )
+        except IdentityConfigurationError:
+            await self._reject(send, 503, "OIDC authentication configuration is invalid.")
+            return
+        except InvalidIdentityError:
+            await self._reject(
+                send, 401, "Bearer token validation failed.",
+                extra_headers=[(b"www-authenticate", b"Bearer")],
+            )
+            return
+        state = scope.setdefault("state", {})
+        state["authenticated_principal"] = principal
+        await self.app(scope, receive, send)
+
+    @staticmethod
+    async def _reject(
+        send: Send, status_code: int, detail: str,
+        extra_headers: list[tuple[bytes, bytes]] | None = None,
+    ) -> None:
+        import json
+        body = json.dumps({"detail": detail}, separators=(",", ":")).encode("utf-8")
+        headers = [
+            (b"content-type", b"application/json"),
+            (b"content-length", str(len(body)).encode("ascii")),
+            (b"cache-control", b"no-store"),
+            *(extra_headers or []),
+        ]
+        await send({"type": "http.response.start", "status": status_code, "headers": headers})
+        await send({"type": "http.response.body", "body": body})
 
 
 class Phase7RecordIsolationGateMiddleware:
@@ -278,6 +359,7 @@ app = FastAPI(
     ),
 )
 app.add_middleware(LabRequestBodyLimitMiddleware)
+app.add_middleware(CognitoAuthenticationMiddleware)
 app.add_middleware(LabSecurityAuditMiddleware, database_path=settings.database_path)
 
 app.add_middleware(
