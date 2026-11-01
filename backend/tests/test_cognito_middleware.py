@@ -1,14 +1,12 @@
 """Tests for the global Cognito authentication boundary."""
 
+import asyncio
 from types import SimpleNamespace
-
-import pytest
 
 from artificial_scientist import main
 
 
-@pytest.mark.asyncio
-async def test_cognito_middleware_rejects_missing_bearer_token(monkeypatch):
+def test_cognito_middleware_rejects_missing_bearer_token(monkeypatch):
     monkeypatch.setattr(
         main,
         "get_settings",
@@ -34,18 +32,17 @@ async def test_cognito_middleware_rejects_missing_bearer_token(monkeypatch):
         sent.append(message)
 
     middleware = main.CognitoAuthenticationMiddleware(app)
-    await middleware(
+    asyncio.run(middleware(
         {"type": "http", "path": "/api/v1/math/units", "headers": []},
         receive,
         send,
-    )
+    ))
 
     assert sent[0]["status"] == 401
     assert (b"www-authenticate", b"Bearer") in sent[0]["headers"]
 
 
-@pytest.mark.asyncio
-async def test_cognito_middleware_leaves_health_public_and_validates_protected_route(monkeypatch):
+def test_cognito_middleware_leaves_health_public_and_validates_protected_route(monkeypatch):
     principal = SimpleNamespace(subject="sub-1", issuer="https://issuer.example", audience="client")
     settings = SimpleNamespace(
         environment="production",
@@ -79,7 +76,7 @@ async def test_cognito_middleware_leaves_health_public_and_validates_protected_r
 
     middleware = main.CognitoAuthenticationMiddleware(app)
     health_scope = {"type": "http", "path": "/api/v1/health", "headers": []}
-    await middleware(health_scope, receive, send)
+    asyncio.run(middleware(health_scope, receive, send))
     assert health_scope in reached
     assert not calls
 
@@ -88,7 +85,7 @@ async def test_cognito_middleware_leaves_health_public_and_validates_protected_r
         "path": "/api/v1/math/units",
         "headers": [(b"authorization", b"Bearer valid-token")],
     }
-    await middleware(protected_scope, receive, send)
+    asyncio.run(middleware(protected_scope, receive, send))
     assert protected_scope in reached
     assert protected_scope["state"]["authenticated_principal"] is principal
     assert calls[0][0] == "valid-token"
