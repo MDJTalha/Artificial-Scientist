@@ -27,8 +27,8 @@ class AiCapabilityResponse(BaseModel):
     provider: str | None = None
     model: str | None = None
     max_output_tokens: int
-    daily_request_limit: int
-    daily_token_budget: int
+    daily_request_limit: int = 0
+    daily_token_budget: int = 0
     requires_human_review: bool = True
     note: str
 
@@ -79,8 +79,8 @@ def _capabilities() -> AiCapabilityResponse:
         provider=config.provider,
         model=config.model,
         max_output_tokens=config.max_output_tokens,
-        daily_request_limit=int(settings.model_daily_request_limit),
-        daily_token_budget=int(settings.model_daily_token_budget),
+        daily_request_limit=int(getattr(settings, 'model_daily_request_limit', '20')),
+        daily_token_budget=int(getattr(settings, 'model_daily_token_budget', '20000')),
         note=(
             "A manually invoked model can draft research assistance only. It does not "
             "retrieve evidence, validate claims, establish novelty or authorize experiments."
@@ -112,18 +112,28 @@ def generate_ai_assistance(
     settings = get_settings()
     try:
         gateway_config = resolve_model_gateway_config(settings)
-        if gateway_config is None:
-            raise ModelGatewayUnavailable('AI inference is not configured by the operator.')
-        if payload.max_output_tokens > gateway_config.max_output_tokens:
-            raise ValueError(
-                'Requested output tokens exceed the operator-configured model token cap.'
-            )
-        daily_request_limit = int(settings.model_daily_request_limit)
-        daily_token_budget = int(settings.model_daily_token_budget)
+    except ModelGatewayUnavailable as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(error),
+        ) from error
+    if gateway_config is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="AI inference is not configured by the operator.",
+        )
+    if payload.max_output_tokens > gateway_config.max_output_tokens:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Requested output tokens exceed the operator-configured model token cap.",
+        )
+    try:
+        daily_request_limit = int(getattr(settings, "model_daily_request_limit", "20"))
+        daily_token_budget = int(getattr(settings, "model_daily_token_budget", "20000"))
     except (ValueError, TypeError) as error:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail='Model gateway or budget configuration is invalid.',
+            detail="Model budget configuration is invalid.",
         ) from error
 
     budget_store = AiInvocationBudgetStore(settings.database_path)
