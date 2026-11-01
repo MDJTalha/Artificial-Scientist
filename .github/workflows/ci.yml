@@ -85,6 +85,10 @@ jobs:
           python -m pip install -e ".[dev]"
       - name: Apply PostgreSQL schema migrations
         run: alembic upgrade head
+      - name: Verify PostgreSQL migration rollback and re-application
+        run: |
+          alembic downgrade base
+          alembic upgrade head
       - name: Verify PostgreSQL connection, migrations and readiness
         run: pytest tests/test_postgresql_integration.py
 
