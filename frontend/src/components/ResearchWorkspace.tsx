@@ -309,7 +309,6 @@ const workspaceRoadmap = [
   { name: 'Experiment Journal & Reproducibility', status: 'AVAILABLE / DEV ONLY', note: 'Browse run history, hashes and artifacts; replay and export remain disabled in production pending identity and sandbox review.' },
   { name: 'Scientific Memory & Learning', status: 'AVAILABLE / TENANT GATED', note: 'Evidence-linked versioning, contradiction tracking and rollback; protected access requires identity integration.' },
   { name: 'Scientific Manuscript & Publication Studio', status: 'AVAILABLE / DRAFT ONLY', note: 'Claim-to-source citation mapping and persistent drafts; external submission is disabled.' },
-  { name: 'Scientific Manuscript & Publication Studio', status: 'BACKEND READY / UI NEXT', note: 'Evidence-linked writing; external submission stays gated.' },
   { name: 'Independent Review, Evaluation & Governance', status: 'NEXT', note: 'Review queues, benchmark evidence and approvals.' },
 ]
 
