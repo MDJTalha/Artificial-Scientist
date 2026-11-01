@@ -1,0 +1,101 @@
+name: Deploy ASDS backend to ECS
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: asds-backend-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 30
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      AWS_DEPLOY_ROLE_ARN: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+      ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
+      ECS_CLUSTER: ${{ vars.ECS_CLUSTER }}
+      ECS_SERVICE: ${{ vars.ECS_SERVICE }}
+      ECS_TASK_DEFINITION_FAMILY: ${{ vars.ECS_TASK_DEFINITION_FAMILY }}
+      ECS_CONTAINER_NAME: ${{ vars.ECS_CONTAINER_NAME }}
+    steps:
+      - name: Check out release source
+        uses: actions/checkout@v4
+
+      - name: Validate deployment configuration
+        run: |
+          for name in AWS_REGION AWS_DEPLOY_ROLE_ARN ECR_REPOSITORY ECS_CLUSTER ECS_SERVICE ECS_TASK_DEFINITION_FAMILY ECS_CONTAINER_NAME; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Missing GitHub production variable: $name"
+              exit 1
+            fi
+          done
+
+      - name: Configure short-lived AWS credentials through GitHub OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: ASDSBackendDeploy
+
+      - name: Reject root or user-key deployment identity
+        run: |
+          ARN="$(aws sts get-caller-identity --query Arn --output text)"
+          case "$ARN" in
+            arn:aws:sts::*:assumed-role/ASDS-GitHubActions-BackendDeploy/*) ;;
+            *) echo "::error::Unexpected AWS deployment identity: $ARN"; exit 1 ;;
+          esac
+
+      - name: Authenticate to Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push immutable backend image
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          IMAGE="$REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+          docker build --pull --tag "$IMAGE" ./backend
+          docker push "$IMAGE"
+          echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
+
+      - name: Render a new task-definition revision
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition "$ECS_TASK_DEFINITION_FAMILY" \
+            --query taskDefinition > task-definition.json
+          jq --arg container "$ECS_CONTAINER_NAME" --arg image "$IMAGE" '
+            if any(.containerDefinitions[]; .name == $container)
+            then (.containerDefinitions[] | select(.name == $container).image) = $image
+            else error("Configured container name is absent from the task definition")
+            end
+            | del(.taskDefinitionArn,.revision,.status,.requiresAttributes,.compatibilities,.registeredAt,.registeredBy)
+          ' task-definition.json > rendered-task-definition.json
+
+      - name: Register and deploy ECS task definition
+        id: deploy
+        run: |
+          TASK_ARN="$(aws ecs register-task-definition \
+            --cli-input-json file://rendered-task-definition.json \
+            --query 'taskDefinition.taskDefinitionArn' --output text)"
+          aws ecs update-service \
+            --cluster "$ECS_CLUSTER" \
+            --service "$ECS_SERVICE" \
+            --task-definition "$TASK_ARN" >/dev/null
+          echo "task_definition=$TASK_ARN" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for ECS service stability
+        run: |
+          aws ecs wait services-stable --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE"
+          aws ecs describe-services \
+            --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE" \
+            --query 'services[0].{status:status,running:runningCount,desired:desiredCount,taskDefinition:taskDefinition}' \
+            --output table
