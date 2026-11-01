@@ -66,6 +66,8 @@ def test_oidc_middleware_protects_literature_and_discovery_routes(monkeypatch):
         "/api/v1/literature/search",
         "/api/v1/discovery/decompose",
         "/api/v1/autonomy/workflows",
+        "/api/v1/knowledge/concepts",
+        "/api/v1/math/units",
     )
     for path in protected_paths:
         messages = invoke_asgi(middleware, path)
