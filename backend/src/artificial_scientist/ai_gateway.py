@@ -216,7 +216,8 @@ def generate_research_assistance(
         raise ModelGatewayUnavailable("Model provider redirects are not accepted.")
     if response.status_code < 200 or response.status_code >= 300:
         raise ModelGatewayUnavailable(
-            f"Model provider returned HTTP {response.status_code}; provider response body is not exposed."
+            f"Model provider returned HTTP {response.status_code}; "
+            "provider response body is not exposed."
         )
     if len(response.content) > MAX_RESPONSE_BYTES:
         raise ModelGatewayInvalidResponse("Model provider response exceeds the 64 KiB limit.")
