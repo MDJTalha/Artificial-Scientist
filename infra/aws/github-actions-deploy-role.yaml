@@ -14,6 +14,9 @@ Parameters:
   DeploymentBranch:
     Type: String
     Default: main
+  DeploymentEnvironment:
+    Type: String
+    Default: production
   EcrRepositoryName:
     Type: String
     Default: asds-backend
@@ -44,8 +47,8 @@ Resources:
             Condition:
               StringEquals:
                 token.actions.githubusercontent.com:aud: sts.amazonaws.com
-              StringLike:
-                token.actions.githubusercontent.com:sub: !Sub "repo:${RepositoryOwner}/${RepositoryName}:ref:refs/heads/${DeploymentBranch}"
+                token.actions.githubusercontent.com:sub: !Sub "repo:${RepositoryOwner}/${RepositoryName}:environment:${DeploymentEnvironment}"
+                token.actions.githubusercontent.com:ref: !Sub "refs/heads/${DeploymentBranch}"
       Policies:
         - PolicyName: ASDS-ECR-Push-And-ECS-Update
           PolicyDocument:
@@ -91,4 +94,4 @@ Outputs:
   DeploymentRoleArn:
     Value: !GetAtt AsdsGitHubDeployRole.Arn
   TrustSubject:
-    Value: !Sub "repo:${RepositoryOwner}/${RepositoryName}:ref:refs/heads/${DeploymentBranch}"
+    Value: !Sub "repo:${RepositoryOwner}/${RepositoryName}:environment:${DeploymentEnvironment}"
