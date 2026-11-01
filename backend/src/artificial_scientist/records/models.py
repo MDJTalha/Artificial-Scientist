@@ -362,8 +362,7 @@ RecordInput = Annotated[
     | ReviewRecord
     | ApprovalRequestRecord
     | KnowledgeConceptRecord
-    | KnowledgeRelationshipRecord
-    | ManuscriptRecord,
+    | KnowledgeRelationshipRecord,
     Field(discriminator="record_type"),
 ]
 
