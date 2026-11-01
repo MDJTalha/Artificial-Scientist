@@ -52,6 +52,15 @@ def test_alembic_schema_and_append_only_guards_are_installed(database_url: str) 
         "asds_tenants",
         "asds_memberships",
         "asds_security_audit",
+        "autonomy_workflows",
+        "autonomy_transitions",
+        "autonomy_checkpoints",
+        "autonomy_memory",
+        "lab_runs",
+        "lab_execution_attempts",
+        "lab_artifacts",
+        "lab_binary_artifacts",
+        "lab_run_retention_events",
         "alembic_version",
     }
     assert expected.issubset(set(inspect(engine).get_table_names()))
@@ -70,7 +79,14 @@ def test_alembic_schema_and_append_only_guards_are_installed(database_url: str) 
         "audit_events_append_only",
         "source_identity_append_only",
         "asds_security_audit_append_only",
+        "autonomy_transitions_append_only",
+        "autonomy_checkpoints_append_only",
+        "autonomy_memory_append_only",
+        "lab_run_retention_events_append_only",
     }.issubset(triggers)
+    # Lab artifacts are retention-managed; blocking DELETE would break the audited cascade.
+    assert "lab_artifacts_append_only" not in triggers
+    assert "lab_binary_artifacts_append_only" not in triggers
 
 
 
